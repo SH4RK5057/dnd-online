@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { Container } from 'pixi.js'
 import { useSession } from '../session/useSession'
+import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useWalls } from '../map/useWalls'
 import { useLights } from '../map/useLights'
 import { useAssetUrl } from '../map/assetSync'
+import { PERSONAL_VISION_RADIUS_CELLS, MAX_VISION_RADIUS_CELLS } from '../map/constants'
 import { usePixiApp } from './usePixiApp'
 import { MapLayer } from './MapLayer'
 import { GridLayer } from './GridLayer'
 import { TokenLayer } from './TokenLayer'
 import { WallLayer } from './WallLayer'
 import { LightLayer } from './LightLayer'
+import { FogLayer } from './FogLayer'
 import type { ToolMode } from './interactionMode'
 
 export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
@@ -30,35 +33,42 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
   const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
 
   const worldRef = useRef<Container | null>(null)
+  const fogTargetRef = useRef<Container | null>(null)
   const mapLayerRef = useRef<MapLayer | null>(null)
   const gridLayerRef = useRef<GridLayer | null>(null)
   const tokenLayerRef = useRef<TokenLayer | null>(null)
   const wallLayerRef = useRef<WallLayer | null>(null)
   const lightLayerRef = useRef<LightLayer | null>(null)
+  const fogLayerRef = useRef<FogLayer | null>(null)
 
-  // Build the layer graph once the Pixi app is ready.
+  // Build the layer graph once the Pixi app is ready. fogTarget wraps
+  // map+grid+token so FogLayer's mask can apply to all three at once,
+  // without affecting the wall/light editing layers (the DM must always see
+  // those un-fogged — moot anyway since fog only ever applies to players).
   useEffect(() => {
     if (!app) return
 
     const world = new Container()
+    const fogTarget = new Container()
     const mapLayer = new MapLayer()
     const gridLayer = new GridLayer()
     const tokenLayer = new TokenLayer()
     const wallLayer = new WallLayer()
     const lightLayer = new LightLayer()
-    world.addChild(mapLayer.container)
-    world.addChild(gridLayer.container)
-    world.addChild(tokenLayer.container)
-    world.addChild(wallLayer.container)
-    world.addChild(lightLayer.container)
+    const fogLayer = new FogLayer()
+
+    fogTarget.addChild(mapLayer.container, gridLayer.container, tokenLayer.container)
+    world.addChild(fogTarget, wallLayer.container, lightLayer.container, fogLayer.mask)
     app.stage.addChild(world)
 
     worldRef.current = world
+    fogTargetRef.current = fogTarget
     mapLayerRef.current = mapLayer
     gridLayerRef.current = gridLayer
     tokenLayerRef.current = tokenLayer
     wallLayerRef.current = wallLayer
     lightLayerRef.current = lightLayer
+    fogLayerRef.current = fogLayer
 
     return () => {
       mapLayer.destroy()
@@ -66,13 +76,16 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
       tokenLayer.destroy()
       wallLayer.destroy()
       lightLayer.destroy()
+      fogLayer.destroy()
       world.destroy()
       worldRef.current = null
+      fogTargetRef.current = null
       mapLayerRef.current = null
       gridLayerRef.current = null
       tokenLayerRef.current = null
       wallLayerRef.current = null
       lightLayerRef.current = null
+      fogLayerRef.current = null
     }
   }, [app])
 
@@ -137,6 +150,34 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
       onDeleteLight: deleteLight,
     })
   }, [lights, tokens, activeScene, mapSize, isDm, toolMode, createLight, moveLight, detachLight, deleteLight])
+
+  // Update fog. DM always sees everything (no mask); players get one only
+  // when the scene has fog enabled and the map is loaded.
+  useEffect(() => {
+    if (!app || !fogTargetRef.current || !fogLayerRef.current || !activeScene || !mapSize) return
+    const fogTarget = fogTargetRef.current
+    const fogLayer = fogLayerRef.current
+
+    if (isDm || !activeScene.fogEnabled) {
+      fogTarget.mask = null
+      return
+    }
+
+    const myPlayerId = getOrCreatePlayerId()
+    const ownTokenIds = tokens.filter((t) => t.ownerId === myPlayerId).map((t) => t.id)
+
+    fogLayer.update(app.renderer, {
+      walls,
+      lights,
+      tokens,
+      gridSizePx: activeScene.gridSizePx,
+      mapSize,
+      ownTokenIds,
+      personalVisionRadiusCells: PERSONAL_VISION_RADIUS_CELLS,
+      maxVisionRadiusCells: MAX_VISION_RADIUS_CELLS,
+    })
+    fogTarget.mask = fogLayer.mask
+  }, [app, activeScene, mapSize, isDm, walls, lights, tokens])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />
 }
