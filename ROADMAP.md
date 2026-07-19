@@ -32,13 +32,29 @@ character sheets, dice, and rules content.
 This stack is 100% JS/TS, runs in the browser, and every dependency has a free tier
 or is fully open-source — nothing here requires a credit card.
 
-## Why this order (hardest-first)
+## Why this order (hardest-first, then dependency order)
 
 The riskiest, most architecturally load-bearing piece is **getting the DM's
 machine and players' browsers talking to each other reliably with no paid
 server in the middle.** Everything else (rendering, sheets, content) is more
-tractable and easier to de-risk later. So networking comes first, even before
-anything is visually impressive.
+tractable and easier to de-risk later. So networking (Phase 1), the map/token
+engine (Phase 2), and fog/lighting (Phase 3) come first, even before anything
+visually impressive on the character/rules side exists.
+
+From Phase 4 on, the order follows what each phase actually needs to exist
+first, not difficulty:
+- **Phase 4** (sheets, dice, initiative) has no dependency on rules content —
+  you can run a real session on manually-entered stats alone — so it ships
+  before the content pipeline.
+- **Phase 5** (5etools content) comes next because Phase 6's encounter
+  builder and Phase 4's monster-stat-block dragging both need a source of
+  monster/spell/item data to be useful, not just a UI shell.
+- **Phase 6** (DM tools) leans on both: initiative (4) and monster data (5).
+- **Phase 7** (player tools) leans on Phase 4 (inventory needs a character
+  sheet to attach to; private/public rolls need the dice roller) — it's
+  scheduled after the DM-facing tools since this is a DM-hosted app where DM
+  tooling amplifies every session, but nothing in it blocks on Phase 5/6.
+- **Phase 8** is explicitly speculative/stretch, so it's always last.
 
 ---
 
@@ -99,9 +115,9 @@ Surfaced playtesting Phase 3. Complete.
 ## Phase 4 — Character sheets, dice, initiative
 - [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)
 - [ ] Dice roller: standard notation, advantage/disadvantage, macros
-- [ ] Roll results broadcast to shared chat/log
+- [ ] Roll results broadcast to a shared roll log (its own simple feed —
+      doesn't depend on Phase 7's full IC/OOC text chat)
 - [ ] Initiative tracker / turn order, HP and status/condition tracking on tokens
-- [ ] NPC/monster stat blocks the DM can drag onto the map
 
 ## Phase 5 — 5etools content integration
 - [ ] **Confirm what's actually redistributable** from 5etools' data (it's
@@ -118,6 +134,8 @@ Surfaced playtesting Phase 3. Complete.
 
 ## Phase 6 — DM tools
 - [ ] Encounter builder (assemble monsters, auto-populate initiative)
+- [ ] NPC/monster stat blocks the DM can drag onto the map (pulls from the
+      Phase 5 content lookup, or a homebrew entry, into the encounter builder)
 - [ ] Hidden DM notes / session journal
 - [ ] Handouts (share an image/doc to players on demand)
 - [ ] Random generators (loot, NPC names)
@@ -129,7 +147,7 @@ Surfaced playtesting Phase 3. Complete.
       new server-storage surface, matches the DM-hosted decision in Phase 1.
 
 ## Phase 7 — Player tools & polish
-- [ ] Personal inventory management, spell slot tracking
+- [ ] Personal inventory management, spell slot/resource tracking
 - [ ] Private vs. public rolls
 - [ ] Built-in text chat (IC/OOC channels), map pings/emotes, and temporary
       annotations/drawing on the map
@@ -148,11 +166,11 @@ Surfaced playtesting Phase 3. Complete.
 ## Full feature backlog (unsorted reference)
 
 Kept here so nothing gets lost even before it's scheduled into a phase above.
+Pruned periodically as items get scheduled into a phase or turn out to
+already be covered by something shipped.
 
-**Core infra:** accounts/session roles (DM vs player), campaign save/load (see
-Phase 6 — local file only, not server-hosted)
-**Maps:** custom uploads, hex grid option, drawing/measurement tools, ruler, pings
-**Tokens:** status icons, HP bars, resource tracking
-**Rules:** automated attack/save/damage resolution, system-agnostic core
-**Communication:** roll history log, OOC/IC channel split
+**Core infra:** campaign save/load (see Phase 6 — local file only, not
+server-hosted)
+**Maps:** drawing/measurement tools, ruler
+**Rules:** automated attack/save/damage resolution
 **Technical:** desktop-app packaging (Electron) if browser-only proves limiting
