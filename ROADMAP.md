@@ -60,10 +60,10 @@ anything is visually impressive.
 - [x] Multiple scenes per campaign, DM can switch active scene
 
 ## Phase 3 — Fog of war & dynamic lighting
-- [ ] Wall/obstruction drawing tool for the DM
-- [ ] Line-of-sight-based fog of war (players only see what their token can see)
-- [ ] Dynamic light sources (torches, spells) affecting visibility
-- [ ] GM-only reveal/hide controls
+- [x] Wall/obstruction drawing tool for the DM
+- [x] Line-of-sight-based fog of war (players only see what their token can see)
+- [x] Dynamic light sources (torches, spells) affecting visibility
+- [x] GM-only reveal/hide controls
 
 ## Phase 4 — Character sheets, dice, initiative
 - [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)
