@@ -3,6 +3,41 @@
   max-width: 480px;
 }
 
+.session-screen__notice {
+  padding: 12px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.token-owner-assign {
+  margin-bottom: 24px;
+}
+
+.token-owner-assign__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.token-owner-assign__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.token-owner-assign__item select {
+  width: auto;
+  flex: 0 1 200px;
+}
+
 .landing-screen__actions,
 .setup-screen__actions {
   display: flex;
