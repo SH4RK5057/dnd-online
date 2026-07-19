@@ -1,0 +1,139 @@
+.landing-screen__actions,
+.setup-screen__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.landing-screen__resume {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.setup-screen form {
+  display: flex;
+  flex-direction: column;
+}
+
+.setup-screen__error {
+  color: var(--danger);
+  font-size: 14px;
+  margin: 12px 0 0;
+}
+
+.session-screen__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.session-screen__header h1 {
+  margin: 0;
+}
+
+.session-screen__code {
+  margin-bottom: 24px;
+}
+
+.session-screen__peers {
+  margin-bottom: 24px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.status-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text);
+}
+
+.status-badge--connected .status-badge__dot {
+  background: var(--ok);
+}
+
+.status-badge--connecting .status-badge__dot,
+.status-badge--reconnecting .status-badge__dot {
+  background: var(--accent);
+}
+
+.status-badge--failed .status-badge__dot {
+  background: var(--danger);
+}
+
+.peer-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.peer-list__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.peer-list__role {
+  font-size: 13px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.peer-list__state {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.peer-list__empty {
+  color: var(--text);
+  font-style: italic;
+}
+
+.copy-join-code__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.copy-join-code__code {
+  font-family: var(--mono);
+  font-size: 24px;
+  letter-spacing: 2px;
+  padding: 4px 12px;
+  background: var(--code-bg);
+  border-radius: 6px;
+}
+
+.copy-join-code__link {
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.connection-error-panel {
+  padding: 16px;
+  border: 1px solid var(--danger);
+  background: var(--danger-bg);
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.connection-error-panel p {
+  margin-bottom: 12px;
+}

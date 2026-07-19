@@ -1,0 +1,113 @@
+# D&D Online — Project Roadmap
+
+A web-based virtual tabletop (VTT) for playing D&D 5e (and similar systems) remotely.
+DM hosts a session from their own machine; players join with a code. Voice happens
+externally (Discord/Google Meet); this app handles the game itself — maps, tokens,
+character sheets, dice, and rules content.
+
+## Decisions locked in (2026-07-18)
+
+- **Hosting model:** DM-hosted. The DM's machine is the authoritative source of
+  truth for a campaign; players connect to it directly, not to a always-on cloud
+  server. No hosting bills, but the game only runs while the DM is online.
+- **Voice/video:** Out of scope — use Discord or Google Meet alongside the app.
+  Built-in text chat is in scope.
+- **Budget:** Free. Every piece of the stack must have a no-cost tier that's good
+  enough for a friend-group-sized game (handful of players per session).
+- **Content:** Pull rules/monster/spell/item data from 5etools where licensing
+  allows; support homebrew content as a fallback/complement.
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Frontend framework | React + TypeScript (Vite) | Free, huge ecosystem, fast dev loop |
+| Map/canvas rendering | PixiJS (WebGL) | Free, fast enough for tokens + fog + lighting at battle-map scale |
+| Shared state / sync | Yjs (CRDT) | Free, open-source; gives conflict-free shared state (token positions, fog, initiative) essentially for free instead of hand-rolling a sync protocol |
+| Networking transport | WebRTC via `y-webrtc`, DM's client as host | Peer-to-peer — no always-on server to pay for or maintain |
+| Signaling (room codes / connection setup) | Small Node.js WS relay, deployed free (Render/Fly.io free tier) | WebRTC still needs a rendezvous point to exchange connection info before peers can talk directly |
+| Local persistence | IndexedDB via `y-indexeddb` | Campaign data lives on the DM's machine, survives restarts, no cloud DB needed |
+| Character sheets / rules data | JSON schema, sourced from 5etools data where license allows | Need to confirm 5etools data licensing before building around it (see Phase 5) |
+
+This stack is 100% JS/TS, runs in the browser, and every dependency has a free tier
+or is fully open-source — nothing here requires a credit card.
+
+## Why this order (hardest-first)
+
+The riskiest, most architecturally load-bearing piece is **getting the DM's
+machine and players' browsers talking to each other reliably with no paid
+server in the middle.** Everything else (rendering, sheets, content) is more
+tractable and easier to de-risk later. So networking comes first, even before
+anything is visually impressive.
+
+---
+
+## Phase 1 — Networking & session hosting (hardest, do first)
+- [x] DM can start a session and get a shareable join code
+- [x] Players can join via code, WebRTC connection established DM ↔ each player
+- [ ] Signaling relay deployed (free tier) to bootstrap connections — code is deploy-ready
+      (`server/README.md`), actual Render/Fly.io deploy is a manual step for you
+- [x] Shared session state synced via Yjs over the WebRTC data channel
+- [x] Reconnect handling (player drops wifi, DM restarts app, etc.)
+- [x] Fallback/error messaging when a connection can't be established (strict NAT/firewall)
+
+## Phase 2 — Core map & token engine
+- [ ] DM uploads a custom map image
+- [ ] Grid overlay (square, snap-to-grid), configurable grid size
+- [ ] Token placement, custom token art upload, drag-to-move
+- [ ] Token size scaling by creature size category
+- [ ] Token moves sync live to all connected players
+- [ ] Multiple scenes per campaign, DM can switch active scene
+
+## Phase 3 — Fog of war & dynamic lighting
+- [ ] Wall/obstruction drawing tool for the DM
+- [ ] Line-of-sight-based fog of war (players only see what their token can see)
+- [ ] Dynamic light sources (torches, spells) affecting visibility
+- [ ] GM-only reveal/hide controls
+
+## Phase 4 — Character sheets, dice, initiative
+- [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)
+- [ ] Dice roller: standard notation, advantage/disadvantage, macros
+- [ ] Roll results broadcast to shared chat/log
+- [ ] Initiative tracker / turn order, HP and status/condition tracking on tokens
+- [ ] NPC/monster stat blocks the DM can drag onto the map
+
+## Phase 5 — 5etools content integration
+- [ ] **Confirm what's actually redistributable** from 5etools' data (it's
+      largely community-compiled OGL/community content, not an official WotC
+      API — needs a license check before we build a hard dependency on it)
+- [ ] Spell/monster/item lookup and quick reference
+- [ ] Drag monster stat blocks straight into encounters
+- [ ] Homebrew content editor as a parallel path (doesn't depend on licensing outcome)
+
+## Phase 6 — DM tools
+- [ ] Encounter builder (assemble monsters, auto-populate initiative)
+- [ ] Hidden DM notes / session journal
+- [ ] Handouts (share an image/doc to players on demand)
+- [ ] Random generators (loot, NPC names)
+- [ ] Soundboard / ambience music
+
+## Phase 7 — Player tools & polish
+- [ ] Personal inventory management, spell slot tracking
+- [ ] Private vs. public rolls
+- [ ] Built-in text chat (IC/OOC channels), map pings/emotes
+- [ ] Mobile/responsive pass
+
+## Phase 8 — Stretch goals
+- [ ] 3D dice roll animations
+- [ ] Support for non-5e systems (generalize the rules engine)
+- [ ] AI-assisted DM tools (NPC dialogue, encounter suggestions)
+- [ ] Party shared inventory/loot
+
+---
+
+## Full feature backlog (unsorted reference)
+
+Kept here so nothing gets lost even before it's scheduled into a phase above.
+
+**Core infra:** accounts/session roles (DM vs player), campaign save/load
+**Maps:** custom uploads, hex grid option, drawing/measurement tools, ruler, pings
+**Tokens:** status icons, HP bars, resource tracking
+**Rules:** automated attack/save/damage resolution, system-agnostic core
+**Communication:** roll history log, OOC/IC channel split
+**Technical:** desktop-app packaging (Electron) if browser-only proves limiting
