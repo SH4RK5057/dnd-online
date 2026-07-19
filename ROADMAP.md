@@ -67,8 +67,7 @@ anything is visually impressive.
 
 ## Phase 3.5 — Fixes & polish (playtesting punch list)
 
-Surfaced playtesting Phase 3; not yet estimated or scheduled to a specific
-chunk. Revisit before or interleaved with Phase 4.
+Surfaced playtesting Phase 3. Complete.
 
 **Bugs**
 - [x] Right-clicking starts a new wall in Draw Walls mode (should only cancel
@@ -90,8 +89,6 @@ chunk. Revisit before or interleaved with Phase 4.
 - [x] Make map private/hidden until the DM has finished setting it up
 
 **Gameplay/DM tools**
-- [ ] Assign token to player
-- [ ] Temporary annotations/drawing on the map
 - [x] Remove fog from all places a player has already seen — map fills in
       permanently as they explore, instead of recomputing fresh each frame
       (this is the "persistent fog-of-exploration" mode flagged as deferred
@@ -134,7 +131,8 @@ chunk. Revisit before or interleaved with Phase 4.
 ## Phase 7 — Player tools & polish
 - [ ] Personal inventory management, spell slot tracking
 - [ ] Private vs. public rolls
-- [ ] Built-in text chat (IC/OOC channels), map pings/emotes
+- [ ] Built-in text chat (IC/OOC channels), map pings/emotes, and temporary
+      annotations/drawing on the map
 - [ ] Mobile/responsive pass (DM stays locked to computer/tablet — this is
       about the player-facing layout)
 - [ ] Let players enter their intended moves; if moving as a group, vote on it
