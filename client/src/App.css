@@ -48,11 +48,26 @@
 .scene-toolbar {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scene-toolbar__section {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  margin-bottom: 12px;
+}
+
+.scene-toolbar__heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
 }
 
 .scene-toolbar__row {

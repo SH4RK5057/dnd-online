@@ -101,151 +101,166 @@ export function SceneToolbar() {
 
   return (
     <div className="scene-toolbar">
-      <div className="scene-toolbar__row">
-        <label htmlFor="scene-select">Scene</label>
-        <select
-          id="scene-select"
-          value={activeSceneId ?? ''}
-          onChange={(event) => void switchToScene(event.target.value)}
-        >
-          {scenes.length === 0 && <option value="">No scenes yet</option>}
-          {scenes.map((scene) => (
-            <option key={scene.id} value={scene.id}>
-              {scene.name}
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={handleDeleteScene} disabled={!activeScene}>
-          Delete scene
-        </button>
-        <button type="button" onClick={handleResetScene} disabled={!activeScene}>
-          Reset scene
-        </button>
-      </div>
+      <section className="scene-toolbar__section">
+        <h3 className="scene-toolbar__heading">Scene</h3>
+        <div className="scene-toolbar__row">
+          <label htmlFor="scene-select">Scene</label>
+          <select
+            id="scene-select"
+            value={activeSceneId ?? ''}
+            onChange={(event) => void switchToScene(event.target.value)}
+          >
+            {scenes.length === 0 && <option value="">No scenes yet</option>}
+            {scenes.map((scene) => (
+              <option key={scene.id} value={scene.id}>
+                {scene.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={handleDeleteScene} disabled={!activeScene}>
+            Delete scene
+          </button>
+          <button type="button" onClick={handleResetScene} disabled={!activeScene}>
+            Reset scene
+          </button>
+        </div>
 
-      <form className="scene-toolbar__row" onSubmit={handleCreateScene}>
-        <input
-          value={newSceneName}
-          onChange={(event) => setNewSceneName(event.target.value)}
-          placeholder="New scene name"
-        />
-        <select value={newScenePresetId} onChange={(event) => setNewScenePresetId(event.target.value)}>
-          {SCENE_PRESETS.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.label}
-            </option>
-          ))}
-        </select>
-        <button type="submit" disabled={!newSceneName.trim()}>
-          Add scene
-        </button>
-      </form>
+        <form className="scene-toolbar__row" onSubmit={handleCreateScene}>
+          <input
+            value={newSceneName}
+            onChange={(event) => setNewSceneName(event.target.value)}
+            placeholder="New scene name"
+          />
+          <select value={newScenePresetId} onChange={(event) => setNewScenePresetId(event.target.value)}>
+            {SCENE_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+          <button type="submit" disabled={!newSceneName.trim()}>
+            Add scene
+          </button>
+        </form>
+      </section>
 
       {activeScene && (
         <>
-          <div className="scene-toolbar__row">
-            <label htmlFor="scene-name">Name</label>
-            <input
-              id="scene-name"
-              value={activeScene.name}
-              onChange={(event) => renameScene(activeScene.id, event.target.value)}
-            />
-          </div>
-
-          <div className="scene-toolbar__row">
-            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={mapUploading}>
-              {mapUploading ? 'Uploading…' : activeScene.mapAssetId ? 'Replace map image' : 'Upload map image'}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(event) => void handleMapUpload(event)}
-              hidden
-            />
-          </div>
-
-          <div className="scene-toolbar__row">
-            <label htmlFor="grid-size">Grid size (px)</label>
-            <input
-              id="grid-size"
-              type="number"
-              min={8}
-              max={512}
-              value={activeScene.gridSizePx}
-              onChange={(event) => updateGrid(activeScene.id, { gridSizePx: Number(event.target.value) })}
-            />
-            <label htmlFor="grid-visible">
-              <input
-                id="grid-visible"
-                type="checkbox"
-                checked={activeScene.gridVisible}
-                onChange={(event) => updateGrid(activeScene.id, { gridVisible: event.target.checked })}
-              />
-              Show grid
-            </label>
-            <label htmlFor="fog-enabled">
-              <input
-                id="fog-enabled"
-                type="checkbox"
-                checked={activeScene.fogEnabled}
-                onChange={(event) => toggleFog(activeScene.id, event.target.checked)}
-              />
-              Fog of war
-            </label>
-            <label htmlFor="ambient-brightness">
-              Ambient light ({Math.round((activeScene.ambientBrightness ?? 1) * 100)}%)
-            </label>
-            <input
-              id="ambient-brightness"
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round((activeScene.ambientBrightness ?? 1) * 100)}
-              onChange={(event) => setAmbientBrightness(activeScene.id, Number(event.target.value) / 100)}
-            />
-            <label htmlFor="grid-type">Grid style</label>
-            <select
-              id="grid-type"
-              value={activeScene.gridType ?? 'square'}
-              onChange={(event) => updateGrid(activeScene.id, { gridType: event.target.value as 'square' | 'hex' })}
-            >
-              <option value="square">Square</option>
-              <option value="hex">Hexagon</option>
-            </select>
-          </div>
-
-          {activeScene.fogEnabled && (
+          <section className="scene-toolbar__section">
+            <h3 className="scene-toolbar__heading">Map</h3>
             <div className="scene-toolbar__row">
-              <label htmlFor="persistent-fog-enabled">
-                <input
-                  id="persistent-fog-enabled"
-                  type="checkbox"
-                  checked={activeScene.persistentFogEnabled ?? true}
-                  onChange={(event) => togglePersistentFog(activeScene.id, event.target.checked)}
-                />
-                Remember explored areas
-              </label>
-              <button type="button" onClick={handleResetExploration}>
-                Reset players' memory of this scene
-              </button>
-            </div>
-          )}
-
-          <div className="scene-toolbar__row">
-            <label htmlFor="scene-published">
+              <label htmlFor="scene-name">Name</label>
               <input
-                id="scene-published"
-                type="checkbox"
-                checked={activeScene.published !== false}
-                onChange={(event) => publishScene(activeScene.id, event.target.checked)}
+                id="scene-name"
+                value={activeScene.name}
+                onChange={(event) => renameScene(activeScene.id, event.target.value)}
               />
-              Visible to players
-            </label>
-            {activeScene.published === false && (
-              <span className="scene-toolbar__hint">Players see a "not ready yet" message until you turn this on.</span>
+            </div>
+
+            <div className="scene-toolbar__row">
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={mapUploading}>
+                {mapUploading ? 'Uploading…' : activeScene.mapAssetId ? 'Replace map image' : 'Upload map image'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(event) => void handleMapUpload(event)}
+                hidden
+              />
+            </div>
+          </section>
+
+          <section className="scene-toolbar__section">
+            <h3 className="scene-toolbar__heading">Grid</h3>
+            <div className="scene-toolbar__row">
+              <label htmlFor="grid-size">Grid size (px)</label>
+              <input
+                id="grid-size"
+                type="number"
+                min={8}
+                max={512}
+                value={activeScene.gridSizePx}
+                onChange={(event) => updateGrid(activeScene.id, { gridSizePx: Number(event.target.value) })}
+              />
+              <label htmlFor="grid-visible">
+                <input
+                  id="grid-visible"
+                  type="checkbox"
+                  checked={activeScene.gridVisible}
+                  onChange={(event) => updateGrid(activeScene.id, { gridVisible: event.target.checked })}
+                />
+                Show grid
+              </label>
+              <label htmlFor="grid-type">Grid style</label>
+              <select
+                id="grid-type"
+                value={activeScene.gridType ?? 'square'}
+                onChange={(event) => updateGrid(activeScene.id, { gridType: event.target.value as 'square' | 'hex' })}
+              >
+                <option value="square">Square</option>
+                <option value="hex">Hexagon</option>
+              </select>
+            </div>
+          </section>
+
+          <section className="scene-toolbar__section">
+            <h3 className="scene-toolbar__heading">Fog &amp; lighting</h3>
+            <div className="scene-toolbar__row">
+              <label htmlFor="fog-enabled">
+                <input
+                  id="fog-enabled"
+                  type="checkbox"
+                  checked={activeScene.fogEnabled}
+                  onChange={(event) => toggleFog(activeScene.id, event.target.checked)}
+                />
+                Fog of war
+              </label>
+              <label htmlFor="ambient-brightness">
+                Ambient light ({Math.round((activeScene.ambientBrightness ?? 1) * 100)}%)
+              </label>
+              <input
+                id="ambient-brightness"
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round((activeScene.ambientBrightness ?? 1) * 100)}
+                onChange={(event) => setAmbientBrightness(activeScene.id, Number(event.target.value) / 100)}
+              />
+            </div>
+
+            {activeScene.fogEnabled && (
+              <div className="scene-toolbar__row">
+                <label htmlFor="persistent-fog-enabled">
+                  <input
+                    id="persistent-fog-enabled"
+                    type="checkbox"
+                    checked={activeScene.persistentFogEnabled ?? true}
+                    onChange={(event) => togglePersistentFog(activeScene.id, event.target.checked)}
+                  />
+                  Remember explored areas
+                </label>
+                <button type="button" onClick={handleResetExploration}>
+                  Reset players' memory of this scene
+                </button>
+              </div>
             )}
-          </div>
+
+            <div className="scene-toolbar__row">
+              <label htmlFor="scene-published">
+                <input
+                  id="scene-published"
+                  type="checkbox"
+                  checked={activeScene.published !== false}
+                  onChange={(event) => publishScene(activeScene.id, event.target.checked)}
+                />
+                Visible to players
+              </label>
+              {activeScene.published === false && (
+                <span className="scene-toolbar__hint">Players see a "not ready yet" message until you turn this on.</span>
+              )}
+            </div>
+          </section>
         </>
       )}
     </div>
