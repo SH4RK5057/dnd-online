@@ -4,12 +4,14 @@ import { useSession } from '../session/useSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useWalls } from '../map/useWalls'
+import { useLights } from '../map/useLights'
 import { useAssetUrl } from '../map/assetSync'
 import { usePixiApp } from './usePixiApp'
 import { MapLayer } from './MapLayer'
 import { GridLayer } from './GridLayer'
 import { TokenLayer } from './TokenLayer'
 import { WallLayer } from './WallLayer'
+import { LightLayer } from './LightLayer'
 import type { ToolMode } from './interactionMode'
 
 export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
@@ -23,6 +25,7 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
   const mapUrl = useAssetUrl(doc, activeScene?.mapAssetId ?? null)
   const { tokens, moveToken } = useTokens(doc, activeScene?.id ?? null)
   const { walls, createWall, deleteWall } = useWalls(doc, activeScene?.id ?? null)
+  const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
 
   const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -31,6 +34,7 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
   const gridLayerRef = useRef<GridLayer | null>(null)
   const tokenLayerRef = useRef<TokenLayer | null>(null)
   const wallLayerRef = useRef<WallLayer | null>(null)
+  const lightLayerRef = useRef<LightLayer | null>(null)
 
   // Build the layer graph once the Pixi app is ready.
   useEffect(() => {
@@ -41,10 +45,12 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
     const gridLayer = new GridLayer()
     const tokenLayer = new TokenLayer()
     const wallLayer = new WallLayer()
+    const lightLayer = new LightLayer()
     world.addChild(mapLayer.container)
     world.addChild(gridLayer.container)
     world.addChild(tokenLayer.container)
     world.addChild(wallLayer.container)
+    world.addChild(lightLayer.container)
     app.stage.addChild(world)
 
     worldRef.current = world
@@ -52,18 +58,21 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
     gridLayerRef.current = gridLayer
     tokenLayerRef.current = tokenLayer
     wallLayerRef.current = wallLayer
+    lightLayerRef.current = lightLayer
 
     return () => {
       mapLayer.destroy()
       gridLayer.destroy()
       tokenLayer.destroy()
       wallLayer.destroy()
+      lightLayer.destroy()
       world.destroy()
       worldRef.current = null
       mapLayerRef.current = null
       gridLayerRef.current = null
       tokenLayerRef.current = null
       wallLayerRef.current = null
+      lightLayerRef.current = null
     }
   }, [app])
 
@@ -117,6 +126,17 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
       onDeleteWall: deleteWall,
     })
   }, [walls, activeScene, mapSize, isDm, toolMode, createWall, deleteWall])
+
+  // Update lights.
+  useEffect(() => {
+    if (!lightLayerRef.current || !activeScene) return
+    lightLayerRef.current.update(lights, tokens, activeScene.gridSizePx, mapSize, isDm && toolMode === 'place-lights', {
+      onCreateLight: (x, y) => createLight({ sceneId: activeScene.id, x, y }),
+      onMoveLight: moveLight,
+      onDetachLight: detachLight,
+      onDeleteLight: deleteLight,
+    })
+  }, [lights, tokens, activeScene, mapSize, isDm, toolMode, createLight, moveLight, detachLight, deleteLight])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />
 }

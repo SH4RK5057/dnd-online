@@ -76,6 +76,51 @@
   flex: 1 1 320px;
 }
 
+.drawing-toolbar__panel--column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.light-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.light-list__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.light-list__item input[type='color'] {
+  width: 32px;
+  padding: 2px;
+}
+
+.light-list__item input[type='number'] {
+  width: 60px;
+}
+
+.light-list__item select {
+  width: auto;
+  flex: 1 1 140px;
+}
+
+.light-list__item label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
 .token-upload {
   display: flex;
   align-items: center;

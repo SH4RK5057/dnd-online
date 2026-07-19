@@ -1,6 +1,15 @@
 import { useSession } from '../session/useSession'
 import { useWalls } from '../map/useWalls'
+import { useLights } from '../map/useLights'
+import { useTokens } from '../map/useTokens'
 import type { ToolMode } from '../canvas/interactionMode'
+
+function colorToHex(color: number): string {
+  return '#' + color.toString(16).padStart(6, '0')
+}
+function hexToColor(hex: string): number {
+  return parseInt(hex.slice(1), 16)
+}
 
 export function DrawingToolbar({
   sceneId,
@@ -14,6 +23,9 @@ export function DrawingToolbar({
   const { session } = useSession()
   const doc = session?.doc ?? null
   const { walls, deleteWall } = useWalls(doc, sceneId)
+  const { lights, setLightRadius, setLightColor, setLightEnabled, attachLightToToken, detachLight, deleteLight } =
+    useLights(doc, sceneId)
+  const { tokens } = useTokens(doc, sceneId)
 
   const handleClearWalls = () => {
     if (walls.length === 0) return
@@ -45,6 +57,61 @@ export function DrawingToolbar({
           <button type="button" onClick={handleClearWalls} disabled={walls.length === 0}>
             Clear all walls ({walls.length})
           </button>
+        </div>
+      )}
+
+      {toolMode === 'place-lights' && (
+        <div className="drawing-toolbar__panel drawing-toolbar__panel--column">
+          <p className="drawing-toolbar__hint">
+            Click empty space to place a light. Drag an existing one to move it (this detaches it from its token, if
+            any). Shift-click to delete.
+          </p>
+          {lights.length > 0 && (
+            <ul className="light-list">
+              {lights.map((light) => (
+                <li key={light.id} className="light-list__item">
+                  <input
+                    type="color"
+                    value={colorToHex(light.color)}
+                    onChange={(event) => setLightColor(light.id, hexToColor(event.target.value))}
+                    title="Light color"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={light.radius}
+                    onChange={(event) => setLightRadius(light.id, Number(event.target.value))}
+                    title="Radius (grid cells)"
+                  />
+                  <select
+                    value={light.attachedTokenId ?? ''}
+                    onChange={(event) =>
+                      event.target.value ? attachLightToToken(light.id, event.target.value) : detachLight(light.id)
+                    }
+                  >
+                    <option value="">Unattached</option>
+                    {tokens.map((token) => (
+                      <option key={token.id} value={token.id}>
+                        {token.name}
+                      </option>
+                    ))}
+                  </select>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={light.enabled}
+                      onChange={(event) => setLightEnabled(light.id, event.target.checked)}
+                    />
+                    On
+                  </label>
+                  <button type="button" onClick={() => deleteLight(light.id)}>
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>
