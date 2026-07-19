@@ -21,6 +21,8 @@ export function SessionScreen() {
   const { activeSceneId, activeScene } = useScenes(session?.doc ?? null)
   const { tokens } = useTokens(session?.doc ?? null, activeSceneId)
   const [toolMode, setToolMode] = useState<ToolMode>('move')
+  const [snapWalls, setSnapWalls] = useState(false)
+  const [showJoinCode, setShowJoinCode] = useState(true)
 
   if (!session) return null
 
@@ -36,8 +38,15 @@ export function SessionScreen() {
 
       {session.role === 'dm' && (
         <div className="session-screen__code">
-          <p>Share this code with your players:</p>
-          <CopyJoinCode code={session.joinCode} />
+          <button type="button" onClick={() => setShowJoinCode((v) => !v)}>
+            {showJoinCode ? 'Hide join code' : 'Show join code'}
+          </button>
+          {showJoinCode && (
+            <>
+              <p>Share this code with your players:</p>
+              <CopyJoinCode code={session.joinCode} />
+            </>
+          )}
         </div>
       )}
 
@@ -46,18 +55,24 @@ export function SessionScreen() {
       {session.role === 'dm' && <SceneToolbar />}
 
       {session.role === 'dm' && activeSceneId && (
-        <DrawingToolbar sceneId={activeSceneId} toolMode={toolMode} onToolModeChange={setToolMode} />
+        <DrawingToolbar
+          sceneId={activeSceneId}
+          toolMode={toolMode}
+          onToolModeChange={setToolMode}
+          snapWalls={snapWalls}
+          onSnapWallsChange={setSnapWalls}
+        />
       )}
+
+      {session.role === 'dm' && activeSceneId && <TokenUploadButton sceneId={activeSceneId} />}
+
+      {session.role === 'dm' && activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
 
       {isUnassignedPlayer && (
         <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
       )}
 
-      <MapCanvas toolMode={toolMode} />
-
-      {session.role === 'dm' && activeSceneId && <TokenUploadButton sceneId={activeSceneId} />}
-
-      {session.role === 'dm' && activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
+      <MapCanvas toolMode={toolMode} snapWalls={snapWalls} />
 
       <div className="session-screen__peers">
         <h2>Who's here</h2>

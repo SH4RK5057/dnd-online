@@ -15,10 +15,14 @@ export function DrawingToolbar({
   sceneId,
   toolMode,
   onToolModeChange,
+  snapWalls,
+  onSnapWallsChange,
 }: {
   sceneId: string
   toolMode: ToolMode
   onToolModeChange: (mode: ToolMode) => void
+  snapWalls: boolean
+  onSnapWallsChange: (snap: boolean) => void
 }) {
   const { session } = useSession()
   const doc = session?.doc ?? null
@@ -52,8 +56,16 @@ export function DrawingToolbar({
         <div className="drawing-toolbar__panel">
           <p className="drawing-toolbar__hint">
             Click to start a wall, click again to add a segment and keep going. Right-click to finish. Shift-click a
-            wall to delete it.
+            wall to delete it. Drag an existing endpoint to move it.
           </p>
+          <label>
+            <input
+              type="checkbox"
+              checked={snapWalls}
+              onChange={(event) => onSnapWallsChange(event.target.checked)}
+            />
+            Snap to grid
+          </label>
           <button type="button" onClick={handleClearWalls} disabled={walls.length === 0}>
             Clear all walls ({walls.length})
           </button>

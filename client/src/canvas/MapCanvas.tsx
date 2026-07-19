@@ -7,7 +7,12 @@ import { useTokens } from '../map/useTokens'
 import { useWalls } from '../map/useWalls'
 import { useLights } from '../map/useLights'
 import { useAssetUrl } from '../map/assetSync'
-import { PERSONAL_VISION_RADIUS_CELLS, MAX_VISION_RADIUS_CELLS } from '../map/constants'
+import {
+  PERSONAL_VISION_RADIUS_CELLS,
+  MAX_VISION_RADIUS_CELLS,
+  BLANK_SCENE_WIDTH_CELLS,
+  BLANK_SCENE_HEIGHT_CELLS,
+} from '../map/constants'
 import { usePixiApp } from './usePixiApp'
 import { MapLayer } from './MapLayer'
 import { GridLayer } from './GridLayer'
@@ -17,7 +22,7 @@ import { LightLayer } from './LightLayer'
 import { FogLayer } from './FogLayer'
 import type { ToolMode } from './interactionMode'
 
-export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
+export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWalls: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const app = usePixiApp(containerRef)
 
@@ -27,7 +32,7 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
   const { activeScene } = useScenes(doc)
   const mapUrl = useAssetUrl(doc, activeScene?.mapAssetId ?? null)
   const { tokens, moveToken } = useTokens(doc, activeScene?.id ?? null)
-  const { walls, createWall, deleteWall } = useWalls(doc, activeScene?.id ?? null)
+  const { walls, createWall, updateWallEndpoint, deleteWall } = useWalls(doc, activeScene?.id ?? null)
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
 
   const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
@@ -100,7 +105,11 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
     const world = worldRef.current
 
     const applySize = () => {
-      const size = mapLayer.size
+      const size =
+        mapLayer.size ??
+        (activeScene
+          ? { width: BLANK_SCENE_WIDTH_CELLS * activeScene.gridSizePx, height: BLANK_SCENE_HEIGHT_CELLS * activeScene.gridSizePx }
+          : null)
       setMapSize(size)
       gridLayer.update({
         gridSizePx: activeScene?.gridSizePx ?? 0,
@@ -134,11 +143,12 @@ export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
   // Update walls.
   useEffect(() => {
     if (!wallLayerRef.current || !activeScene) return
-    wallLayerRef.current.update(walls, activeScene.gridSizePx, mapSize, isDm && toolMode === 'draw-walls', {
+    wallLayerRef.current.update(walls, activeScene.gridSizePx, mapSize, isDm && toolMode === 'draw-walls', snapWalls, {
       onCreateWall: (x1, y1, x2, y2) => createWall({ sceneId: activeScene.id, x1, y1, x2, y2 }),
+      onUpdateWallEndpoint: updateWallEndpoint,
       onDeleteWall: deleteWall,
     })
-  }, [walls, activeScene, mapSize, isDm, toolMode, createWall, deleteWall])
+  }, [walls, activeScene, mapSize, isDm, toolMode, snapWalls, createWall, updateWallEndpoint, deleteWall])
 
   // Update lights.
   useEffect(() => {

@@ -22,6 +22,7 @@ export interface UseScenesResult {
   switchToScene: (sceneId: string) => Promise<void>
   renameScene: (sceneId: string, name: string) => void
   deleteScene: (sceneId: string) => void
+  resetScene: (sceneId: string) => void
   setSceneMap: (sceneId: string, file: File) => Promise<void>
   updateGrid: (sceneId: string, patch: GridPatch) => void
   toggleFog: (sceneId: string, enabled: boolean) => void
@@ -148,6 +149,33 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     [doc],
   )
 
+  const resetScene = useCallback(
+    (sceneId: string) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      if (scene.mapAssetId) pruneAssetChunks(doc, scene.mapAssetId)
+      scenesM.set(sceneId, { ...scene, mapAssetId: null })
+
+      const tokensM = doc.getMap<TokenRecord>('tokens')
+      const wallsM = doc.getMap<WallRecord>('walls')
+      const lightsM = doc.getMap<LightRecord>('lights')
+      doc.transact(() => {
+        tokensM.forEach((token, tokenId) => {
+          if (token.sceneId === sceneId) tokensM.delete(tokenId)
+        })
+        wallsM.forEach((wall, wallId) => {
+          if (wall.sceneId === sceneId) wallsM.delete(wallId)
+        })
+        lightsM.forEach((light, lightId) => {
+          if (light.sceneId === sceneId) lightsM.delete(lightId)
+        })
+      })
+    },
+    [doc],
+  )
+
   const setSceneMap = useCallback(
     async (sceneId: string, file: File) => {
       if (!doc) return
@@ -194,6 +222,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     switchToScene,
     renameScene,
     deleteScene,
+    resetScene,
     setSceneMap,
     updateGrid,
     toggleFog,

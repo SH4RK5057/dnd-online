@@ -22,6 +22,7 @@ export interface UseTokensResult {
   tokens: TokenRecord[]
   createToken: (input: CreateTokenInput) => string
   deleteToken: (tokenId: string) => void
+  deleteAllTokens: (sceneId: string) => void
   renameToken: (tokenId: string, name: string) => void
   setTokenSize: (tokenId: string, sizeCategory: SizeCategory) => void
   moveToken: (tokenId: string, x: number, y: number) => void
@@ -88,6 +89,19 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     [doc],
   )
 
+  const deleteAllTokens = useCallback(
+    (sceneId: string) => {
+      if (!doc) return
+      const tokensM = tokensMap(doc)
+      doc.transact(() => {
+        tokensM.forEach((token, tokenId) => {
+          if (token.sceneId === sceneId) tokensM.delete(tokenId)
+        })
+      })
+    },
+    [doc],
+  )
+
   const renameToken = useCallback((tokenId: string, name: string) => patchToken(tokenId, { name }), [patchToken])
   const setTokenSize = useCallback(
     (tokenId: string, sizeCategory: SizeCategory) => patchToken(tokenId, { sizeCategory }),
@@ -111,5 +125,5 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
 
   const tokens = sceneId ? allTokens.filter((t) => t.sceneId === sceneId) : []
 
-  return { tokens, createToken, deleteToken, renameToken, setTokenSize, moveToken, setTokenArt, assignOwner }
+  return { tokens, createToken, deleteToken, deleteAllTokens, renameToken, setTokenSize, moveToken, setTokenArt, assignOwner }
 }

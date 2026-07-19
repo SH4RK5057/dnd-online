@@ -65,6 +65,44 @@ anything is visually impressive.
 - [x] Dynamic light sources (torches, spells) affecting visibility
 - [x] GM-only reveal/hide controls
 
+## Phase 3.5 — Fixes & polish (playtesting punch list)
+
+Surfaced playtesting Phase 3; not yet estimated or scheduled to a specific
+chunk. Revisit before or interleaved with Phase 4.
+
+**Bugs**
+- [x] Right-clicking starts a new wall in Draw Walls mode (should only cancel
+      the in-progress chain, not start a new one)
+- [x] Can't move existing wall points or lights (drag-to-reposition doesn't work)
+- [x] Grid, walls, and lights don't render when a scene has no map image
+
+**Map & scene UX**
+- [x] Hide join code and link once a session is underway
+- [ ] Presets for scenes
+- [x] Make the map canvas bigger
+- [ ] Let the DM zoom on the map
+- [x] Move token-adding controls up next to map creation
+- [x] Reset scene (clear it back to blank state)
+- [x] Erase all tokens (bulk action)
+- [x] Option for walls to grid-snap
+- [ ] Hexagon grid option
+- [x] Map resolution feels low — investigate upscaling/quality
+- [ ] Make map private/hidden until the DM has finished setting it up
+
+**Gameplay/DM tools**
+- [ ] Assign token to player
+- [ ] DM-entered description shown when a player clicks an enemy token
+- [ ] Actual rules description shown when the DM clicks an enemy or player token
+- [ ] Let players enter their intended moves; if moving as a group, vote on it
+- [ ] Temporary annotations/drawing on the map
+- [ ] Remove fog from all places a player has already seen — map fills in
+      permanently as they explore, instead of recomputing fresh each frame
+      (this is the "persistent fog-of-exploration" mode flagged as deferred
+      scope in Phase 3's plan)
+
+**Platform**
+- [ ] Mobile-friendly layout for players (DM stays locked to computer/tablet)
+
 ## Phase 4 — Character sheets, dice, initiative
 - [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)
 - [ ] Dice roller: standard notation, advantage/disadvantage, macros

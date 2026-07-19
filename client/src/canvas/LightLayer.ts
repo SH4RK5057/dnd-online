@@ -108,7 +108,7 @@ export class LightLayer {
   }
 
   private handlePointerDown = (event: FederatedPointerEvent) => {
-    if (!this.active || !this.callbacks) return
+    if (!this.active || !this.callbacks || event.button !== 0) return
     const point = this.toGridPoint(event)
     const hit = this.findLightNear(point)
 

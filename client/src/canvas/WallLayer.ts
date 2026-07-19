@@ -6,10 +6,20 @@ import type { WallRecord } from '../map/types'
  * exact screen-pixel size (WallLayer doesn't track the world's zoom scale),
  * just a reasonable tap target at typical grid sizes. */
 const DELETE_HIT_TOLERANCE_CELLS = 0.15
+/** Larger than the delete tolerance — endpoints are small dots, worth a more
+ * generous grab target since missing one falls through to "start a new wall". */
+const ENDPOINT_HIT_TOLERANCE_CELLS = 0.25
+const DRAG_WRITE_INTERVAL_MS = 75
 
 export interface WallLayerCallbacks {
   onCreateWall: (x1: number, y1: number, x2: number, y2: number) => void
+  onUpdateWallEndpoint: (wallId: string, which: 'start' | 'end', x: number, y: number) => void
   onDeleteWall: (wallId: string) => void
+}
+
+interface EndpointHit {
+  wall: WallRecord
+  which: 'start' | 'end'
 }
 
 /**
@@ -17,7 +27,8 @@ export interface WallLayerCallbacks {
  * click-chain drawing. Click once to start a chain, click again to commit a
  * segment from the last point to the new one and continue the chain from
  * there, right-click to end the chain without starting a new segment.
- * Shift-click an existing wall to delete it.
+ * Shift-click an existing wall to delete it. Dragging an existing endpoint
+ * (rather than empty space) moves that point instead of starting a chain.
  */
 export class WallLayer {
   readonly container = new Container()
@@ -27,16 +38,21 @@ export class WallLayer {
 
   private active = false
   private gridSizePx = 1
+  private snapToGrid = false
   private walls: WallRecord[] = []
   private callbacks: WallLayerCallbacks | null = null
   private pendingStart: { x: number; y: number } | null = null
+  private draggingEndpoint: EndpointHit | null = null
+  private lastWriteAt = 0
 
   constructor() {
     this.container.addChild(this.hitPlane, this.wallsGraphics, this.previewGraphics)
     this.hitPlane.eventMode = 'none'
-    this.hitPlane.on('pointertap', this.handleTap)
+    this.hitPlane.on('pointerdown', this.handlePointerDown)
     this.hitPlane.on('rightdown', this.handleRightDown)
     this.hitPlane.on('globalpointermove', this.handlePointerMove)
+    this.hitPlane.on('pointerup', this.handlePointerUp)
+    this.hitPlane.on('pointerupoutside', this.handlePointerUp)
   }
 
   update(
@@ -44,14 +60,17 @@ export class WallLayer {
     gridSizePx: number,
     mapSize: { width: number; height: number } | null,
     active: boolean,
+    snapToGrid: boolean,
     callbacks: WallLayerCallbacks,
   ): void {
     this.walls = walls
     this.gridSizePx = gridSizePx
+    this.snapToGrid = snapToGrid
     this.callbacks = callbacks
 
     if (this.active !== active) {
       this.pendingStart = null
+      this.draggingEndpoint = null
       this.previewGraphics.clear()
     }
     this.active = active
@@ -83,17 +102,58 @@ export class WallLayer {
 
   private toGridPoint(event: FederatedPointerEvent): { x: number; y: number } {
     const local = event.getLocalPosition(this.container)
-    return { x: local.x / this.gridSizePx, y: local.y / this.gridSizePx }
+    const x = local.x / this.gridSizePx
+    const y = local.y / this.gridSizePx
+    if (this.snapToGrid) return { x: Math.round(x), y: Math.round(y) }
+    return { x, y }
   }
 
-  private handleTap = (event: FederatedPointerEvent) => {
-    if (!this.active || !this.callbacks) return
+  private findWallNear(point: { x: number; y: number }): WallRecord | null {
+    let nearest: WallRecord | null = null
+    let nearestDist = DELETE_HIT_TOLERANCE_CELLS
+    for (const wall of this.walls) {
+      const dist = distanceToSegment(point, wall)
+      if (dist < nearestDist) {
+        nearestDist = dist
+        nearest = wall
+      }
+    }
+    return nearest
+  }
+
+  private findEndpointNear(point: { x: number; y: number }): EndpointHit | null {
+    let nearest: EndpointHit | null = null
+    let nearestDist = ENDPOINT_HIT_TOLERANCE_CELLS
+    for (const wall of this.walls) {
+      const dStart = Math.hypot(point.x - wall.x1, point.y - wall.y1)
+      if (dStart < nearestDist) {
+        nearestDist = dStart
+        nearest = { wall, which: 'start' }
+      }
+      const dEnd = Math.hypot(point.x - wall.x2, point.y - wall.y2)
+      if (dEnd < nearestDist) {
+        nearestDist = dEnd
+        nearest = { wall, which: 'end' }
+      }
+    }
+    return nearest
+  }
+
+  private handlePointerDown = (event: FederatedPointerEvent) => {
+    if (!this.active || !this.callbacks || event.button !== 0) return
     const point = this.toGridPoint(event)
 
     if (event.shiftKey) {
       const hit = this.findWallNear(point)
-      if (hit) {
-        this.callbacks.onDeleteWall(hit.id)
+      if (hit) this.callbacks.onDeleteWall(hit.id)
+      return
+    }
+
+    if (!this.pendingStart) {
+      const endpointHit = this.findEndpointNear(point)
+      if (endpointHit) {
+        this.draggingEndpoint = endpointHit
+        this.lastWriteAt = 0
         return
       }
     }
@@ -113,7 +173,18 @@ export class WallLayer {
   }
 
   private handlePointerMove = (event: FederatedPointerEvent) => {
-    if (!this.active || !this.pendingStart) return
+    if (!this.active) return
+
+    if (this.draggingEndpoint && this.callbacks) {
+      const now = performance.now()
+      if (now - this.lastWriteAt < DRAG_WRITE_INTERVAL_MS) return
+      this.lastWriteAt = now
+      const point = this.toGridPoint(event)
+      this.callbacks.onUpdateWallEndpoint(this.draggingEndpoint.wall.id, this.draggingEndpoint.which, point.x, point.y)
+      return
+    }
+
+    if (!this.pendingStart) return
     const point = this.toGridPoint(event)
     this.previewGraphics.clear()
     this.previewGraphics
@@ -122,17 +193,15 @@ export class WallLayer {
       .stroke({ width: 2, color: 0xffffff, alpha: 0.6 })
   }
 
-  private findWallNear(point: { x: number; y: number }): WallRecord | null {
-    let nearest: WallRecord | null = null
-    let nearestDist = DELETE_HIT_TOLERANCE_CELLS
-    for (const wall of this.walls) {
-      const dist = distanceToSegment(point, wall)
-      if (dist < nearestDist) {
-        nearestDist = dist
-        nearest = wall
-      }
+  private handlePointerUp = (event: FederatedPointerEvent) => {
+    if (!this.draggingEndpoint || !this.callbacks) {
+      this.draggingEndpoint = null
+      return
     }
-    return nearest
+    // Always land on the exact release position, even if the last move tick was throttled away.
+    const point = this.toGridPoint(event)
+    this.callbacks.onUpdateWallEndpoint(this.draggingEndpoint.wall.id, this.draggingEndpoint.which, point.x, point.y)
+    this.draggingEndpoint = null
   }
 
   destroy(): void {

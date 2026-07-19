@@ -2,6 +2,12 @@ import type { SizeCategory } from './types'
 
 export const DEFAULT_GRID_SIZE_PX = 70
 
+/** Used as the canvas/grid/wall/light working area when a scene has no map
+ * image yet, so the DM can lay out walls, lights, and tokens before
+ * uploading art. Scaled by the scene's actual grid size at use. */
+export const BLANK_SCENE_WIDTH_CELLS = 30
+export const BLANK_SCENE_HEIGHT_CELLS = 20
+
 /** Bytes per Yjs chunk write. Kept well under WebRTC data channels' practical
  * per-message safety margin (~256KB) so each chunk is its own small,
  * separately-broadcast update. */
@@ -12,8 +18,8 @@ export const ASSET_CHUNK_WRITE_DELAY_MS = 25
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
-export const MAP_IMAGE_MAX_DIMENSION = 1600
-export const MAP_IMAGE_QUALITY = 0.75
+export const MAP_IMAGE_MAX_DIMENSION = 2400
+export const MAP_IMAGE_QUALITY = 0.85
 export const TOKEN_IMAGE_MAX_DIMENSION = 256
 export const TOKEN_IMAGE_QUALITY = 0.8
 

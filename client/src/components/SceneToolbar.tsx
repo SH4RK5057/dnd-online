@@ -13,6 +13,7 @@ export function SceneToolbar() {
     switchToScene,
     renameScene,
     deleteScene,
+    resetScene,
     setSceneMap,
     updateGrid,
     toggleFog,
@@ -57,6 +58,13 @@ export function SceneToolbar() {
     }
   }
 
+  const handleResetScene = () => {
+    if (!activeScene) return
+    if (window.confirm(`Reset scene "${activeScene.name}" back to blank? This removes its map, tokens, walls, and lights.`)) {
+      resetScene(activeScene.id)
+    }
+  }
+
   return (
     <div className="scene-toolbar">
       <div className="scene-toolbar__row">
@@ -75,6 +83,9 @@ export function SceneToolbar() {
         </select>
         <button type="button" onClick={handleDeleteScene} disabled={!activeScene}>
           Delete scene
+        </button>
+        <button type="button" onClick={handleResetScene} disabled={!activeScene}>
+          Reset scene
         </button>
       </div>
 
