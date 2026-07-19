@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Container } from 'pixi.js'
+import { Container, type FederatedPointerEvent } from 'pixi.js'
 import { useSession } from '../session/useSession'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useWalls } from '../map/useWalls'
 import { useLights } from '../map/useLights'
+import { useExploration } from '../map/useExploration'
 import { useAssetUrl } from '../map/assetSync'
 import {
   PERSONAL_VISION_RADIUS_CELLS,
@@ -22,6 +23,10 @@ import { LightLayer } from './LightLayer'
 import { FogLayer } from './FogLayer'
 import type { ToolMode } from './interactionMode'
 
+const MIN_ZOOM = 0.2
+const MAX_ZOOM = 5
+const ZOOM_WHEEL_FACTOR = 1.1
+
 export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWalls: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const app = usePixiApp(containerRef)
@@ -34,9 +39,15 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
   const { tokens, moveToken } = useTokens(doc, activeScene?.id ?? null)
   const { walls, createWall, updateWallEndpoint, deleteWall } = useWalls(doc, activeScene?.id ?? null)
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
+  const { exploredCells, revealCells } = useExploration(
+    doc,
+    activeScene?.id ?? null,
+    isDm ? null : getOrCreatePlayerId(),
+  )
 
   const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
 
+  const cameraRef = useRef<Container | null>(null)
   const worldRef = useRef<Container | null>(null)
   const fogTargetRef = useRef<Container | null>(null)
   const mapLayerRef = useRef<MapLayer | null>(null)
@@ -47,12 +58,17 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
   const fogLayerRef = useRef<FogLayer | null>(null)
 
   // Build the layer graph once the Pixi app is ready. fogTarget wraps
-  // map+grid+token so FogLayer's mask can apply to all three at once,
-  // without affecting the wall/light editing layers (the DM must always see
-  // those un-fogged — moot anyway since fog only ever applies to players).
+  // map+grid+token+walls so FogLayer's mask applies to all of them at once —
+  // walls should only be visible to a player where they can currently see
+  // and light reaches, same as the map/tokens underneath. The DM always
+  // renders with fogTarget.mask = null (see the fog effect below), so this
+  // never hides anything from the DM's own editing view. Lights stay a
+  // direct child of world since their on-canvas icon is a DM editing aid,
+  // not something a player should see at all.
   useEffect(() => {
     if (!app) return
 
+    const camera = new Container()
     const world = new Container()
     const fogTarget = new Container()
     const mapLayer = new MapLayer()
@@ -62,10 +78,14 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
     const lightLayer = new LightLayer()
     const fogLayer = new FogLayer()
 
-    fogTarget.addChild(mapLayer.container, gridLayer.container, tokenLayer.container)
-    world.addChild(fogTarget, wallLayer.container, lightLayer.container, fogLayer.mask)
-    app.stage.addChild(world)
+    fogTarget.addChild(mapLayer.container, gridLayer.container, tokenLayer.container, wallLayer.container)
+    world.addChild(fogTarget, lightLayer.container, fogLayer.mask)
+    camera.addChild(world)
+    app.stage.addChild(camera)
+    app.stage.eventMode = 'static'
+    app.stage.hitArea = app.screen
 
+    cameraRef.current = camera
     worldRef.current = world
     fogTargetRef.current = fogTarget
     mapLayerRef.current = mapLayer
@@ -83,6 +103,8 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
       lightLayer.destroy()
       fogLayer.destroy()
       world.destroy()
+      camera.destroy()
+      cameraRef.current = null
       worldRef.current = null
       fogTargetRef.current = null
       mapLayerRef.current = null
@@ -116,6 +138,7 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
         gridOffsetX: activeScene?.gridOffsetX ?? 0,
         gridOffsetY: activeScene?.gridOffsetY ?? 0,
         gridVisible: activeScene?.gridVisible ?? false,
+        gridType: activeScene?.gridType ?? 'square',
         width: size?.width ?? 0,
         height: size?.height ?? 0,
       })
@@ -176,7 +199,7 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
     const myPlayerId = getOrCreatePlayerId()
     const ownTokenIds = tokens.filter((t) => t.ownerId === myPlayerId).map((t) => t.id)
 
-    fogLayer.update(app.renderer, {
+    const newlyExplored = fogLayer.update(app.renderer, {
       walls,
       lights,
       tokens,
@@ -185,9 +208,78 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
       ownTokenIds,
       personalVisionRadiusCells: PERSONAL_VISION_RADIUS_CELLS,
       maxVisionRadiusCells: MAX_VISION_RADIUS_CELLS,
+      ambientBrightness: activeScene.ambientBrightness ?? 1,
+      exploredCells,
     })
     fogTarget.mask = fogLayer.mask
-  }, [app, activeScene, mapSize, isDm, walls, lights, tokens])
+    if (newlyExplored.length > 0) revealCells(newlyExplored)
+  }, [app, activeScene, mapSize, isDm, walls, lights, tokens, exploredCells, revealCells])
+
+  // Reset the zoom/pan camera whenever the active scene changes, so switching
+  // scenes doesn't carry over an unrelated view.
+  useEffect(() => {
+    if (!cameraRef.current) return
+    cameraRef.current.scale.set(1)
+    cameraRef.current.position.set(0, 0)
+  }, [activeScene?.id])
+
+  // Wheel-to-zoom (any mode) and drag-to-pan (Move mode, empty space only —
+  // token drags and wall/light tool clicks take priority and stop propagation
+  // reaching app.stage before this handler sees them).
+  useEffect(() => {
+    if (!app) return
+    const camera = cameraRef.current
+    if (!camera) return
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const rect = app.canvas.getBoundingClientRect()
+      const cursorX = event.clientX - rect.left
+      const cursorY = event.clientY - rect.top
+      const oldScale = camera.scale.x
+      const factor = event.deltaY < 0 ? ZOOM_WHEEL_FACTOR : 1 / ZOOM_WHEEL_FACTOR
+      const newScale = Math.min(Math.max(oldScale * factor, MIN_ZOOM), MAX_ZOOM)
+      const localX = (cursorX - camera.position.x) / oldScale
+      const localY = (cursorY - camera.position.y) / oldScale
+      camera.scale.set(newScale)
+      camera.position.set(cursorX - localX * newScale, cursorY - localY * newScale)
+    }
+    app.canvas.addEventListener('wheel', onWheel, { passive: false })
+
+    let panning = false
+    let panStart = { x: 0, y: 0 }
+    let cameraStart = { x: 0, y: 0 }
+
+    const onPointerDown = (event: FederatedPointerEvent) => {
+      if (toolMode !== 'move' || event.target !== app.stage || event.button !== 0) return
+      panning = true
+      panStart = { x: event.global.x, y: event.global.y }
+      cameraStart = { x: camera.position.x, y: camera.position.y }
+    }
+    const onPointerMove = (event: FederatedPointerEvent) => {
+      if (!panning) return
+      camera.position.set(
+        cameraStart.x + (event.global.x - panStart.x),
+        cameraStart.y + (event.global.y - panStart.y),
+      )
+    }
+    const onPointerUp = () => {
+      panning = false
+    }
+
+    app.stage.on('pointerdown', onPointerDown)
+    app.stage.on('globalpointermove', onPointerMove)
+    app.stage.on('pointerup', onPointerUp)
+    app.stage.on('pointerupoutside', onPointerUp)
+
+    return () => {
+      app.canvas.removeEventListener('wheel', onWheel)
+      app.stage.off('pointerdown', onPointerDown)
+      app.stage.off('globalpointermove', onPointerMove)
+      app.stage.off('pointerup', onPointerUp)
+      app.stage.off('pointerupoutside', onPointerUp)
+    }
+  }, [app, toolMode])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />
 }

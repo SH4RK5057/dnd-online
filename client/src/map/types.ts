@@ -2,6 +2,8 @@ export type SizeCategory = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gar
 
 export type AssetKind = 'map' | 'token'
 
+export type GridType = 'square' | 'hex'
+
 export interface SceneRecord {
   id: string
   name: string
@@ -10,8 +12,23 @@ export interface SceneRecord {
   gridOffsetX: number
   gridOffsetY: number
   gridVisible: boolean
+  /** Visual grid style only — token/wall/light coordinates stay in the same
+   * continuous grid-cell unit space regardless. Read as `?? 'square'` for
+   * scenes created before this field existed. */
+  gridType: GridType
   /** Fog of war on/off for this scene. Off = full visibility for everyone. */
   fogEnabled: boolean
+  /** Baseline light level before any light sources or a token's own vision
+   * aura are added in: 0.0 = pitch black (nothing visible without a light
+   * source nearby), 1.0 = fully lit (daylight — the old always-on behavior).
+   * Only has a visible effect while fogEnabled is true. Read as `?? 1.0` for
+   * scenes created before this field existed. */
+  ambientBrightness: number
+  /** Whether players can see this scene at all — lets the DM prep a map
+   * (upload art, place walls/lights/tokens) before revealing it. Read as
+   * `!== false` everywhere (not `=== true`) so scenes created before this
+   * field existed, which have it `undefined`, stay visible. */
+  published: boolean
   createdAt: number
 }
 

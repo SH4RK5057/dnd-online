@@ -78,30 +78,26 @@ chunk. Revisit before or interleaved with Phase 4.
 
 **Map & scene UX**
 - [x] Hide join code and link once a session is underway
-- [ ] Presets for scenes
+- [x] Presets for scenes
 - [x] Make the map canvas bigger
-- [ ] Let the DM zoom on the map
+- [x] Let the DM zoom on the map
 - [x] Move token-adding controls up next to map creation
 - [x] Reset scene (clear it back to blank state)
 - [x] Erase all tokens (bulk action)
 - [x] Option for walls to grid-snap
-- [ ] Hexagon grid option
+- [x] Hexagon grid option
 - [x] Map resolution feels low — investigate upscaling/quality
-- [ ] Make map private/hidden until the DM has finished setting it up
+- [x] Make map private/hidden until the DM has finished setting it up
 
 **Gameplay/DM tools**
 - [ ] Assign token to player
-- [ ] DM-entered description shown when a player clicks an enemy token
-- [ ] Actual rules description shown when the DM clicks an enemy or player token
-- [ ] Let players enter their intended moves; if moving as a group, vote on it
 - [ ] Temporary annotations/drawing on the map
-- [ ] Remove fog from all places a player has already seen — map fills in
+- [x] Remove fog from all places a player has already seen — map fills in
       permanently as they explore, instead of recomputing fresh each frame
       (this is the "persistent fog-of-exploration" mode flagged as deferred
-      scope in Phase 3's plan)
-
-**Platform**
-- [ ] Mobile-friendly layout for players (DM stays locked to computer/tablet)
+      scope in Phase 3's plan). Also folded in a unified ambient-brightness
+      lighting model (SceneRecord.ambientBrightness) and fixed wall
+      visibility to respect the same fog mask as the map/tokens.
 
 ## Phase 4 — Character sheets, dice, initiative
 - [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)
@@ -117,6 +113,11 @@ chunk. Revisit before or interleaved with Phase 4.
 - [ ] Spell/monster/item lookup and quick reference
 - [ ] Drag monster stat blocks straight into encounters
 - [ ] Homebrew content editor as a parallel path (doesn't depend on licensing outcome)
+- [ ] Actual rules description shown when the DM clicks an enemy or player token
+      (pulled from the monster/character stat lookup above)
+- [ ] DM-entered description shown when a player clicks an enemy token
+      (freeform DM text, distinct from the rules lookup — surfaced here since
+      both live on the same token-click UI)
 
 ## Phase 6 — DM tools
 - [ ] Encounter builder (assemble monsters, auto-populate initiative)
@@ -134,7 +135,9 @@ chunk. Revisit before or interleaved with Phase 4.
 - [ ] Personal inventory management, spell slot tracking
 - [ ] Private vs. public rolls
 - [ ] Built-in text chat (IC/OOC channels), map pings/emotes
-- [ ] Mobile/responsive pass
+- [ ] Mobile/responsive pass (DM stays locked to computer/tablet — this is
+      about the player-facing layout)
+- [ ] Let players enter their intended moves; if moving as a group, vote on it
 
 ## Phase 8 — Stretch goals
 - [ ] 3D dice roll animations

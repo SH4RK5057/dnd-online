@@ -28,6 +28,7 @@ export function SessionScreen() {
 
   const isUnassignedPlayer =
     session.role === 'player' && !!activeScene?.fogEnabled && !tokens.some((t) => t.ownerId === getOrCreatePlayerId())
+  const isUnpublishedForPlayer = session.role === 'player' && !!activeScene && activeScene.published === false
 
   return (
     <section className="session-screen">
@@ -68,11 +69,16 @@ export function SessionScreen() {
 
       {session.role === 'dm' && activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
 
-      {isUnassignedPlayer && (
-        <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
+      {isUnpublishedForPlayer ? (
+        <p className="session-screen__notice">Your DM is still setting up this scene. Hang tight!</p>
+      ) : (
+        <>
+          {isUnassignedPlayer && (
+            <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
+          )}
+          <MapCanvas toolMode={toolMode} snapWalls={snapWalls} />
+        </>
       )}
-
-      <MapCanvas toolMode={toolMode} snapWalls={snapWalls} />
 
       <div className="session-screen__peers">
         <h2>Who's here</h2>

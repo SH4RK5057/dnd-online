@@ -58,3 +58,10 @@ export const PERSONAL_VISION_RADIUS_CELLS = 1
 /** Hard cap on how far a token's own line of sight reaches, even in full light. */
 export const MAX_VISION_RADIUS_CELLS = 30
 export const DEFAULT_LIGHT_COLOR = 0xffaa55
+
+/** Fixed dim level (0-1, same red-channel scale as ambientBrightness) shown
+ * for cells a player has explored before but isn't currently lighting up —
+ * "remembered" persistent fog-of-exploration, not a live view. Independent
+ * of the scene's current ambientBrightness on purpose: it's a memory of
+ * roughly what the space looks like, not a live-updating render. */
+export const EXPLORED_MEMORY_BRIGHTNESS = 0.35

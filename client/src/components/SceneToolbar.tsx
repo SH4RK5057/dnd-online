@@ -1,6 +1,22 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useSession } from '../session/useSession'
 import { useScenes } from '../map/useScenes'
+import type { GridType } from '../map/types'
+
+interface ScenePreset {
+  id: string
+  label: string
+  fogEnabled: boolean
+  ambientBrightness: number
+  gridType: GridType
+}
+
+const SCENE_PRESETS: ScenePreset[] = [
+  { id: 'blank', label: 'Blank (bright, no fog)', fogEnabled: false, ambientBrightness: 1, gridType: 'square' },
+  { id: 'dungeon', label: 'Dungeon (dark, fog on)', fogEnabled: true, ambientBrightness: 0.15, gridType: 'square' },
+  { id: 'outdoor', label: 'Outdoor (bright, fog on)', fogEnabled: true, ambientBrightness: 1, gridType: 'square' },
+  { id: 'outdoor-hex', label: 'Outdoor, hex grid (bright, fog on)', fogEnabled: true, ambientBrightness: 1, gridType: 'hex' },
+]
 
 export function SceneToolbar() {
   const { session } = useSession()
@@ -17,9 +33,12 @@ export function SceneToolbar() {
     setSceneMap,
     updateGrid,
     toggleFog,
+    publishScene,
+    setAmbientBrightness,
   } = useScenes(doc)
 
   const [newSceneName, setNewSceneName] = useState('')
+  const [newScenePresetId, setNewScenePresetId] = useState(SCENE_PRESETS[0].id)
   const [mapUploading, setMapUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -29,7 +48,13 @@ export function SceneToolbar() {
     event.preventDefault()
     const name = newSceneName.trim()
     if (!name) return
-    createScene(name)
+    const id = createScene(name)
+    const preset = SCENE_PRESETS.find((p) => p.id === newScenePresetId)
+    if (preset) {
+      updateGrid(id, { gridType: preset.gridType })
+      toggleFog(id, preset.fogEnabled)
+      setAmbientBrightness(id, preset.ambientBrightness)
+    }
     setNewSceneName('')
   }
 
@@ -95,6 +120,13 @@ export function SceneToolbar() {
           onChange={(event) => setNewSceneName(event.target.value)}
           placeholder="New scene name"
         />
+        <select value={newScenePresetId} onChange={(event) => setNewScenePresetId(event.target.value)}>
+          {SCENE_PRESETS.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
         <button type="submit" disabled={!newSceneName.trim()}>
           Add scene
         </button>
@@ -152,6 +184,41 @@ export function SceneToolbar() {
               />
               Fog of war
             </label>
+            <label htmlFor="ambient-brightness">
+              Ambient light ({Math.round((activeScene.ambientBrightness ?? 1) * 100)}%)
+            </label>
+            <input
+              id="ambient-brightness"
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round((activeScene.ambientBrightness ?? 1) * 100)}
+              onChange={(event) => setAmbientBrightness(activeScene.id, Number(event.target.value) / 100)}
+            />
+            <label htmlFor="grid-type">Grid style</label>
+            <select
+              id="grid-type"
+              value={activeScene.gridType ?? 'square'}
+              onChange={(event) => updateGrid(activeScene.id, { gridType: event.target.value as 'square' | 'hex' })}
+            >
+              <option value="square">Square</option>
+              <option value="hex">Hexagon</option>
+            </select>
+          </div>
+
+          <div className="scene-toolbar__row">
+            <label htmlFor="scene-published">
+              <input
+                id="scene-published"
+                type="checkbox"
+                checked={activeScene.published !== false}
+                onChange={(event) => publishScene(activeScene.id, event.target.checked)}
+              />
+              Visible to players
+            </label>
+            {activeScene.published === false && (
+              <span className="scene-toolbar__hint">Players see a "not ready yet" message until you turn this on.</span>
+            )}
           </div>
         </>
       )}

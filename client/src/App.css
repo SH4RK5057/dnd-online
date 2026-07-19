@@ -62,6 +62,11 @@
   flex-wrap: wrap;
 }
 
+.scene-toolbar__hint {
+  font-size: 13px;
+  color: var(--text);
+}
+
 .scene-toolbar__row label {
   margin: 0;
   white-space: nowrap;
@@ -69,6 +74,11 @@
 
 .scene-toolbar__row input[type='number'] {
   width: 80px;
+}
+
+.scene-toolbar__row input[type='range'] {
+  width: 120px;
+  flex: 0 0 auto;
 }
 
 .scene-toolbar__row input:not([type='checkbox']),

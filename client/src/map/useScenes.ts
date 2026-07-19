@@ -3,6 +3,7 @@ import * as Y from 'yjs'
 import { isAssetFullyLive, publishAsset, pruneAssetChunks, republishAssetFromCache } from './assetSync'
 import { DEFAULT_GRID_SIZE_PX, MAP_IMAGE_MAX_DIMENSION, MAP_IMAGE_QUALITY } from './constants'
 import { compressImage } from './imageCompress'
+import { purgeExplorationForScene } from './useExploration'
 import type { LightRecord, SceneRecord, TokenRecord, WallRecord } from './types'
 
 function scenesMap(doc: Y.Doc) {
@@ -12,7 +13,7 @@ function sessionMap(doc: Y.Doc) {
   return doc.getMap<string>('session')
 }
 
-type GridPatch = Partial<Pick<SceneRecord, 'gridSizePx' | 'gridOffsetX' | 'gridOffsetY' | 'gridVisible'>>
+type GridPatch = Partial<Pick<SceneRecord, 'gridSizePx' | 'gridOffsetX' | 'gridOffsetY' | 'gridVisible' | 'gridType'>>
 
 export interface UseScenesResult {
   scenes: SceneRecord[]
@@ -26,6 +27,8 @@ export interface UseScenesResult {
   setSceneMap: (sceneId: string, file: File) => Promise<void>
   updateGrid: (sceneId: string, patch: GridPatch) => void
   toggleFog: (sceneId: string, enabled: boolean) => void
+  publishScene: (sceneId: string, published: boolean) => void
+  setAmbientBrightness: (sceneId: string, ambientBrightness: number) => void
 }
 
 export function useScenes(doc: Y.Doc | null): UseScenesResult {
@@ -66,7 +69,10 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         gridOffsetX: 0,
         gridOffsetY: 0,
         gridVisible: true,
+        gridType: 'square',
         fogEnabled: false,
+        ambientBrightness: 1,
+        published: false,
         createdAt: Date.now(),
       }
       scenesMap(doc).set(id, record)
@@ -135,6 +141,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
           if (light.sceneId === sceneId) lightsM.delete(lightId)
         })
       })
+      purgeExplorationForScene(doc, sceneId)
 
       const sessionM = sessionMap(doc)
       if (sessionM.get('activeSceneId') === sceneId) {
@@ -172,6 +179,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
           if (light.sceneId === sceneId) lightsM.delete(lightId)
         })
       })
+      purgeExplorationForScene(doc, sceneId)
     },
     [doc],
   )
@@ -212,6 +220,28 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     [doc],
   )
 
+  const publishScene = useCallback(
+    (sceneId: string, published: boolean) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, published })
+    },
+    [doc],
+  )
+
+  const setAmbientBrightness = useCallback(
+    (sceneId: string, ambientBrightness: number) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, ambientBrightness: Math.min(1, Math.max(0, ambientBrightness)) })
+    },
+    [doc],
+  )
+
   const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null
 
   return {
@@ -226,5 +256,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     setSceneMap,
     updateGrid,
     toggleFog,
+    publishScene,
+    setAmbientBrightness,
   }
 }
