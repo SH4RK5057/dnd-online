@@ -94,7 +94,7 @@ function raySegmentIntersection(origin: Point, dir: Point, seg: Segment): number
   return t1
 }
 
-function distanceToSegment(p: Point, seg: Segment): number {
+export function distanceToSegment(p: Point, seg: Segment): number {
   const dx = seg.x2 - seg.x1
   const dy = seg.y2 - seg.y1
   const lenSq = dx * dx + dy * dy

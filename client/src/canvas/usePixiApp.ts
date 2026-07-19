@@ -31,6 +31,9 @@ export function usePixiApp(containerRef: RefObject<HTMLDivElement | null>): Appl
           return
         }
         container.appendChild(instance.canvas)
+        // Right-click is used to cancel an in-progress wall chain (WallLayer);
+        // suppress the browser's native context menu so it doesn't pop up over it.
+        instance.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
         appRef.current = instance
         setApp(instance)
       })

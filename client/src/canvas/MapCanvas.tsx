@@ -1,15 +1,18 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Container } from 'pixi.js'
 import { useSession } from '../session/useSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
+import { useWalls } from '../map/useWalls'
 import { useAssetUrl } from '../map/assetSync'
 import { usePixiApp } from './usePixiApp'
 import { MapLayer } from './MapLayer'
 import { GridLayer } from './GridLayer'
 import { TokenLayer } from './TokenLayer'
+import { WallLayer } from './WallLayer'
+import type { ToolMode } from './interactionMode'
 
-export function MapCanvas() {
+export function MapCanvas({ toolMode }: { toolMode: ToolMode }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const app = usePixiApp(containerRef)
 
@@ -19,11 +22,15 @@ export function MapCanvas() {
   const { activeScene } = useScenes(doc)
   const mapUrl = useAssetUrl(doc, activeScene?.mapAssetId ?? null)
   const { tokens, moveToken } = useTokens(doc, activeScene?.id ?? null)
+  const { walls, createWall, deleteWall } = useWalls(doc, activeScene?.id ?? null)
+
+  const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
 
   const worldRef = useRef<Container | null>(null)
   const mapLayerRef = useRef<MapLayer | null>(null)
   const gridLayerRef = useRef<GridLayer | null>(null)
   const tokenLayerRef = useRef<TokenLayer | null>(null)
+  const wallLayerRef = useRef<WallLayer | null>(null)
 
   // Build the layer graph once the Pixi app is ready.
   useEffect(() => {
@@ -33,25 +40,30 @@ export function MapCanvas() {
     const mapLayer = new MapLayer()
     const gridLayer = new GridLayer()
     const tokenLayer = new TokenLayer()
+    const wallLayer = new WallLayer()
     world.addChild(mapLayer.container)
     world.addChild(gridLayer.container)
     world.addChild(tokenLayer.container)
+    world.addChild(wallLayer.container)
     app.stage.addChild(world)
 
     worldRef.current = world
     mapLayerRef.current = mapLayer
     gridLayerRef.current = gridLayer
     tokenLayerRef.current = tokenLayer
+    wallLayerRef.current = wallLayer
 
     return () => {
       mapLayer.destroy()
       gridLayer.destroy()
       tokenLayer.destroy()
+      wallLayer.destroy()
       world.destroy()
       worldRef.current = null
       mapLayerRef.current = null
       gridLayerRef.current = null
       tokenLayerRef.current = null
+      wallLayerRef.current = null
     }
   }, [app])
 
@@ -67,6 +79,7 @@ export function MapCanvas() {
 
     const applySize = () => {
       const size = mapLayer.size
+      setMapSize(size)
       gridLayer.update({
         gridSizePx: activeScene?.gridSizePx ?? 0,
         gridOffsetX: activeScene?.gridOffsetX ?? 0,
@@ -90,11 +103,20 @@ export function MapCanvas() {
   // Update tokens.
   useEffect(() => {
     if (!doc || !tokenLayerRef.current || !activeScene) return
-    tokenLayerRef.current.update(doc, tokens, activeScene.gridSizePx, isDm, {
+    tokenLayerRef.current.update(doc, tokens, activeScene.gridSizePx, isDm && toolMode === 'move', {
       onMove: moveToken,
       onMoveEnd: moveToken,
     })
-  }, [doc, tokens, activeScene, isDm, moveToken])
+  }, [doc, tokens, activeScene, isDm, toolMode, moveToken])
+
+  // Update walls.
+  useEffect(() => {
+    if (!wallLayerRef.current || !activeScene) return
+    wallLayerRef.current.update(walls, activeScene.gridSizePx, mapSize, isDm && toolMode === 'draw-walls', {
+      onCreateWall: (x1, y1, x2, y2) => createWall({ sceneId: activeScene.id, x1, y1, x2, y2 }),
+      onDeleteWall: deleteWall,
+    })
+  }, [walls, activeScene, mapSize, isDm, toolMode, createWall, deleteWall])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />
 }

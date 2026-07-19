@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useSession } from '../session/useSession'
 import { useConnectionStatus } from '../session/useConnectionStatus'
 import { useScenes } from '../map/useScenes'
@@ -7,12 +8,15 @@ import { CopyJoinCode } from '../components/CopyJoinCode'
 import { ConnectionErrorPanel } from '../components/ConnectionErrorPanel'
 import { SceneToolbar } from '../components/SceneToolbar'
 import { TokenUploadButton } from '../components/TokenUploadButton'
+import { DrawingToolbar } from '../components/DrawingToolbar'
 import { MapCanvas } from '../canvas/MapCanvas'
+import type { ToolMode } from '../canvas/interactionMode'
 
 export function SessionScreen() {
   const { session, sessionMeta, leaveSession } = useSession()
   const { status, peers, failure, retry } = useConnectionStatus(session)
   const { activeSceneId } = useScenes(session?.doc ?? null)
+  const [toolMode, setToolMode] = useState<ToolMode>('move')
 
   if (!session) return null
 
@@ -34,7 +38,11 @@ export function SessionScreen() {
 
       {session.role === 'dm' && <SceneToolbar />}
 
-      <MapCanvas />
+      {session.role === 'dm' && activeSceneId && (
+        <DrawingToolbar sceneId={activeSceneId} toolMode={toolMode} onToolModeChange={setToolMode} />
+      )}
+
+      <MapCanvas toolMode={toolMode} />
 
       {session.role === 'dm' && activeSceneId && <TokenUploadButton sceneId={activeSceneId} />}
 
