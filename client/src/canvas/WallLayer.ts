@@ -9,6 +9,11 @@ const DELETE_HIT_TOLERANCE_CELLS = 0.15
 /** Larger than the delete tolerance — endpoints are small dots, worth a more
  * generous grab target since missing one falls through to "start a new wall". */
 const ENDPOINT_HIT_TOLERANCE_CELLS = 0.25
+/** Slightly more generous than the grab tolerance — this is "snap to connect
+ * exactly," not "grab to drag," so it's worth erring toward connecting two
+ * walls that were clearly meant to meet rather than leaving a hairline gap
+ * a ray can leak through. Takes priority over grid-snap. */
+const ENDPOINT_MAGNET_TOLERANCE_CELLS = 0.35
 const DRAG_WRITE_INTERVAL_MS = 75
 
 export interface WallLayerCallbacks {
@@ -100,12 +105,43 @@ export class WallLayer {
     }
   }
 
-  private toGridPoint(event: FederatedPointerEvent): { x: number; y: number } {
+  /** `exclude` is the endpoint currently being dragged (if any) — it's
+   * excluded from magnet candidates so a point doesn't uselessly "snap to
+   * itself" at its own not-yet-updated position. */
+  private toGridPoint(event: FederatedPointerEvent, exclude?: EndpointHit): { x: number; y: number } {
     const local = event.getLocalPosition(this.container)
-    const x = local.x / this.gridSizePx
-    const y = local.y / this.gridSizePx
-    if (this.snapToGrid) return { x: Math.round(x), y: Math.round(y) }
-    return { x, y }
+    const raw = { x: local.x / this.gridSizePx, y: local.y / this.gridSizePx }
+    const magnet = this.findMagnetPoint(raw, exclude)
+    if (magnet) return magnet
+    if (this.snapToGrid) return { x: Math.round(raw.x), y: Math.round(raw.y) }
+    return raw
+  }
+
+  /** Finds an existing wall endpoint (any wall, either end) within magnet
+   * range of `point`, so newly-placed or dragged points connect exactly
+   * rather than leaving a gap the visibility algorithm can leak light
+   * through — walls are independent line segments to that algorithm, so
+   * "meant to touch" only actually helps if they're bit-for-bit coincident. */
+  private findMagnetPoint(point: { x: number; y: number }, exclude?: EndpointHit): { x: number; y: number } | null {
+    let nearest: { x: number; y: number } | null = null
+    let nearestDist = ENDPOINT_MAGNET_TOLERANCE_CELLS
+    for (const wall of this.walls) {
+      if (!(exclude && exclude.wall.id === wall.id && exclude.which === 'start')) {
+        const d = Math.hypot(point.x - wall.x1, point.y - wall.y1)
+        if (d < nearestDist) {
+          nearestDist = d
+          nearest = { x: wall.x1, y: wall.y1 }
+        }
+      }
+      if (!(exclude && exclude.wall.id === wall.id && exclude.which === 'end')) {
+        const d = Math.hypot(point.x - wall.x2, point.y - wall.y2)
+        if (d < nearestDist) {
+          nearestDist = d
+          nearest = { x: wall.x2, y: wall.y2 }
+        }
+      }
+    }
+    return nearest
   }
 
   private findWallNear(point: { x: number; y: number }): WallRecord | null {
@@ -179,7 +215,7 @@ export class WallLayer {
       const now = performance.now()
       if (now - this.lastWriteAt < DRAG_WRITE_INTERVAL_MS) return
       this.lastWriteAt = now
-      const point = this.toGridPoint(event)
+      const point = this.toGridPoint(event, this.draggingEndpoint)
       this.callbacks.onUpdateWallEndpoint(this.draggingEndpoint.wall.id, this.draggingEndpoint.which, point.x, point.y)
       return
     }
@@ -199,7 +235,7 @@ export class WallLayer {
       return
     }
     // Always land on the exact release position, even if the last move tick was throttled away.
-    const point = this.toGridPoint(event)
+    const point = this.toGridPoint(event, this.draggingEndpoint)
     this.callbacks.onUpdateWallEndpoint(this.draggingEndpoint.wall.id, this.draggingEndpoint.which, point.x, point.y)
     this.draggingEndpoint = null
   }

@@ -112,6 +112,15 @@ Surfaced playtesting Phase 3. Complete.
       lighting model (SceneRecord.ambientBrightness) and fixed wall
       visibility to respect the same fog mask as the map/tokens.
 
+**Post-hoc fixes (found during Phase 4 planning/playtesting, done as
+"Phase 4 Part A" before Phase 4's own scope — noted here since they're
+fixes to already-checked-off items above, not new Phase 4 features):**
+- [x] Persistent-fog "remembered" areas were dim; now full brightness once explored
+- [x] Persistent fog can be toggled on/off per scene without losing explored data
+- [x] "Reset players' memory of this scene" button (wipes explored-area data only)
+- [x] Wall endpoint magnetism — nearby chain/drag points snap to an exact
+      existing endpoint, preventing corner light-leaks from near-miss clicks
+
 ## Phase 4 — Character sheets, dice, initiative
 - [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)
 - [ ] Dice roller: standard notation, advantage/disadvantage, macros

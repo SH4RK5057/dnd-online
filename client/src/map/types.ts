@@ -24,6 +24,13 @@ export interface SceneRecord {
    * Only has a visible effect while fogEnabled is true. Read as `?? 1.0` for
    * scenes created before this field existed. */
   ambientBrightness: number
+  /** Whether explored-but-not-currently-visible cells stay revealed instead
+   * of re-fogging once a player looks away — "persistent fog of
+   * exploration." Only meaningful while fogEnabled is true. Read as `?? true`
+   * for scenes created before this field existed (matches the always-on
+   * behavior it had before this toggle existed). Turning it off doesn't
+   * delete already-recorded exploration data, only stops applying it. */
+  persistentFogEnabled: boolean
   /** Whether players can see this scene at all — lets the DM prep a map
    * (upload art, place walls/lights/tokens) before revealing it. Read as
    * `!== false` everywhere (not `=== true`) so scenes created before this

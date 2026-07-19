@@ -35,6 +35,8 @@ export function SceneToolbar() {
     toggleFog,
     publishScene,
     setAmbientBrightness,
+    togglePersistentFog,
+    resetExploration,
   } = useScenes(doc)
 
   const [newSceneName, setNewSceneName] = useState('')
@@ -87,6 +89,13 @@ export function SceneToolbar() {
     if (!activeScene) return
     if (window.confirm(`Reset scene "${activeScene.name}" back to blank? This removes its map, tokens, walls, and lights.`)) {
       resetScene(activeScene.id)
+    }
+  }
+
+  const handleResetExploration = () => {
+    if (!activeScene) return
+    if (window.confirm(`Reset players' memory of "${activeScene.name}"? They'll see it fogged again until they re-explore.`)) {
+      resetExploration(activeScene.id)
     }
   }
 
@@ -205,6 +214,23 @@ export function SceneToolbar() {
               <option value="hex">Hexagon</option>
             </select>
           </div>
+
+          {activeScene.fogEnabled && (
+            <div className="scene-toolbar__row">
+              <label htmlFor="persistent-fog-enabled">
+                <input
+                  id="persistent-fog-enabled"
+                  type="checkbox"
+                  checked={activeScene.persistentFogEnabled ?? true}
+                  onChange={(event) => togglePersistentFog(activeScene.id, event.target.checked)}
+                />
+                Remember explored areas
+              </label>
+              <button type="button" onClick={handleResetExploration}>
+                Reset players' memory of this scene
+              </button>
+            </div>
+          )}
 
           <div className="scene-toolbar__row">
             <label htmlFor="scene-published">

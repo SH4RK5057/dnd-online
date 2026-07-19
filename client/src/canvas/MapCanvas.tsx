@@ -210,6 +210,7 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
       maxVisionRadiusCells: MAX_VISION_RADIUS_CELLS,
       ambientBrightness: activeScene.ambientBrightness ?? 1,
       exploredCells,
+      persistentFogEnabled: activeScene.persistentFogEnabled ?? true,
     })
     fogTarget.mask = fogLayer.mask
     if (newlyExplored.length > 0) revealCells(newlyExplored)

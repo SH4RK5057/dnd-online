@@ -120,4 +120,64 @@ describe('computeVisibilityPolygon', () => {
     const behindNearWall = { x: 0, y: 4.5 } // past the near wall, still inside maxRadius
     expect(pointInPolygon(behindNearWall, polygonWithNear)).toBe(false)
   })
+
+  it('fully contains an origin inside a closed room with no leaks at any of its four corners', () => {
+    // A closed 10x10 room, walls meeting at exactly-coincident corners —
+    // this is the scenario WallLayer's endpoint magnetism exists to
+    // guarantee in the UI; here we confirm the underlying algorithm itself
+    // has no corner-leak bug when segments really do share an endpoint.
+    const room: Segment[] = [
+      { x1: -5, y1: -5, x2: 5, y2: -5 }, // top
+      { x1: 5, y1: -5, x2: 5, y2: 5 }, // right
+      { x1: 5, y1: 5, x2: -5, y2: 5 }, // bottom
+      { x1: -5, y1: 5, x2: -5, y2: -5 }, // left
+    ]
+    const origin = { x: 0, y: 0 }
+    const maxRadius = 50 // far larger than the room — any leak would reach well past it
+    const polygon = computeVisibilityPolygon(origin, room, maxRadius)
+
+    // A sealed room's visibility polygon should never extend past its walls.
+    for (const point of polygon) {
+      expect(Math.abs(point.x)).toBeLessThanOrEqual(5 + 1e-6)
+      expect(Math.abs(point.y)).toBeLessThanOrEqual(5 + 1e-6)
+    }
+
+    // Points well outside the room, including straight through each corner,
+    // must all be occluded — this is exactly where a coincident-endpoint
+    // leak would show up if the ray-triplet handling were wrong.
+    const outsidePoints = [
+      { x: 20, y: 0 },
+      { x: -20, y: 0 },
+      { x: 0, y: 20 },
+      { x: 0, y: -20 },
+      { x: 20, y: 20 }, // through the bottom-right corner
+      { x: -20, y: -20 }, // through the top-left corner
+      { x: 20, y: -20 }, // through the top-right corner
+      { x: -20, y: 20 }, // through the bottom-left corner
+    ]
+    for (const point of outsidePoints) {
+      expect(pointInPolygon(point, polygon)).toBe(false)
+    }
+  })
+
+  it('lets visibility through a doorway gap in an otherwise-closed room, occluded everywhere else', () => {
+    // Same room as above, but the bottom wall has a doorway gap in the middle.
+    const room: Segment[] = [
+      { x1: -5, y1: -5, x2: 5, y2: -5 }, // top
+      { x1: 5, y1: -5, x2: 5, y2: 5 }, // right
+      { x1: 5, y1: 5, x2: 1, y2: 5 }, // bottom-right half
+      { x1: -1, y1: 5, x2: -5, y2: 5 }, // bottom-left half (gap from x=-1 to x=1)
+      { x1: -5, y1: 5, x2: -5, y2: -5 }, // left
+    ]
+    const origin = { x: 0, y: 0 }
+    const polygon = computeVisibilityPolygon(origin, room, 50)
+
+    const throughDoorway = { x: 0, y: 20 } // straight down through the gap
+    expect(pointInPolygon(throughDoorway, polygon)).toBe(true)
+
+    const throughRightCorner = { x: 20, y: 20 }
+    const throughLeftCorner = { x: -20, y: 20 }
+    expect(pointInPolygon(throughRightCorner, polygon)).toBe(false)
+    expect(pointInPolygon(throughLeftCorner, polygon)).toBe(false)
+  })
 })

@@ -29,6 +29,8 @@ export interface UseScenesResult {
   toggleFog: (sceneId: string, enabled: boolean) => void
   publishScene: (sceneId: string, published: boolean) => void
   setAmbientBrightness: (sceneId: string, ambientBrightness: number) => void
+  togglePersistentFog: (sceneId: string, enabled: boolean) => void
+  resetExploration: (sceneId: string) => void
 }
 
 export function useScenes(doc: Y.Doc | null): UseScenesResult {
@@ -72,6 +74,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         gridType: 'square',
         fogEnabled: false,
         ambientBrightness: 1,
+        persistentFogEnabled: true,
         published: false,
         createdAt: Date.now(),
       }
@@ -242,6 +245,25 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     [doc],
   )
 
+  const togglePersistentFog = useCallback(
+    (sceneId: string, enabled: boolean) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, persistentFogEnabled: enabled })
+    },
+    [doc],
+  )
+
+  const resetExploration = useCallback(
+    (sceneId: string) => {
+      if (!doc) return
+      purgeExplorationForScene(doc, sceneId)
+    },
+    [doc],
+  )
+
   const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null
 
   return {
@@ -258,5 +280,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     toggleFog,
     publishScene,
     setAmbientBrightness,
+    togglePersistentFog,
+    resetExploration,
   }
 }

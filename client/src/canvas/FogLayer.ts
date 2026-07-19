@@ -1,6 +1,5 @@
 import { Container, Graphics, RenderTexture, Sprite, type Renderer } from 'pixi.js'
 import { computeVisibilityPolygon, type Point, type Segment } from '../map/visibility'
-import { EXPLORED_MEMORY_BRIGHTNESS } from '../map/constants'
 import type { LightRecord, TokenRecord, WallRecord } from '../map/types'
 
 export interface FogInput {
@@ -18,9 +17,15 @@ export interface FogInput {
    * SceneRecord.ambientBrightness. 0 = pitch black, 1 = fully lit. */
   ambientBrightness: number
   /** Cell keys ("x,y" in grid-cell-integer units) this player has already
-   * explored on this scene, from useExploration — rendered dimly even when
-   * not currently visible so they never re-fog. */
+   * explored on this scene, from useExploration — stamped fully revealed
+   * even when not currently visible, unless persistentFogEnabled is false. */
   exploredCells: Set<string>
+  /** SceneRecord.persistentFogEnabled — when false, skip the exploration
+   * pass entirely (no read of exploredCells, no newly-explored cells
+   * returned): pure live LOS+ambient fog, nothing remembered. Explored data
+   * already recorded is untouched, just not applied, so re-enabling brings
+   * it back. */
+  persistentFogEnabled: boolean
 }
 
 /**
@@ -53,12 +58,13 @@ export interface FogInput {
  * reads back the masked result via `renderer.extract.pixels` to find which
  * grid cells are genuinely lit up this frame, unions that into the known
  * `exploredCells`, and — for any explored cell that's completely dark this
- * frame (not currently visible at all) — draws a dim EXPLORED_MEMORY_BRIGHTNESS
- * square over just that cell (plain 'normal' blend). A cell the player is
- * actively looking at always shows its true current brightness, even a dim
- * ambient level below the memory floor — the floor only exists to keep
- * cells they've *left* from re-fogging. `update()` returns the
- * newly-discovered cell keys so the caller can persist them.
+ * frame (not currently visible at all) — stamps that cell fully revealed
+ * (opaque white, plain 'normal' blend), same as if it were freshly lit.
+ * Once a cell has been seen it stays fully visible forever (classic
+ * "explored" map convention), it just stops live-updating once the player
+ * leaves — this whole step is skippable via `persistentFogEnabled` for
+ * scenes that want classic re-fog-on-leave behavior instead. `update()`
+ * returns the newly-discovered cell keys so the caller can persist them.
  */
 export class FogLayer {
   readonly mask = new Sprite()
@@ -89,6 +95,7 @@ export class FogLayer {
       maxVisionRadiusCells,
       ambientBrightness,
       exploredCells,
+      persistentFogEnabled,
     } = input
 
     this.ensureRenderTexture(mapSize)
@@ -153,9 +160,13 @@ export class FogLayer {
 
     renderer.render({ container: this.illumContainer, target: this.renderTexture, clear: true, clearColor: 0x000000 })
 
+    if (!persistentFogEnabled) return []
+
     // Persistent fog-of-exploration: find which cells are genuinely lit up
-    // this frame, union into the known explored set, then dim-stamp any
-    // explored cell that's currently darker than the memory floor.
+    // this frame, union into the known explored set, then fully reveal any
+    // explored cell that's completely dark right now — once seen, a cell
+    // stays revealed forever, it just stops live-updating once the player
+    // leaves.
     const cols = Math.max(1, Math.ceil(mapSize.width / gridSizePx))
     const rows = Math.max(1, Math.ceil(mapSize.height / gridSizePx))
     const extracted = renderer.extract.pixels({ target: this.renderTexture })
@@ -182,22 +193,19 @@ export class FogLayer {
 
     // Only stamp cells that aren't currently visible at all (true live red
     // <= 5) — a cell you're actively looking at should show its real
-    // current brightness (even a dim ambient level), not get bumped up to
-    // the memory floor just because it's also been explored before.
-    const memoryGray = Math.round(EXPLORED_MEMORY_BRIGHTNESS * 255)
-    const dimCells: Array<[number, number]> = []
+    // current brightness (even a dim ambient level), not get overwritten
+    // just because it's also been explored before.
+    const revealCells: Array<[number, number]> = []
     for (const key of allExplored) {
       const [cx, cy] = key.split(',').map(Number)
-      if (cellRed(cx, cy) <= 5) dimCells.push([cx, cy])
+      if (cellRed(cx, cy) <= 5) revealCells.push([cx, cy])
     }
 
-    if (dimCells.length > 0) {
+    if (revealCells.length > 0) {
       this.drawGraphics.clear()
       this.drawGraphics.blendMode = 'normal'
-      for (const [cx, cy] of dimCells) {
-        this.drawGraphics
-          .rect(cx * gridSizePx, cy * gridSizePx, gridSizePx, gridSizePx)
-          .fill({ color: (memoryGray << 16) | (memoryGray << 8) | memoryGray, alpha: 1 })
+      for (const [cx, cy] of revealCells) {
+        this.drawGraphics.rect(cx * gridSizePx, cy * gridSizePx, gridSizePx, gridSizePx).fill({ color: 0xffffff, alpha: 1 })
       }
       renderer.render({ container: this.drawGraphics, target: this.renderTexture, clear: false })
     }
