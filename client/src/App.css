@@ -1,8 +1,70 @@
+.landing-screen,
+.setup-screen {
+  max-width: 480px;
+}
+
 .landing-screen__actions,
 .setup-screen__actions {
   display: flex;
   gap: 12px;
   margin-top: 24px;
+}
+
+.scene-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.scene-toolbar__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scene-toolbar__row label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.scene-toolbar__row input[type='number'] {
+  width: 80px;
+}
+
+.scene-toolbar__row input:not([type='checkbox']),
+.scene-toolbar__row select {
+  width: auto;
+  flex: 1 1 160px;
+}
+
+.token-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.token-upload input[type='text'],
+.token-upload input:not([type]) {
+  flex: 1 1 160px;
+  width: auto;
+}
+
+.map-canvas {
+  width: 100%;
+  height: 60vh;
+  min-height: 360px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 24px;
+  background: var(--code-bg);
+  overflow: hidden;
 }
 
 .landing-screen__resume {

@@ -1,0 +1,45 @@
+import type { SizeCategory } from './types'
+
+export const DEFAULT_GRID_SIZE_PX = 70
+
+/** Bytes per Yjs chunk write. Kept well under WebRTC data channels' practical
+ * per-message safety margin (~256KB) so each chunk is its own small,
+ * separately-broadcast update. */
+export const ASSET_CHUNK_SIZE = 16 * 1024
+/** Spacing between chunk writes so a tight synchronous send loop doesn't
+ * flood the data channel. */
+export const ASSET_CHUNK_WRITE_DELAY_MS = 25
+
+export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
+export const MAP_IMAGE_MAX_DIMENSION = 1600
+export const MAP_IMAGE_QUALITY = 0.75
+export const TOKEN_IMAGE_MAX_DIMENSION = 256
+export const TOKEN_IMAGE_QUALITY = 0.8
+
+export const SIZE_FOOTPRINT_CELLS: Record<SizeCategory, number> = {
+  tiny: 1,
+  small: 1,
+  medium: 1,
+  large: 2,
+  huge: 3,
+  gargantuan: 4,
+}
+
+export const SIZE_RENDER_SCALE: Record<SizeCategory, number> = {
+  tiny: 0.5,
+  small: 1,
+  medium: 1,
+  large: 1,
+  huge: 1,
+  gargantuan: 1,
+}
+
+export const SIZE_LABELS: Record<SizeCategory, string> = {
+  tiny: 'Tiny',
+  small: 'Small',
+  medium: 'Medium',
+  large: 'Large',
+  huge: 'Huge',
+  gargantuan: 'Gargantuan',
+}

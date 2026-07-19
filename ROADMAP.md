@@ -52,12 +52,12 @@ anything is visually impressive.
 - [x] Fallback/error messaging when a connection can't be established (strict NAT/firewall)
 
 ## Phase 2 — Core map & token engine
-- [ ] DM uploads a custom map image
-- [ ] Grid overlay (square, snap-to-grid), configurable grid size
-- [ ] Token placement, custom token art upload, drag-to-move
-- [ ] Token size scaling by creature size category
-- [ ] Token moves sync live to all connected players
-- [ ] Multiple scenes per campaign, DM can switch active scene
+- [x] DM uploads a custom map image
+- [x] Grid overlay (square, snap-to-grid), configurable grid size
+- [x] Token placement, custom token art upload, drag-to-move
+- [x] Token size scaling by creature size category
+- [x] Token moves sync live to all connected players
+- [x] Multiple scenes per campaign, DM can switch active scene
 
 ## Phase 3 — Fog of war & dynamic lighting
 - [ ] Wall/obstruction drawing tool for the DM
