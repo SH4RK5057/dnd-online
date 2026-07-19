@@ -86,6 +86,11 @@ anything is visually impressive.
 - [ ] Handouts (share an image/doc to players on demand)
 - [ ] Random generators (loot, NPC names)
 - [ ] Soundboard / ambience music
+- [ ] Campaign export/import as a local file (download the Yjs doc state as a
+      single file, re-import it later or on another machine) — backup/
+      portability on top of the existing IndexedDB persistence, which can be
+      cleared by the browser. Local file only, never uploaded anywhere — no
+      new server-storage surface, matches the DM-hosted decision in Phase 1.
 
 ## Phase 7 — Player tools & polish
 - [ ] Personal inventory management, spell slot tracking
@@ -105,7 +110,8 @@ anything is visually impressive.
 
 Kept here so nothing gets lost even before it's scheduled into a phase above.
 
-**Core infra:** accounts/session roles (DM vs player), campaign save/load
+**Core infra:** accounts/session roles (DM vs player), campaign save/load (see
+Phase 6 — local file only, not server-hosted)
 **Maps:** custom uploads, hex grid option, drawing/measurement tools, ruler, pings
 **Tokens:** status icons, HP bars, resource tracking
 **Rules:** automated attack/save/damage resolution, system-agnostic core
