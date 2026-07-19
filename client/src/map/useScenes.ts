@@ -3,7 +3,7 @@ import * as Y from 'yjs'
 import { isAssetFullyLive, publishAsset, pruneAssetChunks, republishAssetFromCache } from './assetSync'
 import { DEFAULT_GRID_SIZE_PX, MAP_IMAGE_MAX_DIMENSION, MAP_IMAGE_QUALITY } from './constants'
 import { compressImage } from './imageCompress'
-import type { SceneRecord, TokenRecord } from './types'
+import type { LightRecord, SceneRecord, TokenRecord, WallRecord } from './types'
 
 function scenesMap(doc: Y.Doc) {
   return doc.getMap<SceneRecord>('scenes')
@@ -24,6 +24,7 @@ export interface UseScenesResult {
   deleteScene: (sceneId: string) => void
   setSceneMap: (sceneId: string, file: File) => Promise<void>
   updateGrid: (sceneId: string, patch: GridPatch) => void
+  toggleFog: (sceneId: string, enabled: boolean) => void
 }
 
 export function useScenes(doc: Y.Doc | null): UseScenesResult {
@@ -64,6 +65,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         gridOffsetX: 0,
         gridOffsetY: 0,
         gridVisible: true,
+        fogEnabled: false,
         createdAt: Date.now(),
       }
       scenesMap(doc).set(id, record)
@@ -119,9 +121,17 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
       scenesM.delete(sceneId)
 
       const tokensM = doc.getMap<TokenRecord>('tokens')
+      const wallsM = doc.getMap<WallRecord>('walls')
+      const lightsM = doc.getMap<LightRecord>('lights')
       doc.transact(() => {
         tokensM.forEach((token, tokenId) => {
           if (token.sceneId === sceneId) tokensM.delete(tokenId)
+        })
+        wallsM.forEach((wall, wallId) => {
+          if (wall.sceneId === sceneId) wallsM.delete(wallId)
+        })
+        lightsM.forEach((light, lightId) => {
+          if (light.sceneId === sceneId) lightsM.delete(lightId)
         })
       })
 
@@ -163,7 +173,29 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     [doc],
   )
 
+  const toggleFog = useCallback(
+    (sceneId: string, enabled: boolean) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, fogEnabled: enabled })
+    },
+    [doc],
+  )
+
   const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null
 
-  return { scenes, activeSceneId, activeScene, createScene, switchToScene, renameScene, deleteScene, setSceneMap, updateGrid }
+  return {
+    scenes,
+    activeSceneId,
+    activeScene,
+    createScene,
+    switchToScene,
+    renameScene,
+    deleteScene,
+    setSceneMap,
+    updateGrid,
+    toggleFog,
+  }
 }

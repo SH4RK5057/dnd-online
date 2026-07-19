@@ -26,6 +26,7 @@ export interface UseTokensResult {
   setTokenSize: (tokenId: string, sizeCategory: SizeCategory) => void
   moveToken: (tokenId: string, x: number, y: number) => void
   setTokenArt: (tokenId: string, file: File) => Promise<void>
+  assignOwner: (tokenId: string, ownerId: string | null) => void
 }
 
 /** Note (same as the rest of this app's DM-authoritative model): Yjs has no
@@ -70,6 +71,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         sizeCategory: input.sizeCategory,
         x: input.x,
         y: input.y,
+        ownerId: null,
         createdAt: Date.now(),
       }
       tokensMap(doc).set(id, record)
@@ -92,6 +94,10 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     [patchToken],
   )
   const moveToken = useCallback((tokenId: string, x: number, y: number) => patchToken(tokenId, { x, y }), [patchToken])
+  const assignOwner = useCallback(
+    (tokenId: string, ownerId: string | null) => patchToken(tokenId, { ownerId }),
+    [patchToken],
+  )
 
   const setTokenArt = useCallback(
     async (tokenId: string, file: File) => {
@@ -105,5 +111,5 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
 
   const tokens = sceneId ? allTokens.filter((t) => t.sceneId === sceneId) : []
 
-  return { tokens, createToken, deleteToken, renameToken, setTokenSize, moveToken, setTokenArt }
+  return { tokens, createToken, deleteToken, renameToken, setTokenSize, moveToken, setTokenArt, assignOwner }
 }

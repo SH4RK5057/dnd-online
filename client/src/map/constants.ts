@@ -43,3 +43,12 @@ export const SIZE_LABELS: Record<SizeCategory, string> = {
   huge: 'Huge',
   gargantuan: 'Gargantuan',
 }
+
+/** Grid cells, matching TokenRecord/WallRecord/LightRecord's coordinate convention. */
+export const DEFAULT_LIGHT_RADIUS_CELLS = 8
+/** Baseline sight even in total darkness/unlit areas — not a game-rules
+ * darkvision feature, just enough that a token isn't blind at its own feet. */
+export const PERSONAL_VISION_RADIUS_CELLS = 1
+/** Hard cap on how far a token's own line of sight reaches, even in full light. */
+export const MAX_VISION_RADIUS_CELLS = 30
+export const DEFAULT_LIGHT_COLOR = 0xffaa55
