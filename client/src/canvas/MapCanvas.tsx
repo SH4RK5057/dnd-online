@@ -27,7 +27,13 @@ const MIN_ZOOM = 0.2
 const MAX_ZOOM = 5
 const ZOOM_WHEEL_FACTOR = 1.1
 
-export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWalls: boolean }) {
+interface MapCanvasProps {
+  toolMode: ToolMode
+  snapWalls: boolean
+  onPlaceToken?: (x: number, y: number) => void
+}
+
+export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const app = usePixiApp(containerRef)
 
@@ -252,7 +258,17 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
     let cameraStart = { x: 0, y: 0 }
 
     const onPointerDown = (event: FederatedPointerEvent) => {
-      if (toolMode !== 'move' || event.target !== app.stage || event.button !== 0) return
+      if (event.target !== app.stage || event.button !== 0) return
+
+      if (toolMode === 'place-tokens') {
+        const world = worldRef.current
+        if (!world || !onPlaceToken || !activeScene) return
+        const local = world.toLocal(event.global)
+        onPlaceToken(local.x / activeScene.gridSizePx, local.y / activeScene.gridSizePx)
+        return
+      }
+
+      if (toolMode !== 'move') return
       panning = true
       panStart = { x: event.global.x, y: event.global.y }
       cameraStart = { x: camera.position.x, y: camera.position.y }
@@ -280,7 +296,7 @@ export function MapCanvas({ toolMode, snapWalls }: { toolMode: ToolMode; snapWal
       app.stage.off('pointerup', onPointerUp)
       app.stage.off('pointerupoutside', onPointerUp)
     }
-  }, [app, toolMode])
+  }, [app, toolMode, activeScene, onPlaceToken])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />
 }

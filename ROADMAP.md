@@ -120,6 +120,8 @@ fixes to already-checked-off items above, not new Phase 4 features):**
 - [x] "Reset players' memory of this scene" button (wipes explored-area data only)
 - [x] Wall endpoint magnetism — nearby chain/drag points snap to an exact
       existing endpoint, preventing corner light-leaks from near-miss clicks
+- [x] Click-to-place a new token's starting location, instead of always
+      dropping it at the map corner
 
 ## Phase 4 — Character sheets, dice, initiative
 - [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)

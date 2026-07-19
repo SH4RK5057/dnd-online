@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from '../session/useSession'
 import { useConnectionStatus } from '../session/useConnectionStatus'
 import { getOrCreatePlayerId } from '../session/lastSession'
@@ -14,21 +14,46 @@ import { DrawingToolbar } from '../components/DrawingToolbar'
 import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
 import { MapCanvas } from '../canvas/MapCanvas'
 import type { ToolMode } from '../canvas/interactionMode'
+import type { PendingTokenPlacement } from './pendingTokenPlacement'
 
 export function SessionScreen() {
   const { session, sessionMeta, leaveSession } = useSession()
   const { status, peers, failure, retry } = useConnectionStatus(session)
   const { activeSceneId, activeScene } = useScenes(session?.doc ?? null)
-  const { tokens } = useTokens(session?.doc ?? null, activeSceneId)
+  const { tokens, createToken, setTokenArt } = useTokens(session?.doc ?? null, activeSceneId)
   const [toolMode, setToolMode] = useState<ToolMode>('move')
   const [snapWalls, setSnapWalls] = useState(false)
   const [showJoinCode, setShowJoinCode] = useState(true)
+  const [pendingPlacement, setPendingPlacement] = useState<PendingTokenPlacement | null>(null)
+
+  useEffect(() => {
+    if (!pendingPlacement) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingPlacement(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [pendingPlacement])
 
   if (!session) return null
 
   const isUnassignedPlayer =
     session.role === 'player' && !!activeScene?.fogEnabled && !tokens.some((t) => t.ownerId === getOrCreatePlayerId())
   const isUnpublishedForPlayer = session.role === 'player' && !!activeScene && activeScene.published === false
+
+  const effectiveToolMode: ToolMode = pendingPlacement ? 'place-tokens' : toolMode
+
+  const handlePlaceToken = (x: number, y: number) => {
+    if (!pendingPlacement || !activeSceneId) return
+    const { name, sizeCategory, file } = pendingPlacement
+    setPendingPlacement(null)
+    try {
+      const tokenId = createToken({ sceneId: activeSceneId, name, sizeCategory, x, y })
+      if (file) void setTokenArt(tokenId, file)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not add that token.')
+    }
+  }
 
   return (
     <section className="session-screen">
@@ -65,7 +90,14 @@ export function SessionScreen() {
         />
       )}
 
-      {session.role === 'dm' && activeSceneId && <TokenUploadButton sceneId={activeSceneId} />}
+      {session.role === 'dm' && activeSceneId && (
+        <TokenUploadButton
+          sceneId={activeSceneId}
+          pendingPlacement={pendingPlacement}
+          onRequestPlacement={setPendingPlacement}
+          onCancelPlacement={() => setPendingPlacement(null)}
+        />
+      )}
 
       {session.role === 'dm' && activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
 
@@ -76,7 +108,7 @@ export function SessionScreen() {
           {isUnassignedPlayer && (
             <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
           )}
-          <MapCanvas toolMode={toolMode} snapWalls={snapWalls} />
+          <MapCanvas toolMode={effectiveToolMode} snapWalls={snapWalls} onPlaceToken={handlePlaceToken} />
         </>
       )}
 

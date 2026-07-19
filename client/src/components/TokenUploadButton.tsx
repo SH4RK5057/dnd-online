@@ -3,36 +3,38 @@ import { useSession } from '../session/useSession'
 import { useTokens } from '../map/useTokens'
 import { SIZE_LABELS } from '../map/constants'
 import type { SizeCategory } from '../map/types'
+import type { PendingTokenPlacement } from '../screens/pendingTokenPlacement'
 
 const SIZE_OPTIONS = Object.keys(SIZE_LABELS) as SizeCategory[]
 
-export function TokenUploadButton({ sceneId }: { sceneId: string }) {
+interface TokenUploadButtonProps {
+  sceneId: string
+  pendingPlacement: PendingTokenPlacement | null
+  onRequestPlacement: (placement: PendingTokenPlacement) => void
+  onCancelPlacement: () => void
+}
+
+export function TokenUploadButton({
+  sceneId,
+  pendingPlacement,
+  onRequestPlacement,
+  onCancelPlacement,
+}: TokenUploadButtonProps) {
   const { session } = useSession()
   const doc = session?.doc ?? null
-  const { tokens, createToken, setTokenArt, deleteAllTokens } = useTokens(doc, sceneId)
+  const { tokens, deleteAllTokens } = useTokens(doc, sceneId)
 
   const [name, setName] = useState('')
   const [sizeCategory, setSizeCategory] = useState<SizeCategory>('medium')
   const [file, setFile] = useState<File | null>(null)
-  const [busy, setBusy] = useState(false)
 
-  const handleSubmit = async (event: FormEvent) => {
+  const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    setBusy(true)
-    try {
-      const tokenId = createToken({ sceneId, name: trimmed, sizeCategory, x: 0, y: 0 })
-      if (file) {
-        await setTokenArt(tokenId, file)
-      }
-      setName('')
-      setFile(null)
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not add that token.')
-    } finally {
-      setBusy(false)
-    }
+    onRequestPlacement({ name: trimmed, sizeCategory, file })
+    setName('')
+    setFile(null)
   }
 
   const handleEraseAll = () => {
@@ -42,8 +44,21 @@ export function TokenUploadButton({ sceneId }: { sceneId: string }) {
     }
   }
 
+  if (pendingPlacement) {
+    return (
+      <div className="token-upload token-upload--pending">
+        <span>
+          Click the map to place "{pendingPlacement.name}" (or cancel)
+        </span>
+        <button type="button" onClick={onCancelPlacement}>
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <form className="token-upload" onSubmit={(event) => void handleSubmit(event)}>
+    <form className="token-upload" onSubmit={handleSubmit}>
       <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Token name" />
       <select value={sizeCategory} onChange={(event) => setSizeCategory(event.target.value as SizeCategory)}>
         {SIZE_OPTIONS.map((size) => (
@@ -53,8 +68,8 @@ export function TokenUploadButton({ sceneId }: { sceneId: string }) {
         ))}
       </select>
       <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-      <button type="submit" disabled={!name.trim() || busy}>
-        {busy ? 'Adding…' : 'Add token'}
+      <button type="submit" disabled={!name.trim()}>
+        Add token
       </button>
       <button type="button" onClick={handleEraseAll} disabled={tokens.length === 0}>
         Erase all tokens
