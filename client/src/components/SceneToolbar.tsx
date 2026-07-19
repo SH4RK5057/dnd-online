@@ -5,8 +5,18 @@ import { useScenes } from '../map/useScenes'
 export function SceneToolbar() {
   const { session } = useSession()
   const doc = session?.doc ?? null
-  const { scenes, activeSceneId, activeScene, createScene, switchToScene, renameScene, deleteScene, setSceneMap, updateGrid } =
-    useScenes(doc)
+  const {
+    scenes,
+    activeSceneId,
+    activeScene,
+    createScene,
+    switchToScene,
+    renameScene,
+    deleteScene,
+    setSceneMap,
+    updateGrid,
+    toggleFog,
+  } = useScenes(doc)
 
   const [newSceneName, setNewSceneName] = useState('')
   const [mapUploading, setMapUploading] = useState(false)
@@ -121,6 +131,15 @@ export function SceneToolbar() {
                 onChange={(event) => updateGrid(activeScene.id, { gridVisible: event.target.checked })}
               />
               Show grid
+            </label>
+            <label htmlFor="fog-enabled">
+              <input
+                id="fog-enabled"
+                type="checkbox"
+                checked={activeScene.fogEnabled}
+                onChange={(event) => toggleFog(activeScene.id, event.target.checked)}
+              />
+              Fog of war
             </label>
           </div>
         </>
