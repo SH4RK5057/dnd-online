@@ -4,11 +4,13 @@ export function LandingScreen({
   lastSession,
   onHost,
   onJoin,
+  onCharacters,
   onResume,
 }: {
   lastSession: LastSession | null
   onHost: () => void
   onJoin: () => void
+  onCharacters: () => void
   onResume: (lastSession: LastSession) => void
 }) {
   return (
@@ -33,6 +35,9 @@ export function LandingScreen({
         </button>
         <button type="button" onClick={onJoin}>
           Join a session
+        </button>
+        <button type="button" onClick={onCharacters}>
+          My Characters
         </button>
       </div>
     </section>

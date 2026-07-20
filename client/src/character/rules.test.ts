@@ -1,0 +1,162 @@
+import { describe, expect, it } from 'vitest'
+import {
+  computeInitiativeBonus,
+  computeModifier,
+  computeProficiencyBonus,
+  computeSaveBonus,
+  computeSkillBonus,
+  resolveTokenHp,
+} from './rules'
+import type { CharacterRecord } from './types'
+import type { TokenRecord } from '../map/types'
+
+describe('computeModifier', () => {
+  it('handles even and odd scores', () => {
+    expect(computeModifier(10)).toBe(0)
+    expect(computeModifier(11)).toBe(0)
+    expect(computeModifier(12)).toBe(1)
+    expect(computeModifier(20)).toBe(5)
+    expect(computeModifier(8)).toBe(-1)
+    expect(computeModifier(1)).toBe(-5)
+  })
+})
+
+describe('computeProficiencyBonus', () => {
+  it('matches the standard 5e level breakpoints', () => {
+    expect(computeProficiencyBonus(1)).toBe(2)
+    expect(computeProficiencyBonus(4)).toBe(2)
+    expect(computeProficiencyBonus(5)).toBe(3)
+    expect(computeProficiencyBonus(8)).toBe(3)
+    expect(computeProficiencyBonus(9)).toBe(4)
+    expect(computeProficiencyBonus(12)).toBe(4)
+    expect(computeProficiencyBonus(13)).toBe(5)
+    expect(computeProficiencyBonus(16)).toBe(5)
+    expect(computeProficiencyBonus(17)).toBe(6)
+    expect(computeProficiencyBonus(20)).toBe(6)
+  })
+
+  it('clamps out-of-range levels', () => {
+    expect(computeProficiencyBonus(0)).toBe(2)
+    expect(computeProficiencyBonus(25)).toBe(6)
+  })
+})
+
+function baseCharacter(): CharacterRecord {
+  return {
+    id: 'c1',
+    ownerId: 'p1',
+    campaignId: null,
+    locked: false,
+    name: 'Test',
+    race: 'Human',
+    className: 'Fighter',
+    level: 5,
+    background: '',
+    alignment: '',
+    abilities: { str: 16, dex: 14, con: 12, int: 10, wis: 8, cha: 13 },
+    saveProficiencies: { str: true, dex: false, con: true, int: false, wis: false, cha: false },
+    skillProficiencies: { athletics: 'proficient', perception: 'expertise' },
+    ac: 16,
+    initiativeBonus: 0,
+    speed: 30,
+    hp: { max: 44, current: 44, temp: 0 },
+    hitDice: '5d10',
+    inventory: [],
+    spellSlotsByLevel: [],
+    spells: [],
+    feats: [],
+    createdAt: 0,
+  }
+}
+
+describe('computeSaveBonus', () => {
+  it('adds proficiency bonus only when proficient', () => {
+    const c = baseCharacter()
+    // Str 16 -> mod +3, proficient at level 5 (prof +3) => +6
+    expect(computeSaveBonus(c, 'str')).toBe(6)
+    // Dex 14 -> mod +2, not proficient => +2
+    expect(computeSaveBonus(c, 'dex')).toBe(2)
+  })
+})
+
+describe('computeSkillBonus', () => {
+  it('applies no bonus, proficiency, or double proficiency (expertise)', () => {
+    const c = baseCharacter()
+    // Str 16 -> mod +3; athletics proficient, prof +3 => +6
+    expect(computeSkillBonus(c, 'athletics')).toBe(6)
+    // Wis 8 -> mod -1; perception expertise, prof +3*2 => -1 + 6 = 5
+    expect(computeSkillBonus(c, 'perception')).toBe(5)
+    // Int 10 -> mod 0; arcana untrained => 0
+    expect(computeSkillBonus(c, 'arcana')).toBe(0)
+  })
+})
+
+describe('computeInitiativeBonus', () => {
+  it('combines Dex modifier and flat bonus', () => {
+    const c = baseCharacter()
+    expect(computeInitiativeBonus(c)).toBe(2)
+    expect(computeInitiativeBonus({ ...c, initiativeBonus: 2 })).toBe(4)
+  })
+})
+
+describe('resolveTokenHp', () => {
+  const character = baseCharacter()
+  const charactersById = new Map([[character.id, character]])
+
+  it('reads from the linked character when characterId is set', () => {
+    const token: TokenRecord = {
+      id: 't1',
+      sceneId: 's1',
+      name: 'Hero',
+      assetId: null,
+      sizeCategory: 'medium',
+      x: 0,
+      y: 0,
+      ownerId: 'p1',
+      characterId: character.id,
+      hp: null,
+      conditions: [],
+      initiative: null,
+      createdAt: 0,
+    }
+    expect(resolveTokenHp(token, charactersById)).toEqual({ max: 44, current: 44, temp: 0, fromCharacter: true })
+  })
+
+  it('reads from the token directly when unlinked', () => {
+    const token: TokenRecord = {
+      id: 't2',
+      sceneId: 's1',
+      name: 'Goblin',
+      assetId: null,
+      sizeCategory: 'small',
+      x: 0,
+      y: 0,
+      ownerId: null,
+      characterId: null,
+      hp: { max: 7, current: 7, temp: 0 },
+      conditions: [],
+      initiative: null,
+      createdAt: 0,
+    }
+    expect(resolveTokenHp(token, charactersById)).toEqual({ max: 7, current: 7, temp: 0, fromCharacter: false })
+  })
+
+  it('returns null when neither a linked character nor token HP exists', () => {
+    const token: TokenRecord = {
+      id: 't3',
+      sceneId: 's1',
+      name: 'Prop',
+      assetId: null,
+      sizeCategory: 'medium',
+      x: 0,
+      y: 0,
+      ownerId: null,
+      characterId: null,
+      hp: null,
+      conditions: [],
+      initiative: null,
+      createdAt: 0,
+    }
+    expect(resolveTokenHp(token, charactersById)).toBeNull()
+  })
+})

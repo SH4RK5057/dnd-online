@@ -127,38 +127,44 @@ fixes to already-checked-off items above, not new Phase 4 features):**
 
 ## Phase 4 — Character sheets, dice, initiative
 
+Complete.
+
 **Character sheet & files**
-- [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)
-- [ ] Standalone character editor — full character creation/editing decoupled
+- [x] Full 5e character sheet (stats, skills, inventory, spells, feats)
+- [x] Standalone character editor — full character creation/editing decoupled
       from any active campaign; export/download a character as a local file,
       re-upload it later to keep editing it standalone
-- [ ] Campaign binding & character locking — joining a campaign imports a
+- [x] Campaign binding & character locking — joining a campaign imports a
       player's character file; the campaign clones and locks the core
       blueprint (stats, level, class) so it can't be edited mid-session;
       rejoining automatically reconnects the player to their assigned
       campaign character (builds on Phase 1's reconnect handling)
 
 **Dice & rolls**
-- [ ] Dice roller: standard notation, advantage/disadvantage, macros
-- [ ] DM-requested rolls — players communicate intent via chat/voice outside
+- [x] Dice roller: standard notation, advantage/disadvantage, macros (macros
+      = the character sheet's quick-roll buttons, a thin layer over the same
+      roll pipeline — not a separate named-macro CRUD feature)
+- [x] DM-requested rolls — players communicate intent via chat/voice outside
       the app, and the DM sends an official roll prompt/request to a specific
       player through the app UI (for non-battle checks and similar)
-- [ ] Roll results broadcast to a shared roll log (its own simple feed —
+- [x] Roll results broadcast to a shared roll log (its own simple feed —
       doesn't depend on Phase 7's full IC/OOC text chat)
-- [ ] Expandable roll breakdown — each roll log entry can expand to show the
+- [x] Expandable roll breakdown — each roll log entry can expand to show the
       underlying math (natural die result vs. each compound bonus/modifier)
 
 **Initiative & combat**
-- [ ] Initiative tracker / turn order, HP and status/condition tracking on tokens
-- [ ] Automatic initiative rolling on encounter start, with a DM toggle
+- [x] Initiative tracker / turn order, HP and status/condition tracking on tokens
+- [x] Automatic initiative rolling on encounter start, with a DM toggle
       between Individual Monster Initiative (each monster rolls its own) and
       Group Monster Initiative (grouped by enemy type, one roll per group)
-- [ ] Turn-by-turn combat loop — active-turn sequencing that
+- [x] Turn-by-turn combat loop — active-turn sequencing that
       restricts/enables each player's action menu based on whose turn it is
-- [ ] Automated status-effect evaluation — active conditions (Poisoned,
+- [x] Automated status-effect evaluation — active conditions (Poisoned,
       Blinded, etc.) are mechanically applied during rolls and targeted
-      actions, not just displayed as labels (depends on Phase 5's rules
-      content for condition definitions)
+      actions, not just displayed as labels. Ships now as a small hardcoded
+      condition-effects table (dice/conditions.ts) rather than waiting on
+      Phase 5's full rules content — richer/data-driven condition data can
+      replace it later without changing the mechanism.
 
 ## Phase 5 — 5etools content integration
 - [ ] **Confirm what's actually redistributable** from 5etools' data (it's

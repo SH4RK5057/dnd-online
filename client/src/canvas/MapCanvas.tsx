@@ -8,6 +8,8 @@ import { useWalls } from '../map/useWalls'
 import { useLights } from '../map/useLights'
 import { useExploration } from '../map/useExploration'
 import { useAssetUrl } from '../map/assetSync'
+import { useCharacters } from '../character/useCharacters'
+import { resolveTokenHp } from '../character/rules'
 import {
   PERSONAL_VISION_RADIUS_CELLS,
   MAX_VISION_RADIUS_CELLS,
@@ -35,9 +37,21 @@ interface MapCanvasProps {
    * player currently sees (their fog mask, their exploration memory)
    * instead of the DM's always-unmasked view. Always null for players. */
   previewPlayerId?: string | null
+  /** Currently-selected token (for the HP/condition editor panel, owned by
+   * the caller since that panel lives outside the canvas), and the callback
+   * fired when a token is clicked. */
+  selectedTokenId?: string | null
+  onSelectToken?: (tokenId: string) => void
 }
 
-export function MapCanvas({ toolMode, snapWalls, onPlaceToken, previewPlayerId = null }: MapCanvasProps) {
+export function MapCanvas({
+  toolMode,
+  snapWalls,
+  onPlaceToken,
+  previewPlayerId = null,
+  selectedTokenId = null,
+  onSelectToken,
+}: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const app = usePixiApp(containerRef)
 
@@ -58,6 +72,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken, previewPlayerId =
   const { walls, createWall, updateWallEndpoint, deleteWall } = useWalls(doc, activeScene?.id ?? null)
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
   const { exploredCells, revealCells } = useExploration(doc, activeScene?.id ?? null, effectiveViewerId)
+  const { characters } = useCharacters(doc)
 
   const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -178,14 +193,28 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken, previewPlayerId =
     applySize()
   }, [app, mapUrl, activeScene])
 
-  // Update tokens.
+  // Update tokens. Selection is allowed only in Move mode, same as dragging —
+  // otherwise a click meant for the active drawing tool (walls/lights) could
+  // be intercepted by a token sprite sitting on top of it instead.
   useEffect(() => {
     if (!doc || !tokenLayerRef.current || !activeScene) return
-    tokenLayerRef.current.update(doc, tokens, activeScene.gridSizePx, isDmUnmasked && toolMode === 'move', {
-      onMove: moveToken,
-      onMoveEnd: moveToken,
-    })
-  }, [doc, tokens, activeScene, isDmUnmasked, toolMode, moveToken])
+    const charactersById = new Map(characters.map((c) => [c.id, c]))
+    const resolvedHpByTokenId = new Map(tokens.map((t) => [t.id, resolveTokenHp(t, charactersById)]))
+    tokenLayerRef.current.update(
+      doc,
+      tokens,
+      activeScene.gridSizePx,
+      isDmUnmasked && toolMode === 'move',
+      toolMode === 'move',
+      selectedTokenId,
+      resolvedHpByTokenId,
+      {
+        onMove: moveToken,
+        onMoveEnd: moveToken,
+        onSelect: (tokenId) => onSelectToken?.(tokenId),
+      },
+    )
+  }, [doc, tokens, characters, activeScene, isDmUnmasked, toolMode, selectedTokenId, moveToken, onSelectToken])
 
   // Update walls.
   useEffect(() => {

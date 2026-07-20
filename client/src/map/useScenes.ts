@@ -5,6 +5,7 @@ import { DEFAULT_GRID_SIZE_PX, MAP_IMAGE_MAX_DIMENSION, MAP_IMAGE_QUALITY } from
 import { compressImage } from './imageCompress'
 import { purgeExplorationForScene } from './useExploration'
 import type { LightRecord, SceneRecord, TokenRecord, WallRecord } from './types'
+import type { CombatStateRecord } from '../combat/types'
 
 function scenesMap(doc: Y.Doc) {
   return doc.getMap<SceneRecord>('scenes')
@@ -147,6 +148,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         })
       })
       purgeExplorationForScene(doc, sceneId)
+      doc.getMap<CombatStateRecord>('combat').delete(sceneId)
 
       const sessionM = sessionMap(doc)
       if (sessionM.get('activeSceneId') === sceneId) {
@@ -185,6 +187,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         })
       })
       purgeExplorationForScene(doc, sceneId)
+      doc.getMap<CombatStateRecord>('combat').delete(sceneId)
     },
     [doc],
   )

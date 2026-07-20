@@ -6,10 +6,11 @@ import { LandingScreen } from './screens/LandingScreen'
 import { HostSetupScreen } from './screens/HostSetupScreen'
 import { JoinSetupScreen } from './screens/JoinSetupScreen'
 import { SessionScreen } from './screens/SessionScreen'
+import { CharacterManagerScreen } from './screens/CharacterManagerScreen'
 import type { LastSession } from './session/types'
 import './App.css'
 
-type Screen = 'landing' | 'host-form' | 'join-form'
+type Screen = 'landing' | 'host-form' | 'join-form' | 'characters'
 
 function Shell() {
   const { session, startSession, joinSession } = useSession()
@@ -40,12 +41,15 @@ function Shell() {
           onBack={() => setScreen('landing')}
         />
       )
+    case 'characters':
+      return <CharacterManagerScreen onBack={() => setScreen('landing')} />
     default:
       return (
         <LandingScreen
           lastSession={lastSession}
           onHost={() => setScreen('host-form')}
           onJoin={() => setScreen('join-form')}
+          onCharacters={() => setScreen('characters')}
           onResume={(saved) =>
             startSession(saved.dmName, { reuseCode: saved.code, sessionName: saved.sessionName })
           }

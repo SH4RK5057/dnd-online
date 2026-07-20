@@ -28,6 +28,10 @@ export interface UseTokensResult {
   moveToken: (tokenId: string, x: number, y: number) => void
   setTokenArt: (tokenId: string, file: File) => Promise<void>
   assignOwner: (tokenId: string, ownerId: string | null) => void
+  linkCharacter: (tokenId: string, characterId: string | null) => void
+  setTokenHp: (tokenId: string, hp: { current: number; max: number; temp: number } | null) => void
+  setTokenConditions: (tokenId: string, conditions: string[]) => void
+  setTokenInitiative: (tokenId: string, initiative: number | null) => void
 }
 
 /** Note (same as the rest of this app's DM-authoritative model): Yjs has no
@@ -73,6 +77,10 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         x: input.x,
         y: input.y,
         ownerId: null,
+        characterId: null,
+        hp: null,
+        conditions: [],
+        initiative: null,
         createdAt: Date.now(),
       }
       tokensMap(doc).set(id, record)
@@ -112,6 +120,22 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     (tokenId: string, ownerId: string | null) => patchToken(tokenId, { ownerId }),
     [patchToken],
   )
+  const linkCharacter = useCallback(
+    (tokenId: string, characterId: string | null) => patchToken(tokenId, { characterId }),
+    [patchToken],
+  )
+  const setTokenHp = useCallback(
+    (tokenId: string, hp: { current: number; max: number; temp: number } | null) => patchToken(tokenId, { hp }),
+    [patchToken],
+  )
+  const setTokenConditions = useCallback(
+    (tokenId: string, conditions: string[]) => patchToken(tokenId, { conditions }),
+    [patchToken],
+  )
+  const setTokenInitiative = useCallback(
+    (tokenId: string, initiative: number | null) => patchToken(tokenId, { initiative }),
+    [patchToken],
+  )
 
   const setTokenArt = useCallback(
     async (tokenId: string, file: File) => {
@@ -125,5 +149,19 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
 
   const tokens = sceneId ? allTokens.filter((t) => t.sceneId === sceneId) : []
 
-  return { tokens, createToken, deleteToken, deleteAllTokens, renameToken, setTokenSize, moveToken, setTokenArt, assignOwner }
+  return {
+    tokens,
+    createToken,
+    deleteToken,
+    deleteAllTokens,
+    renameToken,
+    setTokenSize,
+    moveToken,
+    setTokenArt,
+    assignOwner,
+    linkCharacter,
+    setTokenHp,
+    setTokenConditions,
+    setTokenInitiative,
+  }
 }

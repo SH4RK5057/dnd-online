@@ -62,6 +62,22 @@ export interface TokenRecord {
    * player's fog-of-war is computed from — a UI convention like the rest of
    * this app's DM-authoritative model, not an enforced permission. */
   ownerId: string | null
+  /** Links this token to a CharacterRecord (character/types.ts). When set,
+   * `hp` below is not authoritative — see character/rules.ts resolveTokenHp
+   * for why HP lives on the character instead once linked. */
+  characterId: string | null
+  /** Only meaningful (read or written) when characterId is null — a loose
+   * monster/NPC token with no character sheet behind it. */
+  hp: { current: number; max: number; temp: number } | null
+  /** Condition names (see dice/conditions.ts KNOWN_CONDITIONS). Always
+   * meaningful regardless of characterId — combat-instance-scoped, not
+   * duplicated onto the character. */
+  conditions: string[]
+  /** This token's rolled initiative for the current encounter, or null
+   * outside combat / before it's rolled. Turn order is always derived fresh
+   * from this field (see combat/rules.ts computeInitiativeOrder) — never
+   * stored as a separate ordered list. */
+  initiative: number | null
   createdAt: number
 }
 
