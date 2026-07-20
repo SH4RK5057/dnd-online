@@ -2,6 +2,7 @@ import { useSession } from '../session/useSession'
 import { useWalls } from '../map/useWalls'
 import { useLights } from '../map/useLights'
 import { useTokens } from '../map/useTokens'
+import { useAnnotations } from '../map/useAnnotations'
 import type { ToolMode } from '../canvas/interactionMode'
 
 function colorToHex(color: number): string {
@@ -30,6 +31,7 @@ export function DrawingToolbar({
   const { lights, setLightRadius, setLightColor, setLightEnabled, attachLightToToken, detachLight, deleteLight } =
     useLights(doc, sceneId)
   const { tokens } = useTokens(doc, sceneId)
+  const { annotations, clearAll: clearAllAnnotations } = useAnnotations(doc, sceneId, true)
 
   const handleClearWalls = () => {
     if (walls.length === 0) return
@@ -49,6 +51,9 @@ export function DrawingToolbar({
         </button>
         <button type="button" aria-pressed={toolMode === 'place-lights'} onClick={() => onToolModeChange('place-lights')}>
           Place Lights
+        </button>
+        <button type="button" aria-pressed={toolMode === 'place-pois'} onClick={() => onToolModeChange('place-pois')}>
+          Place POIs
         </button>
       </div>
 
@@ -71,6 +76,16 @@ export function DrawingToolbar({
           </button>
         </div>
       )}
+
+      <div className="drawing-toolbar__panel">
+        <p className="drawing-toolbar__hint">
+          Shift-drag anywhere on empty map to sketch a temporary annotation — works for everyone in any tool mode,
+          and fades away on its own after about a minute.
+        </p>
+        <button type="button" onClick={clearAllAnnotations} disabled={annotations.length === 0}>
+          Clear all annotations ({annotations.length})
+        </button>
+      </div>
 
       {toolMode === 'place-lights' && (
         <div className="drawing-toolbar__panel drawing-toolbar__panel--column">

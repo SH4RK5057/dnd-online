@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSession } from '../session/useSession'
+import { getOrCreatePlayerId } from '../session/lastSession'
 import { useRollLog } from '../dice/useRollLog'
 import type { RollRecord, RollTerm } from '../dice/types'
 
@@ -41,8 +42,16 @@ export function RollLog() {
   const { session } = useSession()
   const doc = session?.doc ?? null
   const isDm = session?.role === 'dm'
+  const myPlayerId = getOrCreatePlayerId()
   const { rolls } = useRollLog(doc, isDm)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  // Private rolls are still written to the same shared doc.getMap('rolls')
+  // (this app has no server to filter writes at the source — see
+  // dice/types.ts's RollRecord.private doc comment) — visibility is
+  // enforced here instead: only the roller and the DM ever render the
+  // entry, everyone else's client just skips it.
+  const visibleRolls = rolls.filter((roll) => !roll.private || isDm || roll.playerId === myPlayerId)
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -55,7 +64,7 @@ export function RollLog() {
 
   if (!doc) return null
 
-  const newestFirst = [...rolls].reverse()
+  const newestFirst = [...visibleRolls].reverse()
 
   return (
     <div className="roll-log">
@@ -70,6 +79,7 @@ export function RollLog() {
                 ({roll.notation}
                 {roll.mode !== 'normal' ? `, ${roll.mode}` : ''})
               </span>
+              {roll.private && <span className="roll-log__private">private</span>}
             </button>
             {expanded.has(roll.id) && <RollBreakdown roll={roll} />}
           </li>

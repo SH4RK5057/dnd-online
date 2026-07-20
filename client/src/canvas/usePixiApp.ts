@@ -38,8 +38,17 @@ export function usePixiApp(containerRef: RefObject<HTMLDivElement | null>): Appl
         setApp(instance)
       })
 
+    // `resizeTo` alone only reacts to the window's own 'resize' event, not to
+    // the container changing size on its own (e.g. our mobile breakpoint
+    // switching the side panel from row to column layout, which narrows the
+    // canvas without the window itself resizing) — a ResizeObserver catches
+    // that case too, keeping the canvas from overflowing its column.
+    const resizeObserver = new ResizeObserver(() => appRef.current?.resize())
+    resizeObserver.observe(container)
+
     return () => {
       cancelled = true
+      resizeObserver.disconnect()
       if (appRef.current) {
         appRef.current.destroy(true, { children: true, texture: true })
         appRef.current = null

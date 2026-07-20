@@ -5,6 +5,7 @@ import {
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
+  parseHitDiceCount,
   resolveTokenHp,
 } from './rules'
 import type { CharacterRecord } from './types'
@@ -62,7 +63,10 @@ function baseCharacter(): CharacterRecord {
     hp: { max: 44, current: 44, temp: 0 },
     hitDice: '5d10',
     inventory: [],
+    hitDiceUsed: 0,
     spellSlotsByLevel: [],
+    spellSlotsUsedByLevel: [],
+    resources: [],
     spells: [],
     feats: [],
     createdAt: 0,
@@ -176,5 +180,22 @@ describe('resolveTokenHp', () => {
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toBeNull()
+  })
+})
+
+describe('parseHitDiceCount', () => {
+  it('extracts the die count from a standard hit-dice string', () => {
+    expect(parseHitDiceCount('3d8')).toBe(3)
+    expect(parseHitDiceCount('1d6')).toBe(1)
+    expect(parseHitDiceCount('12d10')).toBe(12)
+  })
+
+  it('tolerates surrounding whitespace and case', () => {
+    expect(parseHitDiceCount(' 5D8 ')).toBe(5)
+  })
+
+  it('returns 0 for unparseable text', () => {
+    expect(parseHitDiceCount('')).toBe(0)
+    expect(parseHitDiceCount('lots')).toBe(0)
   })
 })

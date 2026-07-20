@@ -5,6 +5,9 @@ import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useCombat } from '../combat/useCombat'
 import { useCharacters, newBlankCharacter } from '../character/useCharacters'
+import { useInventoryActions } from '../character/useInventoryActions'
+import { useCampaignSettings } from '../character/useCampaignSettings'
+import { applyLongRest, applyShortRest, hitDiceAvailable, shortRestHealingNotation } from '../character/rest'
 import {
   exportCharacterToFile,
   importCharacterFromFile,
@@ -33,12 +36,15 @@ export function CharacterPanel() {
   const { activeSceneId, activeScene } = useScenes(doc)
   const { tokens } = useTokens(doc, activeSceneId)
   const { combat } = useCombat(doc, activeSceneId)
-  const { myCharacter, bindCharacter, updateCharacter } = useCharacters(doc)
+  const { characters, myCharacter, bindCharacter, updateCharacter } = useCharacters(doc)
   const { pushRoll } = useRollLog(doc, isDm)
+  const inventoryActions = useInventoryActions(doc, isDm)
+  const { settings: campaignSettings, setRestsEnabled } = useCampaignSettings(doc)
 
   const [standaloneList, setStandaloneList] = useState(() => listStandaloneCharacters())
   const [selectedStandaloneId, setSelectedStandaloneId] = useState('')
   const [rollMode, setRollMode] = useState<RollMode>('normal')
+  const [hitDiceToSpend, setHitDiceToSpend] = useState(1)
 
   const character = myCharacter(myPlayerId)
 
@@ -127,11 +133,37 @@ export function CharacterPanel() {
         modifier: result.modifier,
         total: result.total,
         requestedBy: null,
+        private: false,
       })
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not roll that.')
     }
   }
+
+  const canRest = campaignSettings.restsEnabled ?? true
+  const diceAvailable = hitDiceAvailable(character)
+
+  const handleShortRest = () => {
+    const count = Math.min(hitDiceToSpend, diceAvailable)
+    if (count <= 0) return
+    const notation = shortRestHealingNotation(character, count)
+    const result = rollNotation(parseNotation(notation), 'normal')
+    pushRoll({
+      playerId: myPlayerId,
+      playerName: session?.displayName ?? 'Player',
+      label: 'Short rest healing',
+      notation,
+      mode: 'normal',
+      terms: result.terms,
+      modifier: result.modifier,
+      total: result.total,
+      requestedBy: null,
+      private: false,
+    })
+    handleUpdate(applyShortRest(character, count, Math.max(0, result.total)))
+  }
+
+  const handleLongRest = () => handleUpdate(applyLongRest(character))
 
   return (
     <div className="character-panel">
@@ -155,6 +187,33 @@ export function CharacterPanel() {
           Export character file
         </button>
       </div>
+
+      {isDm && (
+        <label className="character-panel__rests-toggle">
+          <input type="checkbox" checked={canRest} onChange={(e) => setRestsEnabled(e.target.checked)} />
+          Allow players to rest
+        </label>
+      )}
+
+      <div className="character-panel__rest-row">
+        <button type="button" onClick={handleLongRest} disabled={!canRest}>
+          Long rest
+        </button>
+        <input
+          type="number"
+          min={1}
+          max={Math.max(1, diceAvailable)}
+          value={hitDiceToSpend}
+          disabled={!canRest || diceAvailable === 0}
+          onChange={(e) => setHitDiceToSpend(Number(e.target.value))}
+          title="Hit dice to spend"
+        />
+        <button type="button" onClick={handleShortRest} disabled={!canRest || diceAvailable === 0}>
+          Short rest ({diceAvailable} hit {diceAvailable === 1 ? 'die' : 'dice'} left)
+        </button>
+      </div>
+      {!canRest && <p className="character-sheet__hint">The DM has temporarily disabled resting.</p>}
+
       {combat.active && !isMyTurn && <p className="character-sheet__hint">It's not your turn — quick-roll buttons are disabled.</p>}
       {!activeScene && <p className="character-sheet__hint">No active scene.</p>}
       <CharacterSheet
@@ -163,6 +222,8 @@ export function CharacterPanel() {
         canRoll={canRoll}
         onUpdate={handleUpdate}
         onQuickRoll={handleQuickRoll}
+        inventoryActions={inventoryActions}
+        otherCharacters={characters.filter((c) => c.id !== character.id).map((c) => ({ id: c.id, name: c.name }))}
       />
     </div>
   )

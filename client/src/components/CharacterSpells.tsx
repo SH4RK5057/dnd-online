@@ -15,13 +15,24 @@ export function CharacterSpells({
   character: CharacterRecord
   canEdit: boolean
   blueprintEditable: boolean
-  onUpdate: (patch: Partial<Pick<CharacterRecord, 'spellSlotsByLevel' | 'spells'>>) => void
+  onUpdate: (patch: Partial<Pick<CharacterRecord, 'spellSlotsByLevel' | 'spellSlotsUsedByLevel' | 'spells'>>) => void
 }) {
   const setSlot = (levelIndex: number, value: number) => {
     const next = [...character.spellSlotsByLevel]
     while (next.length <= levelIndex) next.push(0)
     next[levelIndex] = value
     onUpdate({ spellSlotsByLevel: next })
+  }
+
+  // Spending/recovering a slot during play is allowed regardless of
+  // blueprintEditable/locked — only the total granted at this level is part
+  // of the locked blueprint, not how many are currently spent.
+  const setUsed = (levelIndex: number, delta: number) => {
+    const total = character.spellSlotsByLevel[levelIndex] ?? 0
+    const next = [...character.spellSlotsUsedByLevel]
+    while (next.length <= levelIndex) next.push(0)
+    next[levelIndex] = Math.max(0, Math.min(total, (next[levelIndex] ?? 0) + delta))
+    onUpdate({ spellSlotsUsedByLevel: next })
   }
 
   const updateSpell = (id: string, patch: Partial<SpellEntry>) => {
@@ -37,19 +48,34 @@ export function CharacterSpells({
     <div className="character-sheet__section">
       <h3>Spell slots</h3>
       <div className="character-sheet__spell-slots">
-        {SPELL_LEVELS.map((level, index) => (
-          <label key={level}>
-            Lvl {level}
-            <input
-              type="number"
-              min={0}
-              max={9}
-              value={character.spellSlotsByLevel[index] ?? 0}
-              disabled={!canEdit || !blueprintEditable}
-              onChange={(e) => setSlot(index, Number(e.target.value))}
-            />
-          </label>
-        ))}
+        {SPELL_LEVELS.map((level, index) => {
+          const total = character.spellSlotsByLevel[index] ?? 0
+          const used = character.spellSlotsUsedByLevel[index] ?? 0
+          return (
+            <label key={level}>
+              Lvl {level}
+              <input
+                type="number"
+                min={0}
+                max={9}
+                value={total}
+                disabled={!canEdit || !blueprintEditable}
+                onChange={(e) => setSlot(index, Number(e.target.value))}
+              />
+              {total > 0 && canEdit && (
+                <span className="character-sheet__slot-used">
+                  <button type="button" onClick={() => setUsed(index, -1)} disabled={used <= 0}>
+                    −
+                  </button>
+                  {used}/{total} used
+                  <button type="button" onClick={() => setUsed(index, 1)} disabled={used >= total}>
+                    +
+                  </button>
+                </span>
+              )}
+            </label>
+          )
+        })}
       </div>
 
       <h3>Spellbook</h3>

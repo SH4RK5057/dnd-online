@@ -28,6 +28,11 @@ export interface RollRecord {
   /** Set when this roll fulfilled a DM roll request (see useRollRequests) —
    * the requesting DM's playerId, purely informational. */
   requestedBy: string | null
+  /** Private rolls are still written to the same shared log (this app has
+   * no server-side filtering — see components/RollLog.tsx for the
+   * UI-level visibility check) but only rendered for the roller and the
+   * DM; everyone else's client just doesn't show the entry. */
+  private: boolean
   createdAt: number
 }
 

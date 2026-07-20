@@ -52,6 +52,18 @@ export interface FeatEntry {
   notes: string
 }
 
+/** A generic class/character resource beyond spell slots and hit dice — ki
+ * points, rage uses, sorcery points, bardic inspiration, whatever a given
+ * class or feature grants. Deliberately generic rather than a fixed list of
+ * named resources, since which ones apply depends on class/level/features
+ * this app doesn't model in depth. */
+export interface ResourceEntry {
+  id: string
+  name: string
+  current: number
+  max: number
+}
+
 /**
  * A character's data. The SAME shape is used for a standalone character
  * (stored locally, see character/standaloneStorage.ts, `campaignId: null`)
@@ -92,11 +104,21 @@ export interface CharacterRecord {
   initiativeBonus: number
   speed: number
   hp: { max: number; current: number; temp: number }
-  /** Free text, e.g. "3d8". */
+  /** Free text, e.g. "3d8" — the die count is parsed out for hit-dice
+   * tracking (character/rest.ts parseHitDiceCount), the rest is cosmetic. */
   hitDice: string
+  /** How many of `hitDice`'s total count have been spent (short rest) and
+   * not yet recovered (long rest regains half, rounded down, min 1). */
+  hitDiceUsed: number
   inventory: InventoryItem[]
-  /** Index 0 = level-1 slots ... index 8 = level-9 slots. */
+  /** Index 0 = level-1 slots ... index 8 = level-9 slots — the total granted
+   * at this level. */
   spellSlotsByLevel: number[]
+  /** Same indexing as spellSlotsByLevel — how many of each level are
+   * currently spent. A long rest resets every entry to 0. */
+  spellSlotsUsedByLevel: number[]
+  /** Other class/feature resources (ki, rage uses, etc.) — see ResourceEntry. */
+  resources: ResourceEntry[]
   spells: SpellEntry[]
   feats: FeatEntry[]
   createdAt: number

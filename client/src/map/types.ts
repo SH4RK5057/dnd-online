@@ -4,6 +4,22 @@ export type AssetKind = 'map' | 'token' | 'handout' | 'audio'
 
 export type GridType = 'square' | 'hex'
 
+/** What kind of space this scene represents, which drives which navigation
+ * UI applies (canvas/../components/SceneNavigationPanel.tsx):
+ * - 'dungeon': the original battle-map behavior — individual token
+ *   movement, dynamic line-of-sight and fog of war. The default, so every
+ *   scene created before this field existed keeps behaving exactly as it
+ *   always did.
+ * - 'town': the DM picks Group or Individual navigation (navigationMode)
+ *   between Points of Interest (map/poiTypes.ts), with a transition overlay
+ *   when a POI links to another scene.
+ * - 'landscape': always Group navigation, driven by POIs, gated behind a
+ *   party movement-consensus mechanic (consensusMode).
+ */
+export type SceneScale = 'dungeon' | 'town' | 'landscape'
+export type NavigationMode = 'group' | 'individual'
+export type ConsensusMode = 'vote' | 'leader'
+
 export interface SceneRecord {
   id: string
   name: string
@@ -45,6 +61,19 @@ export interface SceneRecord {
    * `!== false` everywhere (not `=== true`) so scenes created before this
    * field existed, which have it `undefined`, stay visible. */
   published: boolean
+  /** Read as `?? 'dungeon'` for scenes created before this field existed. */
+  scale: SceneScale
+  /** Only meaningful when scale is 'town'. Read as `?? 'group'`. */
+  navigationMode: NavigationMode
+  /** Only meaningful when scale is 'landscape'. Read as `?? 'vote'`. */
+  consensusMode: ConsensusMode
+  /** The player designated to move the party alone, when consensusMode is
+   * 'leader'. Read as `?? null`. */
+  partyLeaderId: string | null
+  /** The POI (map/poiTypes.ts) the party is currently considered to be at,
+   * for town/landscape scenes — null if they haven't moved yet, or this is
+   * a dungeon scene where the concept doesn't apply. Read as `?? null`. */
+  currentPoiId: string | null
   createdAt: number
 }
 

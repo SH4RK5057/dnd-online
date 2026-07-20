@@ -265,33 +265,33 @@ Complete.
 ## Phase 7 — Player tools & polish
 
 **Inventory & resources**
-- [ ] Personal inventory management, spell slot/resource tracking
-- [ ] Inventory history tab — a log of every item transfer, addition, and
+- [x] Personal inventory management, spell slot/resource tracking
+- [x] Inventory history tab — a log of every item transfer, addition, and
       deletion between players and the DM, visible alongside the inventory itself
-- [ ] Automated rest states — native Short Rest / Long Rest recovery
+- [x] Automated rest states — native Short Rest / Long Rest recovery
       triggers, usable by a player anytime unless the DM has temporarily
       disabled them (the DM-side toggle lives in Phase 6)
 
 **Rolls & communication**
-- [ ] Private vs. public rolls
-- [ ] Built-in text chat (IC/OOC channels), map pings/emotes, and temporary
+- [x] Private vs. public rolls
+- [x] Built-in text chat (IC/OOC channels), map pings/emotes, and temporary
       annotations/drawing on the map
 
 **Multi-scale scene navigation** (replaces the old single "vote on group
 movement" bullet with a full DM-configurable navigation mode per scene)
-- [ ] Town scenes: DM chooses Group or Individual navigation, smooth
+- [x] Town scenes: DM chooses Group or Individual navigation, smooth
       scene-transition overlays between locations, Point-of-Interest (POI) pathing
-- [ ] Landscape scenes: Group-only navigation driven by POIs; DM chooses the
+- [x] Landscape scenes: Group-only navigation driven by POIs; DM chooses the
       party's movement-consensus mode — Democratic Voting (majority choice)
       or Leader Appointment (one designated player moves the party)
-- [ ] Dungeon scenes: individual token movement (the existing Phase 2/3
+- [x] Dungeon scenes: individual token movement (the existing Phase 2/3
       battle-map behavior) with dynamic line-of-sight and fog of war
-- [ ] Location Ping System — players flash a visual ripple/label on the map
+- [x] Location Ping System — players flash a visual ripple/label on the map
       for their peers (a more specific, targeted version of the general map
       pings/emotes bullet above)
 
 **Polish**
-- [ ] Mobile/responsive pass (DM stays locked to computer/tablet — this is
+- [x] Mobile/responsive pass (DM stays locked to computer/tablet — this is
       about the player-facing layout)
 
 ## Phase 8 — Stretch goals

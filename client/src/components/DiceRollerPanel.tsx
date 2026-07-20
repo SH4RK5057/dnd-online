@@ -30,6 +30,7 @@ export function DiceRollerPanel() {
   const [notation, setNotation] = useState('1d20')
   const [label, setLabel] = useState('')
   const [mode, setMode] = useState<RollMode>('normal')
+  const [isPrivate, setIsPrivate] = useState(false)
 
   const [requestTarget, setRequestTarget] = useState('')
   const [requestLabel, setRequestLabel] = useState('')
@@ -44,7 +45,14 @@ export function DiceRollerPanel() {
     return myToken?.conditions ?? []
   })()
 
-  const doRoll = (rollNotationStr: string, rollLabel: string, rollMode: RollMode, requestedBy: string | null, requestId?: string) => {
+  const doRoll = (
+    rollNotationStr: string,
+    rollLabel: string,
+    rollMode: RollMode,
+    requestedBy: string | null,
+    requestId?: string,
+    rollPrivate = false,
+  ) => {
     try {
       const effectiveMode = resolveEffectiveMode(rollMode, myConditions, 'abilityCheck')
       const parsed = parseNotation(rollNotationStr)
@@ -59,6 +67,7 @@ export function DiceRollerPanel() {
         modifier: result.modifier,
         total: result.total,
         requestedBy,
+        private: rollPrivate,
       })
       if (requestId) clearRequest(requestId)
     } catch (err) {
@@ -66,7 +75,7 @@ export function DiceRollerPanel() {
     }
   }
 
-  const handleFreeformRoll = () => doRoll(notation, label, mode, null)
+  const handleFreeformRoll = () => doRoll(notation, label, mode, null, undefined, isPrivate)
 
   const handleCreateRequest = () => {
     if (!requestTarget) return
@@ -110,6 +119,10 @@ export function DiceRollerPanel() {
           <option value="advantage">Advantage</option>
           <option value="disadvantage">Disadvantage</option>
         </select>
+        <label>
+          <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+          Private (you + DM only)
+        </label>
         <button type="button" onClick={handleFreeformRoll}>
           Roll
         </button>

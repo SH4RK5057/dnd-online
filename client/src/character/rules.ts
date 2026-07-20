@@ -83,3 +83,11 @@ export function resolveTokenHp(token: TokenRecord, charactersById: Map<string, C
 export function emptyAbilityScores(): AbilityScores {
   return { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }
 }
+
+/** Extracts the die COUNT from a free-text hit-dice string like "3d8" (the
+ * die size after the "d" is cosmetic display only, not used for tracking
+ * how many are available to spend). Returns 0 for anything unparseable. */
+export function parseHitDiceCount(hitDice: string): number {
+  const match = /^(\d+)d\d+/i.exec(hitDice.trim())
+  return match ? Number(match[1]) : 0
+}

@@ -4,6 +4,7 @@ import { useConnectionStatus } from '../session/useConnectionStatus'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
+import { usePois } from '../map/usePois'
 import { ConnectionStatusBadge } from '../components/ConnectionStatusBadge'
 import { PeerList } from '../components/PeerList'
 import { CopyJoinCode } from '../components/CopyJoinCode'
@@ -27,6 +28,8 @@ import { HandoutsPanel, PlayerHandoutsView } from '../components/HandoutsPanel'
 import { RandomGenerators } from '../components/RandomGenerators'
 import { SoundboardPanel } from '../components/SoundboardPanel'
 import { CampaignFilesPanel } from '../components/CampaignFilesPanel'
+import { ChatPanel } from '../components/ChatPanel'
+import { SceneNavigationPanel } from '../components/SceneNavigationPanel'
 import { EncounterNotificationBanner } from '../components/EncounterNotificationBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { MapCanvas } from '../canvas/MapCanvas'
@@ -34,6 +37,7 @@ import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken
 import type { MonsterData } from '../content/types'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingTokenPlacement } from './pendingTokenPlacement'
+import type { PendingPoiPlacement } from './pendingPoiPlacement'
 
 export function SessionScreen() {
   const { session, sessionMeta, leaveSession } = useSession()
@@ -41,10 +45,12 @@ export function SessionScreen() {
   const { scenes, activeSceneId, activeScene, switchToScene } = useScenes(session?.doc ?? null)
   const { notification, dismiss: dismissNotification } = useEncounterNotifications(session?.doc ?? null, scenes)
   const { tokens, createToken, setTokenArt, initTokenFromMonster } = useTokens(session?.doc ?? null, activeSceneId)
+  const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
   const [toolMode, setToolMode] = useState<ToolMode>('move')
   const [snapWalls, setSnapWalls] = useState(false)
   const [showJoinCode, setShowJoinCode] = useState(true)
   const [pendingPlacement, setPendingPlacement] = useState<PendingTokenPlacement | null>(null)
+  const [pendingPoiPlacement, setPendingPoiPlacement] = useState<PendingPoiPlacement | null>(null)
   const [previewPlayerId, setPreviewPlayerId] = useState<string | null>(null)
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null)
   const [showCharacterSheet, setShowCharacterSheet] = useState(true)
@@ -58,6 +64,7 @@ export function SessionScreen() {
   const [showRandomGenerators, setShowRandomGenerators] = useState(false)
   const [showSoundboard, setShowSoundboard] = useState(false)
   const [showCampaignFiles, setShowCampaignFiles] = useState(false)
+  const [showChat, setShowChat] = useState(true)
 
   useEffect(() => {
     if (!notification) return
@@ -74,6 +81,15 @@ export function SessionScreen() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [pendingPlacement])
 
+  useEffect(() => {
+    if (!pendingPoiPlacement) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingPoiPlacement(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [pendingPoiPlacement])
+
   if (!session) return null
 
   const isUnassignedPlayer =
@@ -81,7 +97,24 @@ export function SessionScreen() {
   const isUnpublishedForPlayer = session.role === 'player' && !!activeScene && activeScene.published === false
 
   const isPreviewingPlayer = session.role === 'dm' && previewPlayerId !== null
-  const effectiveToolMode: ToolMode = isPreviewingPlayer ? 'move' : pendingPlacement ? 'place-tokens' : toolMode
+  const effectiveToolMode: ToolMode = isPreviewingPlayer
+    ? 'move'
+    : pendingPlacement
+      ? 'place-tokens'
+      : pendingPoiPlacement
+        ? 'place-pois'
+        : toolMode
+
+  const handlePlacePoi = (x: number, y: number) => {
+    if (!pendingPoiPlacement || !activeSceneId) return
+    const { name } = pendingPoiPlacement
+    setPendingPoiPlacement(null)
+    try {
+      createPoi(activeSceneId, name, x, y)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not add that POI.')
+    }
+  }
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingPlacement || !activeSceneId) return
@@ -224,6 +257,12 @@ export function SessionScreen() {
             </>
           )}
 
+          <SceneNavigationPanel
+            pendingPoiPlacement={pendingPoiPlacement}
+            onRequestPoiPlacement={setPendingPoiPlacement}
+            onCancelPoiPlacement={() => setPendingPoiPlacement(null)}
+          />
+
           {/* Character sheet, dice, and initiative are shared between DM and
               players — everyone rolls dice and sees the initiative order,
               and a DM can play their own character same as anyone. */}
@@ -246,6 +285,11 @@ export function SessionScreen() {
             {showInitiativeTracker ? 'Hide initiative tracker' : 'Show initiative tracker'}
           </button>
           {showInitiativeTracker && <InitiativeTracker />}
+
+          <button type="button" onClick={() => setShowChat((v) => !v)}>
+            {showChat ? 'Hide chat' : 'Show chat'}
+          </button>
+          {showChat && <ChatPanel />}
 
           {session.role === 'player' && (
             <>
@@ -285,6 +329,7 @@ export function SessionScreen() {
                 toolMode={effectiveToolMode}
                 snapWalls={snapWalls}
                 onPlaceToken={handlePlaceToken}
+                onPlacePoi={handlePlacePoi}
                 previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
                 selectedTokenId={selectedTokenId}
                 onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}

@@ -4,7 +4,7 @@ import { isAssetFullyLive, publishAsset, pruneAssetChunks, republishAssetFromCac
 import { DEFAULT_GRID_SIZE_PX, MAP_IMAGE_MAX_DIMENSION, MAP_IMAGE_QUALITY } from './constants'
 import { compressImage } from './imageCompress'
 import { purgeExplorationForScene } from './useExploration'
-import type { LightRecord, SceneRecord, TokenRecord, WallRecord } from './types'
+import type { ConsensusMode, LightRecord, NavigationMode, SceneRecord, SceneScale, TokenRecord, WallRecord } from './types'
 import type { CombatStateRecord } from '../combat/types'
 
 function scenesMap(doc: Y.Doc) {
@@ -33,6 +33,11 @@ export interface UseScenesResult {
   togglePersistentFog: (sceneId: string, enabled: boolean) => void
   resetExploration: (sceneId: string) => void
   toggleSharedVision: (sceneId: string, enabled: boolean) => void
+  setSceneScale: (sceneId: string, scale: SceneScale) => void
+  setNavigationMode: (sceneId: string, mode: NavigationMode) => void
+  setConsensusMode: (sceneId: string, mode: ConsensusMode) => void
+  setPartyLeader: (sceneId: string, playerId: string | null) => void
+  setCurrentPoi: (sceneId: string, poiId: string | null) => void
 }
 
 export function useScenes(doc: Y.Doc | null): UseScenesResult {
@@ -79,6 +84,11 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         persistentFogEnabled: true,
         sharedVisionEnabled: false,
         published: false,
+        scale: 'dungeon',
+        navigationMode: 'group',
+        consensusMode: 'vote',
+        partyLeaderId: null,
+        currentPoiId: null,
         createdAt: Date.now(),
       }
       scenesMap(doc).set(id, record)
@@ -280,6 +290,61 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     [doc],
   )
 
+  const setSceneScale = useCallback(
+    (sceneId: string, scale: SceneScale) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, scale })
+    },
+    [doc],
+  )
+
+  const setNavigationMode = useCallback(
+    (sceneId: string, mode: NavigationMode) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, navigationMode: mode })
+    },
+    [doc],
+  )
+
+  const setConsensusMode = useCallback(
+    (sceneId: string, mode: ConsensusMode) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, consensusMode: mode })
+    },
+    [doc],
+  )
+
+  const setPartyLeader = useCallback(
+    (sceneId: string, playerId: string | null) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, partyLeaderId: playerId })
+    },
+    [doc],
+  )
+
+  const setCurrentPoi = useCallback(
+    (sceneId: string, poiId: string | null) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, currentPoiId: poiId })
+    },
+    [doc],
+  )
+
   const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null
 
   return {
@@ -299,5 +364,10 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     togglePersistentFog,
     resetExploration,
     toggleSharedVision,
+    setSceneScale,
+    setNavigationMode,
+    setConsensusMode,
+    setPartyLeader,
+    setCurrentPoi,
   }
 }

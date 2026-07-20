@@ -7,6 +7,10 @@ import { useTokens } from '../map/useTokens'
 import { useWalls } from '../map/useWalls'
 import { useLights } from '../map/useLights'
 import { useExploration } from '../map/useExploration'
+import { usePings } from '../map/usePings'
+import { useAnnotations } from '../map/useAnnotations'
+import { colorForPlayerId } from '../map/annotationColor'
+import { usePois } from '../map/usePois'
 import { useAssetUrl } from '../map/assetSync'
 import { useCharacters } from '../character/useCharacters'
 import { resolveTokenHp } from '../character/rules'
@@ -23,6 +27,10 @@ import { TokenLayer } from './TokenLayer'
 import { WallLayer } from './WallLayer'
 import { LightLayer } from './LightLayer'
 import { FogLayer } from './FogLayer'
+import { PingLayer } from './PingLayer'
+import { AnnotationLayer } from './AnnotationLayer'
+import { PoiLayer } from './PoiLayer'
+import type { Point } from '../map/annotationTypes'
 import type { ToolMode } from './interactionMode'
 
 const MIN_ZOOM = 0.2
@@ -33,6 +41,7 @@ interface MapCanvasProps {
   toolMode: ToolMode
   snapWalls: boolean
   onPlaceToken?: (x: number, y: number) => void
+  onPlacePoi?: (x: number, y: number) => void
   /** DM-only: when set, the DM's own canvas renders exactly what this
    * player currently sees (their fog mask, their exploration memory)
    * instead of the DM's always-unmasked view. Always null for players. */
@@ -48,6 +57,7 @@ export function MapCanvas({
   toolMode,
   snapWalls,
   onPlaceToken,
+  onPlacePoi,
   previewPlayerId = null,
   selectedTokenId = null,
   onSelectToken,
@@ -73,6 +83,9 @@ export function MapCanvas({
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
   const { exploredCells, revealCells } = useExploration(doc, activeScene?.id ?? null, effectiveViewerId)
   const { characters } = useCharacters(doc)
+  const { pings, createPing } = usePings(doc, activeScene?.id ?? null, isDm)
+  const { annotations, createAnnotation } = useAnnotations(doc, activeScene?.id ?? null, isDm)
+  const { pois } = usePois(doc, activeScene?.id ?? null)
 
   const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -86,6 +99,9 @@ export function MapCanvas({
   const wallLayerRef = useRef<WallLayer | null>(null)
   const lightLayerRef = useRef<LightLayer | null>(null)
   const fogLayerRef = useRef<FogLayer | null>(null)
+  const pingLayerRef = useRef<PingLayer | null>(null)
+  const annotationLayerRef = useRef<AnnotationLayer | null>(null)
+  const poiLayerRef = useRef<PoiLayer | null>(null)
 
   // Build the layer graph once the Pixi app is ready. fogTarget (map+grid+
   // walls) uses FogLayer's full mask — live sight plus remembered
@@ -112,10 +128,22 @@ export function MapCanvas({
     const wallLayer = new WallLayer()
     const lightLayer = new LightLayer()
     const fogLayer = new FogLayer()
+    const pingLayer = new PingLayer(app)
+    const annotationLayer = new AnnotationLayer()
+    const poiLayer = new PoiLayer()
 
     fogTarget.addChild(mapLayer.container, gridLayer.container, wallLayer.container)
     tokenTarget.addChild(tokenLayer.container)
-    world.addChild(tokenTarget, fogTarget, lightLayer.container, fogLayer.mask, fogLayer.liveMask)
+    world.addChild(
+      tokenTarget,
+      fogTarget,
+      annotationLayer.container,
+      poiLayer.container,
+      lightLayer.container,
+      pingLayer.container,
+      fogLayer.mask,
+      fogLayer.liveMask,
+    )
     camera.addChild(world)
     app.stage.addChild(camera)
     app.stage.eventMode = 'static'
@@ -131,6 +159,9 @@ export function MapCanvas({
     wallLayerRef.current = wallLayer
     lightLayerRef.current = lightLayer
     fogLayerRef.current = fogLayer
+    pingLayerRef.current = pingLayer
+    annotationLayerRef.current = annotationLayer
+    poiLayerRef.current = poiLayer
 
     return () => {
       mapLayer.destroy()
@@ -139,6 +170,9 @@ export function MapCanvas({
       wallLayer.destroy()
       lightLayer.destroy()
       fogLayer.destroy()
+      pingLayer.destroy()
+      annotationLayer.destroy()
+      poiLayer.destroy()
       world.destroy()
       camera.destroy()
       cameraRef.current = null
@@ -151,6 +185,9 @@ export function MapCanvas({
       wallLayerRef.current = null
       lightLayerRef.current = null
       fogLayerRef.current = null
+      pingLayerRef.current = null
+      annotationLayerRef.current = null
+      poiLayerRef.current = null
     }
   }, [app])
 
@@ -287,6 +324,24 @@ export function MapCanvas({
     if (newlyExplored.length > 0) revealCells(newlyExplored)
   }, [app, activeScene, mapSize, isDmUnmasked, effectiveViewerId, walls, lights, tokens, exploredCells, revealCells])
 
+  // Update pings.
+  useEffect(() => {
+    if (!pingLayerRef.current || !activeScene) return
+    pingLayerRef.current.update(pings, activeScene.gridSizePx)
+  }, [pings, activeScene])
+
+  // Update annotations.
+  useEffect(() => {
+    if (!annotationLayerRef.current || !activeScene) return
+    annotationLayerRef.current.update(annotations, activeScene.gridSizePx)
+  }, [annotations, activeScene])
+
+  // Update POIs.
+  useEffect(() => {
+    if (!poiLayerRef.current || !activeScene) return
+    poiLayerRef.current.update(pois, activeScene.currentPoiId ?? null, activeScene.gridSizePx)
+  }, [pois, activeScene])
+
   // Reset the zoom/pan camera whenever the active scene changes, so switching
   // scenes doesn't carry over an unrelated view.
   useEffect(() => {
@@ -320,12 +375,46 @@ export function MapCanvas({
     }
     app.canvas.addEventListener('wheel', onWheel, { passive: false })
 
+    // Double-click anywhere to ping that location — available regardless of
+    // toolMode (and to players, who have no toolMode UI at all), since it's
+    // a communication aid, not an editing tool. A native DOM listener rather
+    // than a Pixi one, same reasoning as the wheel handler above: it's not
+    // tied to any particular interactive object, just "wherever the cursor
+    // is on the canvas."
+    const onDblClick = (event: MouseEvent) => {
+      const world = worldRef.current
+      if (!world || !activeScene) return
+      const rect = app.canvas.getBoundingClientRect()
+      const local = world.toLocal({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+      createPing(getOrCreatePlayerId(), session?.displayName ?? 'Player', local.x / activeScene.gridSizePx, local.y / activeScene.gridSizePx)
+    }
+    app.canvas.addEventListener('dblclick', onDblClick)
+
     let panning = false
     let panStart = { x: 0, y: 0 }
     let cameraStart = { x: 0, y: 0 }
 
+    // Shift-drag (empty space, any toolMode) draws a freehand annotation —
+    // checked first, ahead of the mode-specific branches below, so it works
+    // the same way for players (who have no toolMode UI at all, effectively
+    // always "move") as it does for the DM in any tool. Points are collected
+    // locally and only committed to the shared doc once, on release — see
+    // AnnotationLayer.ts's doc comment for why this lives here rather than
+    // as that layer's own hit-tested interaction.
+    let annotating = false
+    let annotationPoints: Point[] = []
+
     const onPointerDown = (event: FederatedPointerEvent) => {
       if (event.target !== app.stage || event.button !== 0) return
+
+      if (event.shiftKey) {
+        const world = worldRef.current
+        if (!world || !activeScene) return
+        annotating = true
+        const local = world.toLocal(event.global)
+        annotationPoints = [{ x: local.x / activeScene.gridSizePx, y: local.y / activeScene.gridSizePx }]
+        return
+      }
 
       if (toolMode === 'place-tokens') {
         const world = worldRef.current
@@ -335,12 +424,28 @@ export function MapCanvas({
         return
       }
 
+      if (toolMode === 'place-pois') {
+        const world = worldRef.current
+        if (!world || !onPlacePoi || !activeScene) return
+        const local = world.toLocal(event.global)
+        onPlacePoi(local.x / activeScene.gridSizePx, local.y / activeScene.gridSizePx)
+        return
+      }
+
       if (toolMode !== 'move') return
       panning = true
       panStart = { x: event.global.x, y: event.global.y }
       cameraStart = { x: camera.position.x, y: camera.position.y }
     }
     const onPointerMove = (event: FederatedPointerEvent) => {
+      if (annotating) {
+        const world = worldRef.current
+        if (!world || !activeScene) return
+        const local = world.toLocal(event.global)
+        annotationPoints.push({ x: local.x / activeScene.gridSizePx, y: local.y / activeScene.gridSizePx })
+        annotationLayerRef.current?.setPreview(annotationPoints, colorForPlayerId(getOrCreatePlayerId()))
+        return
+      }
       if (!panning) return
       camera.position.set(
         cameraStart.x + (event.global.x - panStart.x),
@@ -348,6 +453,13 @@ export function MapCanvas({
       )
     }
     const onPointerUp = () => {
+      if (annotating) {
+        annotating = false
+        if (annotationPoints.length >= 2) createAnnotation(getOrCreatePlayerId(), annotationPoints)
+        annotationPoints = []
+        annotationLayerRef.current?.setPreview([], 0)
+        return
+      }
       panning = false
     }
 
@@ -358,12 +470,13 @@ export function MapCanvas({
 
     return () => {
       app.canvas.removeEventListener('wheel', onWheel)
+      app.canvas.removeEventListener('dblclick', onDblClick)
       app.stage.off('pointerdown', onPointerDown)
       app.stage.off('globalpointermove', onPointerMove)
       app.stage.off('pointerup', onPointerUp)
       app.stage.off('pointerupoutside', onPointerUp)
     }
-  }, [app, toolMode, activeScene, onPlaceToken])
+  }, [app, toolMode, activeScene, onPlaceToken, onPlacePoi, createPing, createAnnotation, session?.displayName])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />
 }
