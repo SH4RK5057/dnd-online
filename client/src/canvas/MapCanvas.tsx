@@ -56,6 +56,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
   const cameraRef = useRef<Container | null>(null)
   const worldRef = useRef<Container | null>(null)
   const fogTargetRef = useRef<Container | null>(null)
+  const tokenTargetRef = useRef<Container | null>(null)
   const mapLayerRef = useRef<MapLayer | null>(null)
   const gridLayerRef = useRef<GridLayer | null>(null)
   const tokenLayerRef = useRef<TokenLayer | null>(null)
@@ -63,12 +64,16 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
   const lightLayerRef = useRef<LightLayer | null>(null)
   const fogLayerRef = useRef<FogLayer | null>(null)
 
-  // Build the layer graph once the Pixi app is ready. fogTarget wraps
-  // map+grid+token+walls so FogLayer's mask applies to all of them at once —
-  // walls should only be visible to a player where they can currently see
-  // and light reaches, same as the map/tokens underneath. The DM always
-  // renders with fogTarget.mask = null (see the fog effect below), so this
-  // never hides anything from the DM's own editing view. Lights stay a
+  // Build the layer graph once the Pixi app is ready. fogTarget (map+grid+
+  // walls) uses FogLayer's full mask — live sight plus remembered
+  // exploration — since static terrain should stay revealed once seen.
+  // tokenTarget (tokens only) uses the separate liveMask instead: a token
+  // sitting in a room a player merely remembers, but isn't currently
+  // looking at, shouldn't stay visible just because the terrain does. Both
+  // get mask = null for the DM (see the fog effect below), so this never
+  // hides anything from the DM's own editing view. tokenTarget is added
+  // before fogTarget so walls keep painting over tokens, matching the
+  // paint order the single combined container used to have. Lights stay a
   // direct child of world since their on-canvas icon is a DM editing aid,
   // not something a player should see at all.
   useEffect(() => {
@@ -77,6 +82,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
     const camera = new Container()
     const world = new Container()
     const fogTarget = new Container()
+    const tokenTarget = new Container()
     const mapLayer = new MapLayer()
     const gridLayer = new GridLayer()
     const tokenLayer = new TokenLayer()
@@ -84,8 +90,9 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
     const lightLayer = new LightLayer()
     const fogLayer = new FogLayer()
 
-    fogTarget.addChild(mapLayer.container, gridLayer.container, tokenLayer.container, wallLayer.container)
-    world.addChild(fogTarget, lightLayer.container, fogLayer.mask)
+    fogTarget.addChild(mapLayer.container, gridLayer.container, wallLayer.container)
+    tokenTarget.addChild(tokenLayer.container)
+    world.addChild(tokenTarget, fogTarget, lightLayer.container, fogLayer.mask, fogLayer.liveMask)
     camera.addChild(world)
     app.stage.addChild(camera)
     app.stage.eventMode = 'static'
@@ -94,6 +101,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
     cameraRef.current = camera
     worldRef.current = world
     fogTargetRef.current = fogTarget
+    tokenTargetRef.current = tokenTarget
     mapLayerRef.current = mapLayer
     gridLayerRef.current = gridLayer
     tokenLayerRef.current = tokenLayer
@@ -113,6 +121,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
       cameraRef.current = null
       worldRef.current = null
       fogTargetRef.current = null
+      tokenTargetRef.current = null
       mapLayerRef.current = null
       gridLayerRef.current = null
       tokenLayerRef.current = null
@@ -202,12 +211,14 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
   // Update fog. DM always sees everything (no mask); players get one only
   // when the scene has fog enabled and the map is loaded.
   useEffect(() => {
-    if (!app || !fogTargetRef.current || !fogLayerRef.current || !activeScene || !mapSize) return
+    if (!app || !fogTargetRef.current || !tokenTargetRef.current || !fogLayerRef.current || !activeScene || !mapSize) return
     const fogTarget = fogTargetRef.current
+    const tokenTarget = tokenTargetRef.current
     const fogLayer = fogLayerRef.current
 
     if (isDm || !activeScene.fogEnabled) {
       fogTarget.mask = null
+      tokenTarget.mask = null
       return
     }
 
@@ -228,6 +239,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
       persistentFogEnabled: activeScene.persistentFogEnabled ?? true,
     })
     fogTarget.mask = fogLayer.mask
+    tokenTarget.mask = fogLayer.liveMask
     if (newlyExplored.length > 0) revealCells(newlyExplored)
   }, [app, activeScene, mapSize, isDm, walls, lights, tokens, exploredCells, revealCells])
 

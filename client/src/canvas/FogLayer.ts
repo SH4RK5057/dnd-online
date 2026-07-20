@@ -65,10 +65,22 @@ export interface FogInput {
  * leaves — this whole step is skippable via `persistentFogEnabled` for
  * scenes that want classic re-fog-on-leave behavior instead. `update()`
  * returns the newly-discovered cell keys so the caller can persist them.
+ *
+ * `.mask` (live LOS + remembered exploration, described above) is correct
+ * for static terrain — map, grid, walls — which should stay revealed once
+ * seen. It's wrong for dynamic content like tokens: a creature standing in
+ * a "remembered" room a player isn't currently looking at shouldn't stay
+ * visible just because the room itself is remembered. `.liveMask` is a
+ * second mask, built from the exact same per-frame LOS+ambient+lights
+ * render as `.mask` but WITHOUT the remembered-exploration overlay ever
+ * applied to it — callers should mask dynamic content (tokens) with this
+ * one instead, so it only shows what's genuinely in sight this frame.
  */
 export class FogLayer {
   readonly mask = new Sprite()
+  readonly liveMask = new Sprite()
   private renderTexture: RenderTexture | null = null
+  private liveRenderTexture: RenderTexture | null = null
   private readonly drawGraphics = new Graphics()
   private readonly bgGraphics = new Graphics()
   private readonly illumGraphics = new Graphics()
@@ -79,6 +91,7 @@ export class FogLayer {
   constructor() {
     // Part of the mask machinery only, never drawn as a normal scene object.
     this.mask.renderable = false
+    this.liveMask.renderable = false
     this.illumContainer.addChild(this.bgGraphics, this.illumGraphics)
     this.illumContainer.mask = this.losMaskGraphics
   }
@@ -99,7 +112,7 @@ export class FogLayer {
     } = input
 
     this.ensureRenderTexture(mapSize)
-    if (!this.renderTexture) return []
+    if (!this.renderTexture || !this.liveRenderTexture) return []
 
     const ambientGray = Math.round(Math.min(1, Math.max(0, ambientBrightness)) * 255)
     const ambientColor = (ambientGray << 16) | (ambientGray << 8) | ambientGray
@@ -121,6 +134,7 @@ export class FogLayer {
       // a token" message is a separate UI concern.)
       this.drawGraphics.clear()
       renderer.render({ container: this.drawGraphics, target: this.renderTexture, clear: true, clearColor: 0x000000 })
+      renderer.render({ container: this.drawGraphics, target: this.liveRenderTexture, clear: true, clearColor: 0x000000 })
       return []
     }
 
@@ -159,6 +173,10 @@ export class FogLayer {
     }
 
     renderer.render({ container: this.illumContainer, target: this.renderTexture, clear: true, clearColor: 0x000000 })
+    // Same live content, into the second texture — this one never receives
+    // the remembered-exploration overlay below, so it stays "what's lit up
+    // this exact frame" for masking dynamic content like tokens.
+    renderer.render({ container: this.illumContainer, target: this.liveRenderTexture, clear: true, clearColor: 0x000000 })
 
     if (!persistentFogEnabled) return []
 
@@ -220,12 +238,17 @@ export class FogLayer {
     this.renderTexture?.destroy(true)
     this.renderTexture = RenderTexture.create({ width: mapSize.width, height: mapSize.height })
     this.mask.texture = this.renderTexture
+    this.liveRenderTexture?.destroy(true)
+    this.liveRenderTexture = RenderTexture.create({ width: mapSize.width, height: mapSize.height })
+    this.liveMask.texture = this.liveRenderTexture
     this.currentSize = { width: mapSize.width, height: mapSize.height }
   }
 
   destroy(): void {
     this.renderTexture?.destroy(true)
+    this.liveRenderTexture?.destroy(true)
     this.mask.destroy()
+    this.liveMask.destroy()
     this.illumContainer.destroy({ children: true })
   }
 }
