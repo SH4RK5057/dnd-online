@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type * as Y from 'yjs'
 import { useCompendium } from '../content/useCompendium'
 import { filterItems, filterMonsters, filterSpells } from '../content/search'
-import { loadSavedMirrorUrl, saveMirrorUrl } from '../content/constants'
+import { loadSavedMirrorToken, loadSavedMirrorUrl, saveMirrorToken, saveMirrorUrl } from '../content/constants'
 import { StatBlockCard } from './StatBlockCard'
 import type { MonsterData } from '../content/types'
 
@@ -33,6 +33,7 @@ export function CompendiumDrawer({
   const [itemType, setItemType] = useState<string | 'all'>('all')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [mirrorUrl, setMirrorUrl] = useState(() => loadSavedMirrorUrl())
+  const [mirrorToken, setMirrorToken] = useState(() => loadSavedMirrorToken())
   const [mirrorBusy, setMirrorBusy] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -65,9 +66,10 @@ export function CompendiumDrawer({
   const handleImportUrl = async () => {
     if (!mirrorUrl.trim()) return
     saveMirrorUrl(mirrorUrl.trim())
+    saveMirrorToken(mirrorToken.trim())
     setMirrorBusy(true)
     try {
-      await compendium.importMirrorUrl(mirrorUrl.trim())
+      await compendium.importMirrorUrl(mirrorUrl.trim(), mirrorToken.trim())
     } finally {
       setMirrorBusy(false)
     }
@@ -179,19 +181,31 @@ export function CompendiumDrawer({
           <summary>Private mirror import</summary>
           <p className="compendium-drawer__hint">
             Import your own local 5etools-2014-src-shaped JSON files (data/spells/*.json, data/bestiary/*.json,
-            data/items.json), or fetch from a private mirror URL you host yourself. Nothing here is bundled with the app.
+            data/items.json), or fetch from any mirror URL you point it at — public or private. Nothing here is
+            bundled with the app; this only ever fetches from wherever you tell it to, straight from your browser.
           </p>
           <input ref={fileInputRef} type="file" accept=".json" multiple onChange={(e) => void handleImportFiles(e.target.files)} disabled={mirrorBusy} />
           <div className="compendium-drawer__mirror-url">
             <input
               value={mirrorUrl}
               onChange={(e) => setMirrorUrl(e.target.value)}
-              placeholder="https://your-private-mirror.example"
+              placeholder="e.g. https://raw.githubusercontent.com/<owner>/<repo>/<branch>"
+            />
+            <input
+              type="password"
+              value={mirrorToken}
+              onChange={(e) => setMirrorToken(e.target.value)}
+              placeholder="Access token (only for a private repo)"
             />
             <button type="button" onClick={() => void handleImportUrl()} disabled={mirrorBusy || !mirrorUrl.trim()}>
               {mirrorBusy ? 'Importing…' : 'Fetch'}
             </button>
           </div>
+          <p className="compendium-drawer__hint">
+            For a private GitHub repo: use a raw.githubusercontent.com URL (owner/repo/branch, no trailing path) and
+            a personal access token with read access to that repo. The token is saved only in this browser's local
+            storage and sent only to the URL above.
+          </p>
           {compendium.mirrorImportedAt && (
             <p className="compendium-drawer__hint">Last imported {new Date(compendium.mirrorImportedAt).toLocaleString()}</p>
           )}

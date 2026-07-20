@@ -121,9 +121,9 @@ export async function importMirrorFiles(files: FileList | File[]): Promise<Mirro
   return { content, errors }
 }
 
-async function tryFetchJson(url: string): Promise<unknown | null> {
+async function tryFetchJson(url: string, token: string): Promise<unknown | null> {
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, token ? { headers: { Authorization: `token ${token}` } } : undefined)
     if (!res.ok) return null
     return await res.json()
   } catch {
@@ -131,30 +131,44 @@ async function tryFetchJson(url: string): Promise<unknown | null> {
   }
 }
 
-/** Fetches from a configured private mirror URL (5etools-2014-src layout).
- * Tries each content family's index.json first (maps source -> filename)
- * and falls back to a couple of conventional single-file names if no index
- * is found — a private mirror's exact layout can vary, so this stays
- * best-effort/resilient rather than requiring one fixed structure. Never
- * throws; every failure is collected into `errors` instead. */
-export async function fetchMirrorFromUrl(baseUrl: string): Promise<MirrorImportResult> {
+/** Fetches from a configured mirror URL (5etools-2014-src layout) — any repo
+ * the DM points it at, public or private. `token` is optional: pass a
+ * GitHub personal access token (or any bearer token your mirror expects) to
+ * reach a private repo — raw.githubusercontent.com honors `Authorization:
+ * token <PAT>` for repos that token can read, so a URL like
+ * `https://raw.githubusercontent.com/<owner>/<repo>/<branch>` plus a token
+ * works the same as a public mirror URL alone. The token is only ever used
+ * for these fetches, made directly from this browser to GitHub (or wherever
+ * the URL points) — it's never sent anywhere else. Tries each content
+ * family's index.json first (maps source -> filename) and falls back to a
+ * couple of conventional single-file names if no index is found — a
+ * mirror's exact layout can vary, so this stays best-effort/resilient
+ * rather than requiring one fixed structure. Never throws; every failure is
+ * collected into `errors` instead. */
+export async function fetchMirrorFromUrl(baseUrl: string, token = ''): Promise<MirrorImportResult> {
   const base = baseUrl.replace(/\/+$/, '')
   const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now() }
   const errors: string[] = []
 
-  const itemsJson = await tryFetchJson(`${base}/data/items.json`)
+  const itemsJson = await tryFetchJson(`${base}/data/items.json`, token)
   if (itemsJson) ingestFile('items.json', itemsJson, content, errors)
-  else errors.push('data/items.json: not found or unreachable')
+  else errors.push('data/items.json: not found or unreachable (check the URL, and the token if this is a private repo)')
 
-  await fetchIndexedFamily(base, 'spells', content, errors)
-  await fetchIndexedFamily(base, 'bestiary', content, errors)
+  await fetchIndexedFamily(base, 'spells', token, content, errors)
+  await fetchIndexedFamily(base, 'bestiary', token, content, errors)
 
   await putCachedMirrorContent(content)
   return { content, errors }
 }
 
-async function fetchIndexedFamily(base: string, folder: string, content: MirrorContent, errors: string[]): Promise<void> {
-  const index = await tryFetchJson(`${base}/data/${folder}/index.json`)
+async function fetchIndexedFamily(
+  base: string,
+  folder: string,
+  token: string,
+  content: MirrorContent,
+  errors: string[],
+): Promise<void> {
+  const index = await tryFetchJson(`${base}/data/${folder}/index.json`, token)
   const filenames: string[] = []
   if (index && typeof index === 'object') {
     filenames.push(...Object.values(index as Record<string, string>))
@@ -164,7 +178,7 @@ async function fetchIndexedFamily(base: string, folder: string, content: MirrorC
     filenames.push(folder === 'spells' ? 'spells-phb.json' : 'bestiary-mm.json')
   }
   for (const filename of filenames) {
-    const json = await tryFetchJson(`${base}/data/${folder}/${filename}`)
+    const json = await tryFetchJson(`${base}/data/${folder}/${filename}`, token)
     if (json) ingestFile(`${folder}/${filename}`, json, content, errors)
     else errors.push(`${folder}/${filename}: not found or unreachable`)
   }

@@ -35,7 +35,9 @@ export interface UseCompendiumResult {
   mirrorErrors: string[]
   mirrorImportedAt: number | null
   importMirrorLocalFiles: (files: FileList | File[]) => Promise<void>
-  importMirrorUrl: (url: string) => Promise<void>
+  /** `token` is optional — a bearer token (e.g. GitHub PAT) for a private
+   * mirror repo. See mirrorStorage.ts's fetchMirrorFromUrl. */
+  importMirrorUrl: (url: string, token?: string) => Promise<void>
   homebrew: ReturnType<typeof useHomebrewContent>
 }
 
@@ -65,8 +67,8 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     setMirrorErrors(errors)
   }, [])
 
-  const importMirrorUrl = useCallback(async (url: string) => {
-    const { content, errors } = await fetchMirrorFromUrl(url)
+  const importMirrorUrl = useCallback(async (url: string, token = '') => {
+    const { content, errors } = await fetchMirrorFromUrl(url, token)
     setMirror(content)
     setMirrorErrors(errors)
   }, [])
