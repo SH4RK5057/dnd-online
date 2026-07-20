@@ -150,9 +150,15 @@ export async function fetchMirrorFromUrl(baseUrl: string, token = ''): Promise<M
   const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now() }
   const errors: string[] = []
 
+  // 5etools-2014-src splits items across two files: items.json (magic items)
+  // and items-base.json (mundane gear) — fetch both, items-base.json is
+  // optional (older/simpler mirrors may only have one).
   const itemsJson = await tryFetchJson(`${base}/data/items.json`, token)
   if (itemsJson) ingestFile('items.json', itemsJson, content, errors)
   else errors.push('data/items.json: not found or unreachable (check the URL, and the token if this is a private repo)')
+
+  const itemsBaseJson = await tryFetchJson(`${base}/data/items-base.json`, token)
+  if (itemsBaseJson) ingestFile('items-base.json', itemsBaseJson, content, errors)
 
   await fetchIndexedFamily(base, 'spells', token, content, errors)
   await fetchIndexedFamily(base, 'bestiary', token, content, errors)
