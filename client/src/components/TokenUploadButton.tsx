@@ -32,7 +32,7 @@ export function TokenUploadButton({
     event.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    onRequestPlacement({ name: trimmed, sizeCategory, file })
+    onRequestPlacement({ name: trimmed, sizeCategory, file, monsterInit: null })
     setName('')
     setFile(null)
   }

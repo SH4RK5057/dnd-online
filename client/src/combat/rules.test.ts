@@ -16,6 +16,10 @@ function token(overrides: Partial<TokenRecord>): TokenRecord {
     hp: null,
     conditions: [],
     initiative: null,
+    monsterKey: null,
+    ac: null,
+    speed: null,
+    description: '',
     createdAt: 0,
     ...overrides,
   }

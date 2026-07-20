@@ -169,17 +169,39 @@ Complete.
 ## Phase 5 — 5etools content integration
 - [ ] **Confirm what's actually redistributable** from 5etools' data (it's
       largely community-compiled OGL/community content, not an official WotC
-      API — needs a license check before we build a hard dependency on it)
-- [ ] Spell/monster/item lookup and quick reference
-- [ ] Drag monster stat blocks straight into encounters
-- [ ] Homebrew content editor as a parallel path (doesn't depend on licensing outcome)
-- [ ] DM homebrew rule overrides — a rule-modifier engine letting the DM
+      API — needs a license check before we build a hard dependency on it).
+      Still unresolved — a human legal call, not something code can settle —
+      but the implementation below sidesteps it entirely: nothing except the
+      hand-authored SRD 5.1 (CC-BY-4.0) fallback data is bundled in this
+      repo; full-size 5etools-shaped content only ever comes from a DM's own
+      private local files or self-hosted mirror URL, imported at runtime
+      client-side and cached in the browser's IndexedDB, never committed.
+- [x] Spell/monster/item lookup and quick reference — searchable/filterable
+      compendium drawer (name/level/school for spells, name/CR/type for
+      monsters, name/type for items), merging the SRD fallback, private
+      mirror import, and homebrew content into one browsable list.
+      `{@dice}`/`{@damage}`/`{@save}`/`{@condition}`/etc. 5etools inline tag
+      syntax is parsed and rendered as styled stat-block text.
+- [x] Drag monster stat blocks straight into encounters — "drag" implemented
+      as click-to-place (consistent with this app's existing wall/light/
+      token placement UX rather than native HTML drag-and-drop): DM clicks
+      "Add to scene" on a monster card, then clicks the map; the new token's
+      HP/AC/speed are initialized from the stat block and it remembers which
+      compendium entry it came from for the rules lookup below.
+- [x] Homebrew content editor as a parallel path (doesn't depend on
+      licensing outcome) — create/edit/delete custom spells, monsters, and
+      items, saved flat into the campaign's shared doc so they sync to
+      players and appear in the compendium alongside SRD/mirror content.
+- [x] DM homebrew rule overrides — a rule-modifier engine letting the DM
       apply custom campaign/scene modifiers that override default 5e rules or
       an individual character's stats (builds on the homebrew content editor
-      above)
-- [ ] Actual rules description shown when the DM clicks an enemy or player token
+      above). Ships as a generic named-override registry + resolver
+      (scene-scoped overrides win over campaign-wide for the same key) —
+      not a simulator wired into every 5e rule, but the place a DM records
+      "this is different in my game" as data other systems can consult.
+- [x] Actual rules description shown when the DM clicks an enemy or player token
       (pulled from the monster/character stat lookup above)
-- [ ] DM-entered description shown when a player clicks an enemy token
+- [x] DM-entered description shown when a player clicks an enemy token
       (freeform DM text, distinct from the rules lookup — surfaced here since
       both live on the same token-click UI)
 

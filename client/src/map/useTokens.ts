@@ -32,6 +32,15 @@ export interface UseTokensResult {
   setTokenHp: (tokenId: string, hp: { current: number; max: number; temp: number } | null) => void
   setTokenConditions: (tokenId: string, conditions: string[]) => void
   setTokenInitiative: (tokenId: string, initiative: number | null) => void
+  setTokenAc: (tokenId: string, ac: number | null) => void
+  setTokenSpeed: (tokenId: string, speed: number | null) => void
+  setTokenDescription: (tokenId: string, description: string) => void
+  /** Encounter drag-and-drop: one atomic patch initializing HP/AC/speed and
+   * recording the compendium source, instead of several separate writes. */
+  initTokenFromMonster: (
+    tokenId: string,
+    fields: { monsterKey: string; hp: { current: number; max: number; temp: number }; ac: number; speed: number },
+  ) => void
 }
 
 /** Note (same as the rest of this app's DM-authoritative model): Yjs has no
@@ -81,6 +90,10 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         hp: null,
         conditions: [],
         initiative: null,
+        monsterKey: null,
+        ac: null,
+        speed: null,
+        description: '',
         createdAt: Date.now(),
       }
       tokensMap(doc).set(id, record)
@@ -136,6 +149,19 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     (tokenId: string, initiative: number | null) => patchToken(tokenId, { initiative }),
     [patchToken],
   )
+  const setTokenAc = useCallback((tokenId: string, ac: number | null) => patchToken(tokenId, { ac }), [patchToken])
+  const setTokenSpeed = useCallback((tokenId: string, speed: number | null) => patchToken(tokenId, { speed }), [patchToken])
+  const setTokenDescription = useCallback(
+    (tokenId: string, description: string) => patchToken(tokenId, { description }),
+    [patchToken],
+  )
+  const initTokenFromMonster = useCallback(
+    (
+      tokenId: string,
+      fields: { monsterKey: string; hp: { current: number; max: number; temp: number }; ac: number; speed: number },
+    ) => patchToken(tokenId, fields),
+    [patchToken],
+  )
 
   const setTokenArt = useCallback(
     async (tokenId: string, file: File) => {
@@ -163,5 +189,9 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     setTokenHp,
     setTokenConditions,
     setTokenInitiative,
+    setTokenAc,
+    setTokenSpeed,
+    setTokenDescription,
+    initTokenFromMonster,
   }
 }

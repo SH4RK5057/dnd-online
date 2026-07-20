@@ -18,7 +18,13 @@ import { DiceRollerPanel } from '../components/DiceRollerPanel'
 import { RollLog } from '../components/RollLog'
 import { InitiativeTracker } from '../components/InitiativeTracker'
 import { TokenHpConditionEditor } from '../components/TokenHpConditionEditor'
+import { CompendiumDrawer } from '../components/CompendiumDrawer'
+import { HomebrewEditor } from '../components/HomebrewEditor'
+import { RuleOverridesPanel } from '../components/RuleOverridesPanel'
+import { TokenInspector } from '../components/TokenInspector'
 import { MapCanvas } from '../canvas/MapCanvas'
+import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken'
+import type { MonsterData } from '../content/types'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingTokenPlacement } from './pendingTokenPlacement'
 
@@ -26,7 +32,7 @@ export function SessionScreen() {
   const { session, sessionMeta, leaveSession } = useSession()
   const { status, peers, failure, retry } = useConnectionStatus(session)
   const { activeSceneId, activeScene } = useScenes(session?.doc ?? null)
-  const { tokens, createToken, setTokenArt } = useTokens(session?.doc ?? null, activeSceneId)
+  const { tokens, createToken, setTokenArt, initTokenFromMonster } = useTokens(session?.doc ?? null, activeSceneId)
   const [toolMode, setToolMode] = useState<ToolMode>('move')
   const [snapWalls, setSnapWalls] = useState(false)
   const [showJoinCode, setShowJoinCode] = useState(true)
@@ -36,6 +42,9 @@ export function SessionScreen() {
   const [showCharacterSheet, setShowCharacterSheet] = useState(true)
   const [showDiceRoller, setShowDiceRoller] = useState(true)
   const [showInitiativeTracker, setShowInitiativeTracker] = useState(true)
+  const [showCompendium, setShowCompendium] = useState(false)
+  const [showHomebrewEditor, setShowHomebrewEditor] = useState(false)
+  const [showRuleOverrides, setShowRuleOverrides] = useState(false)
 
   useEffect(() => {
     if (!pendingPlacement) return
@@ -57,14 +66,29 @@ export function SessionScreen() {
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingPlacement || !activeSceneId) return
-    const { name, sizeCategory, file } = pendingPlacement
+    const { name, sizeCategory, file, monsterInit } = pendingPlacement
     setPendingPlacement(null)
     try {
       const tokenId = createToken({ sceneId: activeSceneId, name, sizeCategory, x, y })
       if (file) void setTokenArt(tokenId, file)
+      if (monsterInit) initTokenFromMonster(tokenId, monsterInit)
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not add that token.')
     }
+  }
+
+  const handleAddMonsterToScene = (monster: MonsterData) => {
+    setPendingPlacement({
+      name: monster.name,
+      sizeCategory: monsterSizeToCategory(monster.size),
+      file: null,
+      monsterInit: {
+        monsterKey: monster.key,
+        hp: { current: monster.hp, max: monster.hp, temp: 0 },
+        ac: monster.ac,
+        speed: parseSpeedFeet(monster.speed),
+      },
+    })
   }
 
   return (
@@ -118,6 +142,27 @@ export function SessionScreen() {
               {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
 
               <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />
+
+              <button type="button" onClick={() => setShowCompendium((v) => !v)}>
+                {showCompendium ? 'Hide compendium' : 'Show compendium'}
+              </button>
+              {showCompendium && (
+                <CompendiumDrawer
+                  doc={session.doc}
+                  isDm
+                  onAddMonsterToScene={activeSceneId && !isPreviewingPlayer ? handleAddMonsterToScene : undefined}
+                />
+              )}
+
+              <button type="button" onClick={() => setShowHomebrewEditor((v) => !v)}>
+                {showHomebrewEditor ? 'Hide homebrew editor' : 'Show homebrew editor'}
+              </button>
+              {showHomebrewEditor && <HomebrewEditor doc={session.doc} />}
+
+              <button type="button" onClick={() => setShowRuleOverrides((v) => !v)}>
+                {showRuleOverrides ? 'Hide rule overrides' : 'Show rule overrides'}
+              </button>
+              {showRuleOverrides && <RuleOverridesPanel doc={session.doc} activeSceneId={activeSceneId} />}
             </>
           )}
 
@@ -144,12 +189,24 @@ export function SessionScreen() {
           </button>
           {showInitiativeTracker && <InitiativeTracker />}
 
+          {session.role === 'player' && (
+            <>
+              <button type="button" onClick={() => setShowCompendium((v) => !v)}>
+                {showCompendium ? 'Hide compendium' : 'Show compendium'}
+              </button>
+              {showCompendium && <CompendiumDrawer doc={session.doc} isDm={false} />}
+            </>
+          )}
+
           {activeSceneId && selectedTokenId && (
             <TokenHpConditionEditor
               sceneId={activeSceneId}
               selectedTokenId={selectedTokenId}
               onClose={() => setSelectedTokenId(null)}
             />
+          )}
+          {activeSceneId && selectedTokenId && (
+            <TokenInspector doc={session.doc} sceneId={activeSceneId} isDm={session.role === 'dm'} selectedTokenId={selectedTokenId} />
           )}
         </div>
 

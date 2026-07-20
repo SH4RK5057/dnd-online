@@ -9,4 +9,8 @@ export interface PendingTokenPlacement {
   name: string
   sizeCategory: SizeCategory
   file: File | null
+  /** Set when this placement came from the compendium's "Add to scene"
+   * button (encounter drag-and-drop) instead of TokenUploadButton — carries
+   * the stat block fields to initialize on the token once it's placed. */
+  monsterInit: { monsterKey: string; hp: { current: number; max: number; temp: number }; ac: number; speed: number } | null
 }

@@ -117,6 +117,10 @@ describe('resolveTokenHp', () => {
       hp: null,
       conditions: [],
       initiative: null,
+      monsterKey: null,
+      ac: null,
+      speed: null,
+      description: '',
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toEqual({ max: 44, current: 44, temp: 0, fromCharacter: true })
@@ -136,6 +140,10 @@ describe('resolveTokenHp', () => {
       hp: { max: 7, current: 7, temp: 0 },
       conditions: [],
       initiative: null,
+      monsterKey: null,
+      ac: null,
+      speed: null,
+      description: '',
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toEqual({ max: 7, current: 7, temp: 0, fromCharacter: false })
@@ -155,6 +163,10 @@ describe('resolveTokenHp', () => {
       hp: null,
       conditions: [],
       initiative: null,
+      monsterKey: null,
+      ac: null,
+      speed: null,
+      description: '',
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toBeNull()

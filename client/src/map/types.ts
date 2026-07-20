@@ -78,6 +78,24 @@ export interface TokenRecord {
    * from this field (see combat/rules.ts computeInitiativeOrder) — never
    * stored as a separate ordered list. */
   initiative: number | null
+  /** content/types.ts ContentKey (e.g. "srd:goblin", "mirror:...",
+   * "homebrew:<id>") this token was created from via encounter drag-and-drop,
+   * or null. A one-time initialization source, not a live link — editing the
+   * compendium entry afterward doesn't retroactively change existing tokens.
+   * Used by the DM's token inspector to show the full stat block/rules for
+   * this token (content/useCompendium.ts findByKey). */
+  monsterKey: string | null
+  /** Only meaningful (read or written) when characterId is null — mirrors
+   * `hp`'s split: a linked character's AC lives on the CharacterRecord
+   * instead. Initialized from monsterKey's stat block on drop, editable after. */
+  ac: number | null
+  /** Same split as `ac` above. */
+  speed: number | null
+  /** Freeform DM-entered text shown to players when they click this token —
+   * distinct from the rules/stat-block lookup (which is DM-only, pulled from
+   * monsterKey or characterId instead of stored here). Empty string = DM
+   * hasn't written one; players see nothing in that case, not a placeholder. */
+  description: string
   createdAt: number
 }
 
