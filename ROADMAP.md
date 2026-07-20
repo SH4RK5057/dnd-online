@@ -208,38 +208,55 @@ Complete.
 ## Phase 6 — DM tools
 
 **Encounters**
-- [ ] Encounter builder (assemble monsters, auto-populate initiative)
-- [ ] Start an encounter anytime — DM can trigger combat at any point, either
+- [x] Encounter builder (assemble monsters, auto-populate initiative) —
+      the pre-combat panel InitiativeTracker shows whenever combat isn't
+      active, checklist of scene tokens feeding the existing Phase 4
+      startCombat/initiative-rolling pipeline
+- [x] Start an encounter anytime — DM can trigger combat at any point, either
       pulling in tokens already on the scene or dynamically spawning new
       enemies from the encounter builder
-- [ ] Split-party / selective encounters — if players are geographically
+- [x] Split-party / selective encounters — if players are geographically
       split on the map, the DM can trigger an encounter for just a subset of
-      them; every connected player still gets a global notification that an
-      encounter has started and where (notification delivered via Phase 7's
-      chat/pings system)
-- [ ] NPC/monster stat blocks the DM can drag onto the map (pulls from the
+      them (uncheck anyone not involved in the encounter builder); every
+      connected player still gets a global notification that an encounter
+      has started and where. Ships as its own small self-contained
+      notification (a toast banner watching every scene's combat state),
+      not wired through Phase 7's chat/pings since that doesn't exist yet
+- [x] NPC/monster stat blocks the DM can drag onto the map (pulls from the
       Phase 5 content lookup, or a homebrew entry, into the encounter builder)
+      — shipped as part of Phase 5's compendium drawer
 
 **Advanced tokens**
-- [ ] Per-token hidden/visible toggle — DM can place a token (trap, mimic,
+- [x] Per-token hidden/visible toggle — DM can place a token (trap, mimic,
       stealthy enemy) fully hidden from players until revealed, independent
       of fog-of-war
-- [ ] Token altitude (Z-axis) — optional Z-position stored on token records
+- [x] Token altitude (Z-axis) — optional Z-position stored on token records
       for flying/elevated creatures; not actively rendered in 3D, but visible
       when inspecting a token and usable for range/line-of-sight calculations
+      (map/distance3D.ts)
 
 **Session tools**
-- [ ] Hidden DM notes / session journal
-- [ ] Handouts (share an image/doc to players on demand)
-- [ ] Random generators (loot, NPC names)
-- [ ] Soundboard / ambience music
+- [x] Hidden DM notes / session journal
+- [x] Handouts (share an image/doc to players on demand)
+- [x] Random generators (loot, NPC names) — original procedural name
+      synthesis and flavor text, not any published table; loot can also
+      pull real items from whatever compendium content is loaded
+- [x] Soundboard / ambience music — DM-local playback only (this app has no
+      audio-streaming infrastructure and voice/video is explicitly out of
+      scope per the Decisions section), clip library lives in the new
+      cross-campaign Global Settings store
 
 **DM file ecosystem**
-- [ ] Modular, DM-managed record types beyond the whole-campaign blob below —
+- [x] Modular, DM-managed record types beyond the whole-campaign blob below —
       Campaigns, Global Settings (portable DM preferences applied across
       campaigns), Scenes, Enemies, Spells, and Items — each independently
-      saved/loaded/shared
-- [ ] Campaign export/import as a local file (download the Yjs doc state as a
+      saved/loaded/shared. Global Settings shipped as a new localStorage
+      store (currently housing the soundboard library); Enemies/Spells/Items
+      already independently exportable/importable via the Phase 5 homebrew
+      editor; Scenes independently exportable/importable as JSON (settings +
+      tokens + walls + lights — map/token art doesn't travel, re-upload
+      after import, a deliberate v1 scope limit)
+- [x] Campaign export/import as a local file (download the Yjs doc state as a
       single file, re-import it later or on another machine) — backup/
       portability on top of the existing IndexedDB persistence, which can be
       cleared by the browser. Local file only, never uploaded anywhere — no
