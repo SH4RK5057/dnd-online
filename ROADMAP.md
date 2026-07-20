@@ -126,11 +126,39 @@ fixes to already-checked-off items above, not new Phase 4 features):**
       sections instead of one cramped, overlapping row of controls
 
 ## Phase 4 — Character sheets, dice, initiative
+
+**Character sheet & files**
 - [ ] Full 5e character sheet (stats, skills, inventory, spells, feats)
+- [ ] Standalone character editor — full character creation/editing decoupled
+      from any active campaign; export/download a character as a local file,
+      re-upload it later to keep editing it standalone
+- [ ] Campaign binding & character locking — joining a campaign imports a
+      player's character file; the campaign clones and locks the core
+      blueprint (stats, level, class) so it can't be edited mid-session;
+      rejoining automatically reconnects the player to their assigned
+      campaign character (builds on Phase 1's reconnect handling)
+
+**Dice & rolls**
 - [ ] Dice roller: standard notation, advantage/disadvantage, macros
+- [ ] DM-requested rolls — players communicate intent via chat/voice outside
+      the app, and the DM sends an official roll prompt/request to a specific
+      player through the app UI (for non-battle checks and similar)
 - [ ] Roll results broadcast to a shared roll log (its own simple feed —
       doesn't depend on Phase 7's full IC/OOC text chat)
+- [ ] Expandable roll breakdown — each roll log entry can expand to show the
+      underlying math (natural die result vs. each compound bonus/modifier)
+
+**Initiative & combat**
 - [ ] Initiative tracker / turn order, HP and status/condition tracking on tokens
+- [ ] Automatic initiative rolling on encounter start, with a DM toggle
+      between Individual Monster Initiative (each monster rolls its own) and
+      Group Monster Initiative (grouped by enemy type, one roll per group)
+- [ ] Turn-by-turn combat loop — active-turn sequencing that
+      restricts/enables each player's action menu based on whose turn it is
+- [ ] Automated status-effect evaluation — active conditions (Poisoned,
+      Blinded, etc.) are mechanically applied during rolls and targeted
+      actions, not just displayed as labels (depends on Phase 5's rules
+      content for condition definitions)
 
 ## Phase 5 — 5etools content integration
 - [ ] **Confirm what's actually redistributable** from 5etools' data (it's
@@ -139,6 +167,10 @@ fixes to already-checked-off items above, not new Phase 4 features):**
 - [ ] Spell/monster/item lookup and quick reference
 - [ ] Drag monster stat blocks straight into encounters
 - [ ] Homebrew content editor as a parallel path (doesn't depend on licensing outcome)
+- [ ] DM homebrew rule overrides — a rule-modifier engine letting the DM
+      apply custom campaign/scene modifiers that override default 5e rules or
+      an individual character's stats (builds on the homebrew content editor
+      above)
 - [ ] Actual rules description shown when the DM clicks an enemy or player token
       (pulled from the monster/character stat lookup above)
 - [ ] DM-entered description shown when a player clicks an enemy token
@@ -146,13 +178,39 @@ fixes to already-checked-off items above, not new Phase 4 features):**
       both live on the same token-click UI)
 
 ## Phase 6 — DM tools
+
+**Encounters**
 - [ ] Encounter builder (assemble monsters, auto-populate initiative)
+- [ ] Start an encounter anytime — DM can trigger combat at any point, either
+      pulling in tokens already on the scene or dynamically spawning new
+      enemies from the encounter builder
+- [ ] Split-party / selective encounters — if players are geographically
+      split on the map, the DM can trigger an encounter for just a subset of
+      them; every connected player still gets a global notification that an
+      encounter has started and where (notification delivered via Phase 7's
+      chat/pings system)
 - [ ] NPC/monster stat blocks the DM can drag onto the map (pulls from the
       Phase 5 content lookup, or a homebrew entry, into the encounter builder)
+
+**Advanced tokens**
+- [ ] Per-token hidden/visible toggle — DM can place a token (trap, mimic,
+      stealthy enemy) fully hidden from players until revealed, independent
+      of fog-of-war
+- [ ] Token altitude (Z-axis) — optional Z-position stored on token records
+      for flying/elevated creatures; not actively rendered in 3D, but visible
+      when inspecting a token and usable for range/line-of-sight calculations
+
+**Session tools**
 - [ ] Hidden DM notes / session journal
 - [ ] Handouts (share an image/doc to players on demand)
 - [ ] Random generators (loot, NPC names)
 - [ ] Soundboard / ambience music
+
+**DM file ecosystem**
+- [ ] Modular, DM-managed record types beyond the whole-campaign blob below —
+      Campaigns, Global Settings (portable DM preferences applied across
+      campaigns), Scenes, Enemies, Spells, and Items — each independently
+      saved/loaded/shared
 - [ ] Campaign export/import as a local file (download the Yjs doc state as a
       single file, re-import it later or on another machine) — backup/
       portability on top of the existing IndexedDB persistence, which can be
@@ -160,13 +218,36 @@ fixes to already-checked-off items above, not new Phase 4 features):**
       new server-storage surface, matches the DM-hosted decision in Phase 1.
 
 ## Phase 7 — Player tools & polish
+
+**Inventory & resources**
 - [ ] Personal inventory management, spell slot/resource tracking
+- [ ] Inventory history tab — a log of every item transfer, addition, and
+      deletion between players and the DM, visible alongside the inventory itself
+- [ ] Automated rest states — native Short Rest / Long Rest recovery
+      triggers, usable by a player anytime unless the DM has temporarily
+      disabled them (the DM-side toggle lives in Phase 6)
+
+**Rolls & communication**
 - [ ] Private vs. public rolls
 - [ ] Built-in text chat (IC/OOC channels), map pings/emotes, and temporary
       annotations/drawing on the map
+
+**Multi-scale scene navigation** (replaces the old single "vote on group
+movement" bullet with a full DM-configurable navigation mode per scene)
+- [ ] Town scenes: DM chooses Group or Individual navigation, smooth
+      scene-transition overlays between locations, Point-of-Interest (POI) pathing
+- [ ] Landscape scenes: Group-only navigation driven by POIs; DM chooses the
+      party's movement-consensus mode — Democratic Voting (majority choice)
+      or Leader Appointment (one designated player moves the party)
+- [ ] Dungeon scenes: individual token movement (the existing Phase 2/3
+      battle-map behavior) with dynamic line-of-sight and fog of war
+- [ ] Location Ping System — players flash a visual ripple/label on the map
+      for their peers (a more specific, targeted version of the general map
+      pings/emotes bullet above)
+
+**Polish**
 - [ ] Mobile/responsive pass (DM stays locked to computer/tablet — this is
       about the player-facing layout)
-- [ ] Let players enter their intended moves; if moving as a group, vote on it
 
 ## Phase 8 — Stretch goals
 - [ ] 3D dice roll animations
@@ -182,8 +263,6 @@ Kept here so nothing gets lost even before it's scheduled into a phase above.
 Pruned periodically as items get scheduled into a phase or turn out to
 already be covered by something shipped.
 
-**Core infra:** campaign save/load (see Phase 6 — local file only, not
-server-hosted)
 **Maps:** drawing/measurement tools, ruler
 **Rules:** automated attack/save/damage resolution
 **Technical:** desktop-app packaging (Electron) if browser-only proves limiting
