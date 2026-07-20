@@ -78,39 +78,47 @@ export function SessionScreen() {
 
       {failure && <ConnectionErrorPanel failure={failure} onRetry={retry} />}
 
-      {session.role === 'dm' && <SceneToolbar />}
+      <div className="session-screen__body">
+        {session.role === 'dm' && (
+          <div className="session-screen__panel">
+            <SceneToolbar />
 
-      {session.role === 'dm' && activeSceneId && (
-        <DrawingToolbar
-          sceneId={activeSceneId}
-          toolMode={toolMode}
-          onToolModeChange={setToolMode}
-          snapWalls={snapWalls}
-          onSnapWallsChange={setSnapWalls}
-        />
-      )}
+            {activeSceneId && (
+              <DrawingToolbar
+                sceneId={activeSceneId}
+                toolMode={toolMode}
+                onToolModeChange={setToolMode}
+                snapWalls={snapWalls}
+                onSnapWallsChange={setSnapWalls}
+              />
+            )}
 
-      {session.role === 'dm' && activeSceneId && (
-        <TokenUploadButton
-          sceneId={activeSceneId}
-          pendingPlacement={pendingPlacement}
-          onRequestPlacement={setPendingPlacement}
-          onCancelPlacement={() => setPendingPlacement(null)}
-        />
-      )}
+            {activeSceneId && (
+              <TokenUploadButton
+                sceneId={activeSceneId}
+                pendingPlacement={pendingPlacement}
+                onRequestPlacement={setPendingPlacement}
+                onCancelPlacement={() => setPendingPlacement(null)}
+              />
+            )}
 
-      {session.role === 'dm' && activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
+            {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
+          </div>
+        )}
 
-      {isUnpublishedForPlayer ? (
-        <p className="session-screen__notice">Your DM is still setting up this scene. Hang tight!</p>
-      ) : (
-        <>
-          {isUnassignedPlayer && (
-            <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
+        <div className="session-screen__main">
+          {isUnpublishedForPlayer ? (
+            <p className="session-screen__notice">Your DM is still setting up this scene. Hang tight!</p>
+          ) : (
+            <>
+              {isUnassignedPlayer && (
+                <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
+              )}
+              <MapCanvas toolMode={effectiveToolMode} snapWalls={snapWalls} onPlaceToken={handlePlaceToken} />
+            </>
           )}
-          <MapCanvas toolMode={effectiveToolMode} snapWalls={snapWalls} onPlaceToken={handlePlaceToken} />
-        </>
-      )}
+        </div>
+      </div>
 
       <div className="session-screen__peers">
         <h2>Who's here</h2>

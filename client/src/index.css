@@ -56,6 +56,14 @@
   padding: 32px 20px;
 }
 
+/* The session screen's DM tool panels + map canvas need real width to lay
+ * out side-by-side — the 1100px cap above is sized for the narrow landing/
+ * setup screens instead. */
+#root:has(.session-screen) {
+  width: 100%;
+  max-width: 100%;
+}
+
 body {
   margin: 0;
 }

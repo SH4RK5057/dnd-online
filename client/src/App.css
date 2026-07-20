@@ -203,13 +203,39 @@
   justify-content: space-between;
 }
 
+/* DM tool panels used to stack full-width above the map canvas, pushing it
+ * far down the page. Panel and canvas now share a viewport-relative height
+ * so they visually line up, and sit side by side instead. */
+:root {
+  --session-body-height: 80vh;
+}
+
+.session-screen__body {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.session-screen__panel {
+  flex: 0 0 340px;
+  width: 340px;
+  max-height: var(--session-body-height);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.session-screen__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .map-canvas {
   width: 100%;
-  height: 80vh;
+  height: var(--session-body-height);
   min-height: 480px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  margin-bottom: 24px;
   background: var(--code-bg);
   overflow: hidden;
 }
