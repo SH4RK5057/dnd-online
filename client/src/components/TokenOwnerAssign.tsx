@@ -22,19 +22,34 @@ export function TokenOwnerAssign({ sceneId }: { sceneId: string }) {
       <h2>Token ownership</h2>
       <p className="drawing-toolbar__hint">Which player's view fog-of-war computes from, per token on this scene.</p>
       <ul className="token-owner-assign__list">
-        {tokens.map((token) => (
-          <li key={token.id} className="token-owner-assign__item">
-            <span>{token.name}</span>
-            <select value={token.ownerId ?? ''} onChange={(event) => assignOwner(token.id, event.target.value || null)}>
-              <option value="">Unassigned</option>
-              {players.map((player) => (
-                <option key={player.playerId} value={player.playerId}>
-                  {player.name}
-                </option>
-              ))}
-            </select>
-          </li>
-        ))}
+        {tokens.map((token) => {
+          // A token's owner can be a player who isn't currently connected
+          // (they closed their tab, or joined in an earlier session) — the
+          // assignment itself is untouched by that (`ownerId` isn't cleared
+          // on disconnect), but a plain <select value={token.ownerId}> with
+          // no matching <option> for that id silently renders as blank,
+          // which looks exactly like "Unassigned" even though it isn't. Add
+          // a synthetic option for that case so the dropdown always shows
+          // the real assignment, and a DM can't be misled into thinking a
+          // still-valid assignment needs fixing (or worse, clear it).
+          const ownerIsKnownPlayer = token.ownerId === null || players.some((p) => p.playerId === token.ownerId)
+          return (
+            <li key={token.id} className="token-owner-assign__item">
+              <span>{token.name}</span>
+              <select value={token.ownerId ?? ''} onChange={(event) => assignOwner(token.id, event.target.value || null)}>
+                <option value="">Unassigned</option>
+                {!ownerIsKnownPlayer && token.ownerId && (
+                  <option value={token.ownerId}>Player {token.ownerId.slice(0, 8)} (disconnected)</option>
+                )}
+                {players.map((player) => (
+                  <option key={player.playerId} value={player.playerId}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
