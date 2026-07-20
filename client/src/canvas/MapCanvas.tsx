@@ -153,6 +153,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
         const scale = Math.min(app.screen.width / size.width, app.screen.height / size.height, 1)
         world.scale.set(scale)
         world.position.set((app.screen.width - size.width * scale) / 2, (app.screen.height - size.height * scale) / 2)
+        wallLayerRef.current?.setViewScale(scale * (cameraRef.current?.scale.x ?? 1))
       }
     }
 
@@ -172,11 +173,19 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
   // Update walls.
   useEffect(() => {
     if (!wallLayerRef.current || !activeScene) return
-    wallLayerRef.current.update(walls, activeScene.gridSizePx, mapSize, isDm && toolMode === 'draw-walls', snapWalls, {
-      onCreateWall: (x1, y1, x2, y2) => createWall({ sceneId: activeScene.id, x1, y1, x2, y2 }),
-      onUpdateWallEndpoint: updateWallEndpoint,
-      onDeleteWall: deleteWall,
-    })
+    wallLayerRef.current.update(
+      walls,
+      activeScene.gridSizePx,
+      mapSize,
+      isDm && toolMode === 'draw-walls',
+      snapWalls,
+      activeScene.gridType ?? 'square',
+      {
+        onCreateWall: (x1, y1, x2, y2) => createWall({ sceneId: activeScene.id, x1, y1, x2, y2 }),
+        onUpdateWallEndpoint: updateWallEndpoint,
+        onDeleteWall: deleteWall,
+      },
+    )
   }, [walls, activeScene, mapSize, isDm, toolMode, snapWalls, createWall, updateWallEndpoint, deleteWall])
 
   // Update lights.
@@ -228,6 +237,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
     if (!cameraRef.current) return
     cameraRef.current.scale.set(1)
     cameraRef.current.position.set(0, 0)
+    wallLayerRef.current?.setViewScale(worldRef.current?.scale.x ?? 1)
   }, [activeScene?.id])
 
   // Wheel-to-zoom (any mode) and drag-to-pan (Move mode, empty space only —
@@ -250,6 +260,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
       const localY = (cursorY - camera.position.y) / oldScale
       camera.scale.set(newScale)
       camera.position.set(cursorX - localX * newScale, cursorY - localY * newScale)
+      wallLayerRef.current?.setViewScale(newScale * (worldRef.current?.scale.x ?? 1))
     }
     app.canvas.addEventListener('wheel', onWheel, { passive: false })
 

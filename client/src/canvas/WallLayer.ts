@@ -1,19 +1,28 @@
 import { Container, Graphics, type FederatedPointerEvent } from 'pixi.js'
 import { distanceToSegment } from '../map/visibility'
-import type { WallRecord } from '../map/types'
+import { snapToHexGrid } from './hexGrid'
+import type { GridType, WallRecord } from '../map/types'
 
-/** Grid-cell-space hit tolerance for shift-click-to-delete. Not pegged to an
- * exact screen-pixel size (WallLayer doesn't track the world's zoom scale),
- * just a reasonable tap target at typical grid sizes. */
-const DELETE_HIT_TOLERANCE_CELLS = 0.15
+/** Hit-test tolerances are expressed as target screen-pixel radii, not fixed
+ * grid-cell amounts — grid-cell-space tolerances stay a constant WORLD size
+ * regardless of camera zoom, so at typical "zoomed out to see the whole
+ * dungeon" scales they shrink to a couple of screen pixels and become
+ * essentially unhittable with a real mouse. `setViewScale` keeps the current
+ * camera zoom so these can be converted to cell-space fresh on every check. */
+const DELETE_HIT_RADIUS_PX = 10
 /** Larger than the delete tolerance — endpoints are small dots, worth a more
  * generous grab target since missing one falls through to "start a new wall". */
-const ENDPOINT_HIT_TOLERANCE_CELLS = 0.25
+const ENDPOINT_HIT_RADIUS_PX = 16
 /** Slightly more generous than the grab tolerance — this is "snap to connect
  * exactly," not "grab to drag," so it's worth erring toward connecting two
  * walls that were clearly meant to meet rather than leaving a hairline gap
  * a ray can leak through. Takes priority over grid-snap. */
-const ENDPOINT_MAGNET_TOLERANCE_CELLS = 0.35
+const ENDPOINT_MAGNET_RADIUS_PX = 22
+/** Below this on-screen movement between a chain segment's down and up, a
+ * gesture counts as a stationary click (leaves the chain open for another
+ * click) rather than a click-and-drag (commits the segment immediately and
+ * ends the chain) — see handlePointerUp. */
+const DRAG_COMMIT_THRESHOLD_PX = 6
 const DRAG_WRITE_INTERVAL_MS = 75
 
 export interface WallLayerCallbacks {
@@ -44,6 +53,8 @@ export class WallLayer {
   private active = false
   private gridSizePx = 1
   private snapToGrid = false
+  private gridType: GridType = 'square'
+  private viewScale = 1
   private walls: WallRecord[] = []
   private callbacks: WallLayerCallbacks | null = null
   private pendingStart: { x: number; y: number } | null = null
@@ -60,17 +71,30 @@ export class WallLayer {
     this.hitPlane.on('pointerupoutside', this.handlePointerUp)
   }
 
+  /** Called by MapCanvas whenever the camera's zoom changes, so hit-test
+   * tolerances (defined as screen-pixel radii) can be converted to the
+   * correct grid-cell-space distance for the current zoom level. */
+  setViewScale(scale: number): void {
+    this.viewScale = scale > 0 ? scale : 1
+  }
+
+  private toleranceCells(radiusPx: number): number {
+    return radiusPx / (this.gridSizePx * this.viewScale)
+  }
+
   update(
     walls: WallRecord[],
     gridSizePx: number,
     mapSize: { width: number; height: number } | null,
     active: boolean,
     snapToGrid: boolean,
+    gridType: GridType,
     callbacks: WallLayerCallbacks,
   ): void {
     this.walls = walls
     this.gridSizePx = gridSizePx
     this.snapToGrid = snapToGrid
+    this.gridType = gridType
     this.callbacks = callbacks
 
     if (this.active !== active) {
@@ -113,7 +137,9 @@ export class WallLayer {
     const raw = { x: local.x / this.gridSizePx, y: local.y / this.gridSizePx }
     const magnet = this.findMagnetPoint(raw, exclude)
     if (magnet) return magnet
-    if (this.snapToGrid) return { x: Math.round(raw.x), y: Math.round(raw.y) }
+    if (this.snapToGrid) {
+      return this.gridType === 'hex' ? snapToHexGrid(raw) : { x: Math.round(raw.x), y: Math.round(raw.y) }
+    }
     return raw
   }
 
@@ -124,7 +150,7 @@ export class WallLayer {
    * "meant to touch" only actually helps if they're bit-for-bit coincident. */
   private findMagnetPoint(point: { x: number; y: number }, exclude?: EndpointHit): { x: number; y: number } | null {
     let nearest: { x: number; y: number } | null = null
-    let nearestDist = ENDPOINT_MAGNET_TOLERANCE_CELLS
+    let nearestDist = this.toleranceCells(ENDPOINT_MAGNET_RADIUS_PX)
     for (const wall of this.walls) {
       if (!(exclude && exclude.wall.id === wall.id && exclude.which === 'start')) {
         const d = Math.hypot(point.x - wall.x1, point.y - wall.y1)
@@ -146,7 +172,7 @@ export class WallLayer {
 
   private findWallNear(point: { x: number; y: number }): WallRecord | null {
     let nearest: WallRecord | null = null
-    let nearestDist = DELETE_HIT_TOLERANCE_CELLS
+    let nearestDist = this.toleranceCells(DELETE_HIT_RADIUS_PX)
     for (const wall of this.walls) {
       const dist = distanceToSegment(point, wall)
       if (dist < nearestDist) {
@@ -159,7 +185,7 @@ export class WallLayer {
 
   private findEndpointNear(point: { x: number; y: number }): EndpointHit | null {
     let nearest: EndpointHit | null = null
-    let nearestDist = ENDPOINT_HIT_TOLERANCE_CELLS
+    let nearestDist = this.toleranceCells(ENDPOINT_HIT_RADIUS_PX)
     for (const wall of this.walls) {
       const dStart = Math.hypot(point.x - wall.x1, point.y - wall.y1)
       if (dStart < nearestDist) {
@@ -230,14 +256,29 @@ export class WallLayer {
   }
 
   private handlePointerUp = (event: FederatedPointerEvent) => {
-    if (!this.draggingEndpoint || !this.callbacks) {
+    if (this.draggingEndpoint && this.callbacks) {
+      // Always land on the exact release position, even if the last move tick was throttled away.
+      const point = this.toGridPoint(event, this.draggingEndpoint)
+      this.callbacks.onUpdateWallEndpoint(this.draggingEndpoint.wall.id, this.draggingEndpoint.which, point.x, point.y)
       this.draggingEndpoint = null
       return
     }
-    // Always land on the exact release position, even if the last move tick was throttled away.
-    const point = this.toGridPoint(event, this.draggingEndpoint)
-    this.callbacks.onUpdateWallEndpoint(this.draggingEndpoint.wall.id, this.draggingEndpoint.which, point.x, point.y)
     this.draggingEndpoint = null
+
+    // Click-and-drag support: a chain segment's down click sets pendingStart
+    // (see handlePointerDown) without creating anything yet, on the
+    // assumption the user might be starting a multi-click chain. If instead
+    // they drag a meaningful distance before releasing, that's a "draw one
+    // wall" gesture — commit it here and end the chain. A release with
+    // little/no movement is a stationary click, which leaves pendingStart
+    // open so the next click can continue the chain, same as before.
+    if (!this.active || !this.callbacks || !this.pendingStart) return
+    const point = this.toGridPoint(event)
+    const dragDistancePx = Math.hypot(point.x - this.pendingStart.x, point.y - this.pendingStart.y) * this.gridSizePx * this.viewScale
+    if (dragDistancePx < DRAG_COMMIT_THRESHOLD_PX) return
+    this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y)
+    this.pendingStart = null
+    this.previewGraphics.clear()
   }
 
   destroy(): void {
