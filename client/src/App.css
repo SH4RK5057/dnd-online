@@ -38,6 +38,23 @@
   flex: 0 1 200px;
 }
 
+.preview-as-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.preview-as-player label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.preview-as-player select {
+  width: auto;
+  flex: 0 1 200px;
+}
+
 .landing-screen__actions,
 .setup-screen__actions {
   display: flex;

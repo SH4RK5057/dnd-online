@@ -12,6 +12,7 @@ import { SceneToolbar } from '../components/SceneToolbar'
 import { TokenUploadButton } from '../components/TokenUploadButton'
 import { DrawingToolbar } from '../components/DrawingToolbar'
 import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
+import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
 import { MapCanvas } from '../canvas/MapCanvas'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingTokenPlacement } from './pendingTokenPlacement'
@@ -25,6 +26,7 @@ export function SessionScreen() {
   const [snapWalls, setSnapWalls] = useState(false)
   const [showJoinCode, setShowJoinCode] = useState(true)
   const [pendingPlacement, setPendingPlacement] = useState<PendingTokenPlacement | null>(null)
+  const [previewPlayerId, setPreviewPlayerId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!pendingPlacement) return
@@ -41,7 +43,8 @@ export function SessionScreen() {
     session.role === 'player' && !!activeScene?.fogEnabled && !tokens.some((t) => t.ownerId === getOrCreatePlayerId())
   const isUnpublishedForPlayer = session.role === 'player' && !!activeScene && activeScene.published === false
 
-  const effectiveToolMode: ToolMode = pendingPlacement ? 'place-tokens' : toolMode
+  const isPreviewingPlayer = session.role === 'dm' && previewPlayerId !== null
+  const effectiveToolMode: ToolMode = isPreviewingPlayer ? 'move' : pendingPlacement ? 'place-tokens' : toolMode
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingPlacement || !activeSceneId) return
@@ -83,7 +86,7 @@ export function SessionScreen() {
           <div className="session-screen__panel">
             <SceneToolbar />
 
-            {activeSceneId && (
+            {activeSceneId && !isPreviewingPlayer && (
               <DrawingToolbar
                 sceneId={activeSceneId}
                 toolMode={toolMode}
@@ -93,7 +96,7 @@ export function SessionScreen() {
               />
             )}
 
-            {activeSceneId && (
+            {activeSceneId && !isPreviewingPlayer && (
               <TokenUploadButton
                 sceneId={activeSceneId}
                 pendingPlacement={pendingPlacement}
@@ -103,6 +106,8 @@ export function SessionScreen() {
             )}
 
             {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
+
+            <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />
           </div>
         )}
 
@@ -114,7 +119,12 @@ export function SessionScreen() {
               {isUnassignedPlayer && (
                 <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
               )}
-              <MapCanvas toolMode={effectiveToolMode} snapWalls={snapWalls} onPlaceToken={handlePlaceToken} />
+              <MapCanvas
+                toolMode={effectiveToolMode}
+                snapWalls={snapWalls}
+                onPlaceToken={handlePlaceToken}
+                previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
+              />
             </>
           )}
         </div>

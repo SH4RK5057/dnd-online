@@ -31,25 +31,33 @@ interface MapCanvasProps {
   toolMode: ToolMode
   snapWalls: boolean
   onPlaceToken?: (x: number, y: number) => void
+  /** DM-only: when set, the DM's own canvas renders exactly what this
+   * player currently sees (their fog mask, their exploration memory)
+   * instead of the DM's always-unmasked view. Always null for players. */
+  previewPlayerId?: string | null
 }
 
-export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps) {
+export function MapCanvas({ toolMode, snapWalls, onPlaceToken, previewPlayerId = null }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const app = usePixiApp(containerRef)
 
   const { session } = useSession()
   const doc = session?.doc ?? null
   const isDm = session?.role === 'dm'
+  // The identity this canvas should render fog/vision as. Previewing (DM
+  // only) overrides the viewer's real identity to the previewed player's;
+  // otherwise a player renders as themselves and the DM renders unmasked.
+  // isDmUnmasked — not bare isDm — is what should gate every DM-only
+  // editing interaction (dragging tokens, drawing walls, placing lights)
+  // below, so previewing a player also disables editing on their behalf.
+  const effectiveViewerId = previewPlayerId ?? (isDm ? null : getOrCreatePlayerId())
+  const isDmUnmasked = isDm && !previewPlayerId
   const { activeScene } = useScenes(doc)
   const mapUrl = useAssetUrl(doc, activeScene?.mapAssetId ?? null)
   const { tokens, moveToken } = useTokens(doc, activeScene?.id ?? null)
   const { walls, createWall, updateWallEndpoint, deleteWall } = useWalls(doc, activeScene?.id ?? null)
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
-  const { exploredCells, revealCells } = useExploration(
-    doc,
-    activeScene?.id ?? null,
-    isDm ? null : getOrCreatePlayerId(),
-  )
+  const { exploredCells, revealCells } = useExploration(doc, activeScene?.id ?? null, effectiveViewerId)
 
   const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -173,11 +181,11 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
   // Update tokens.
   useEffect(() => {
     if (!doc || !tokenLayerRef.current || !activeScene) return
-    tokenLayerRef.current.update(doc, tokens, activeScene.gridSizePx, isDm && toolMode === 'move', {
+    tokenLayerRef.current.update(doc, tokens, activeScene.gridSizePx, isDmUnmasked && toolMode === 'move', {
       onMove: moveToken,
       onMoveEnd: moveToken,
     })
-  }, [doc, tokens, activeScene, isDm, toolMode, moveToken])
+  }, [doc, tokens, activeScene, isDmUnmasked, toolMode, moveToken])
 
   // Update walls.
   useEffect(() => {
@@ -186,7 +194,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
       walls,
       activeScene.gridSizePx,
       mapSize,
-      isDm && toolMode === 'draw-walls',
+      isDmUnmasked && toolMode === 'draw-walls',
       snapWalls,
       activeScene.gridType ?? 'square',
       {
@@ -195,18 +203,18 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
         onDeleteWall: deleteWall,
       },
     )
-  }, [walls, activeScene, mapSize, isDm, toolMode, snapWalls, createWall, updateWallEndpoint, deleteWall])
+  }, [walls, activeScene, mapSize, isDmUnmasked, toolMode, snapWalls, createWall, updateWallEndpoint, deleteWall])
 
   // Update lights.
   useEffect(() => {
     if (!lightLayerRef.current || !activeScene) return
-    lightLayerRef.current.update(lights, tokens, activeScene.gridSizePx, mapSize, isDm && toolMode === 'place-lights', {
+    lightLayerRef.current.update(lights, tokens, activeScene.gridSizePx, mapSize, isDmUnmasked && toolMode === 'place-lights', {
       onCreateLight: (x, y) => createLight({ sceneId: activeScene.id, x, y }),
       onMoveLight: moveLight,
       onDetachLight: detachLight,
       onDeleteLight: deleteLight,
     })
-  }, [lights, tokens, activeScene, mapSize, isDm, toolMode, createLight, moveLight, detachLight, deleteLight])
+  }, [lights, tokens, activeScene, mapSize, isDmUnmasked, toolMode, createLight, moveLight, detachLight, deleteLight])
 
   // Update fog. DM always sees everything (no mask); players get one only
   // when the scene has fog enabled and the map is loaded.
@@ -216,15 +224,16 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
     const tokenTarget = tokenTargetRef.current
     const fogLayer = fogLayerRef.current
 
-    if (isDm || !activeScene.fogEnabled) {
+    if (isDmUnmasked || !activeScene.fogEnabled) {
       fogTarget.mask = null
       tokenTarget.mask = null
       return
     }
 
-    const myPlayerId = getOrCreatePlayerId()
     const ownTokenIds = (
-      activeScene.sharedVisionEnabled ?? false ? tokens.filter((t) => t.ownerId !== null) : tokens.filter((t) => t.ownerId === myPlayerId)
+      activeScene.sharedVisionEnabled ?? false
+        ? tokens.filter((t) => t.ownerId !== null)
+        : tokens.filter((t) => t.ownerId === effectiveViewerId)
     ).map((t) => t.id)
 
     const newlyExplored = fogLayer.update(app.renderer, {
@@ -243,7 +252,7 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
     fogTarget.mask = fogLayer.mask
     tokenTarget.mask = fogLayer.liveMask
     if (newlyExplored.length > 0) revealCells(newlyExplored)
-  }, [app, activeScene, mapSize, isDm, walls, lights, tokens, exploredCells, revealCells])
+  }, [app, activeScene, mapSize, isDmUnmasked, effectiveViewerId, walls, lights, tokens, exploredCells, revealCells])
 
   // Reset the zoom/pan camera whenever the active scene changes, so switching
   // scenes doesn't carry over an unrelated view.
