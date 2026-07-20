@@ -37,6 +37,7 @@ export function SceneToolbar() {
     setAmbientBrightness,
     togglePersistentFog,
     resetExploration,
+    toggleSharedVision,
   } = useScenes(doc)
 
   const [newSceneName, setNewSceneName] = useState('')
@@ -230,20 +231,33 @@ export function SceneToolbar() {
             </div>
 
             {activeScene.fogEnabled && (
-              <div className="scene-toolbar__row">
-                <label htmlFor="persistent-fog-enabled">
-                  <input
-                    id="persistent-fog-enabled"
-                    type="checkbox"
-                    checked={activeScene.persistentFogEnabled ?? true}
-                    onChange={(event) => togglePersistentFog(activeScene.id, event.target.checked)}
-                  />
-                  Remember explored areas
-                </label>
-                <button type="button" onClick={handleResetExploration}>
-                  Reset players' memory of this scene
-                </button>
-              </div>
+              <>
+                <div className="scene-toolbar__row">
+                  <label htmlFor="persistent-fog-enabled">
+                    <input
+                      id="persistent-fog-enabled"
+                      type="checkbox"
+                      checked={activeScene.persistentFogEnabled ?? true}
+                      onChange={(event) => togglePersistentFog(activeScene.id, event.target.checked)}
+                    />
+                    Remember explored areas
+                  </label>
+                  <button type="button" onClick={handleResetExploration}>
+                    Reset players' memory of this scene
+                  </button>
+                </div>
+                <div className="scene-toolbar__row">
+                  <label htmlFor="shared-vision-enabled">
+                    <input
+                      id="shared-vision-enabled"
+                      type="checkbox"
+                      checked={activeScene.sharedVisionEnabled ?? false}
+                      onChange={(event) => toggleSharedVision(activeScene.id, event.target.checked)}
+                    />
+                    Share vision between players
+                  </label>
+                </div>
+              </>
             )}
 
             <div className="scene-toolbar__row">

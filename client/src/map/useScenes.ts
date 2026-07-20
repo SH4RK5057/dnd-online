@@ -31,6 +31,7 @@ export interface UseScenesResult {
   setAmbientBrightness: (sceneId: string, ambientBrightness: number) => void
   togglePersistentFog: (sceneId: string, enabled: boolean) => void
   resetExploration: (sceneId: string) => void
+  toggleSharedVision: (sceneId: string, enabled: boolean) => void
 }
 
 export function useScenes(doc: Y.Doc | null): UseScenesResult {
@@ -75,6 +76,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         fogEnabled: false,
         ambientBrightness: 1,
         persistentFogEnabled: true,
+        sharedVisionEnabled: false,
         published: false,
         createdAt: Date.now(),
       }
@@ -264,6 +266,17 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     [doc],
   )
 
+  const toggleSharedVision = useCallback(
+    (sceneId: string, enabled: boolean) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, sharedVisionEnabled: enabled })
+    },
+    [doc],
+  )
+
   const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null
 
   return {
@@ -282,5 +295,6 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     setAmbientBrightness,
     togglePersistentFog,
     resetExploration,
+    toggleSharedVision,
   }
 }

@@ -223,7 +223,9 @@ export function MapCanvas({ toolMode, snapWalls, onPlaceToken }: MapCanvasProps)
     }
 
     const myPlayerId = getOrCreatePlayerId()
-    const ownTokenIds = tokens.filter((t) => t.ownerId === myPlayerId).map((t) => t.id)
+    const ownTokenIds = (
+      activeScene.sharedVisionEnabled ?? false ? tokens.filter((t) => t.ownerId !== null) : tokens.filter((t) => t.ownerId === myPlayerId)
+    ).map((t) => t.id)
 
     const newlyExplored = fogLayer.update(app.renderer, {
       walls,

@@ -31,6 +31,15 @@ export interface SceneRecord {
    * behavior it had before this toggle existed). Turning it off doesn't
    * delete already-recorded exploration data, only stops applying it. */
   persistentFogEnabled: boolean
+  /** Whether every player's live line-of-sight is computed from the union
+   * of all player-owned tokens on the scene, instead of just their own —
+   * lets a party spread across a room see everything any of them can see.
+   * Only affects LIVE sight; each player's own persistent exploration
+   * memory (see persistentFogEnabled) stays independent and is never
+   * merged. Only meaningful while fogEnabled is true. Read as `?? false`
+   * for scenes created before this field existed (matches the old
+   * every-player-sees-only-their-own-tokens behavior). */
+  sharedVisionEnabled: boolean
   /** Whether players can see this scene at all — lets the DM prep a map
    * (upload art, place walls/lights/tokens) before revealing it. Read as
    * `!== false` everywhere (not `=== true`) so scenes created before this
