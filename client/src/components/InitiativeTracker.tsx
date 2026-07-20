@@ -5,7 +5,9 @@ import { useCharacters } from '../character/useCharacters'
 import { useCombat } from '../combat/useCombat'
 import { computeInitiativeOrder } from '../combat/rules'
 import { computeInitiativeBonus } from '../character/rules'
+import { EncounterBuilder } from './EncounterBuilder'
 import type { MonsterInitiativeMode } from '../combat/types'
+import type { TokenRecord } from '../map/types'
 
 /** Initiative order + round/turn state are visible to everyone (players
  * want to see the queue and whose turn it is); starting/ending combat,
@@ -31,7 +33,7 @@ export function InitiativeTracker() {
   const order = computeInitiativeOrder(tokens)
 
   const handleModeChange = (mode: MonsterInitiativeMode) => setMonsterInitiativeMode(mode)
-  const handleStart = () => startCombat(tokens, rollBonusForToken, setTokenInitiative)
+  const handleStart = (selectedTokens: TokenRecord[]) => startCombat(selectedTokens, rollBonusForToken, setTokenInitiative)
   const handleEnd = () => endCombat(tokens, setTokenInitiative)
   const handleAdvance = () => advanceTurn(tokens)
 
@@ -48,7 +50,7 @@ export function InitiativeTracker() {
               <option value="individual">Individual</option>
             </select>
           </label>
-          {combat.active ? (
+          {combat.active && (
             <>
               <button type="button" onClick={handleAdvance}>
                 Next turn
@@ -57,13 +59,11 @@ export function InitiativeTracker() {
                 End combat
               </button>
             </>
-          ) : (
-            <button type="button" onClick={handleStart} disabled={tokens.length === 0}>
-              Start combat
-            </button>
           )}
         </div>
       )}
+
+      {isDm && !combat.active && <EncounterBuilder tokens={tokens} onStart={handleStart} />}
 
       {combat.active && <p className="character-sheet__hint">Round {combat.round}</p>}
 

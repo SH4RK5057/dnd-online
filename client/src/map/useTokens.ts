@@ -35,6 +35,8 @@ export interface UseTokensResult {
   setTokenAc: (tokenId: string, ac: number | null) => void
   setTokenSpeed: (tokenId: string, speed: number | null) => void
   setTokenDescription: (tokenId: string, description: string) => void
+  setTokenHidden: (tokenId: string, hidden: boolean) => void
+  setTokenZ: (tokenId: string, z: number) => void
   /** Encounter drag-and-drop: one atomic patch initializing HP/AC/speed and
    * recording the compendium source, instead of several separate writes. */
   initTokenFromMonster: (
@@ -94,6 +96,8 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         ac: null,
         speed: null,
         description: '',
+        hidden: false,
+        z: 0,
         createdAt: Date.now(),
       }
       tokensMap(doc).set(id, record)
@@ -155,6 +159,8 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     (tokenId: string, description: string) => patchToken(tokenId, { description }),
     [patchToken],
   )
+  const setTokenHidden = useCallback((tokenId: string, hidden: boolean) => patchToken(tokenId, { hidden }), [patchToken])
+  const setTokenZ = useCallback((tokenId: string, z: number) => patchToken(tokenId, { z }), [patchToken])
   const initTokenFromMonster = useCallback(
     (
       tokenId: string,
@@ -192,6 +198,8 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     setTokenAc,
     setTokenSpeed,
     setTokenDescription,
+    setTokenHidden,
+    setTokenZ,
     initTokenFromMonster,
   }
 }

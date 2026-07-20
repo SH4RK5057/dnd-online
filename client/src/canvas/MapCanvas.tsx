@@ -198,11 +198,15 @@ export function MapCanvas({
   // be intercepted by a token sprite sitting on top of it instead.
   useEffect(() => {
     if (!doc || !tokenLayerRef.current || !activeScene) return
+    // Hidden tokens (traps, mimics, stealthy enemies) render only for the
+    // real, unmasked DM — independent of fog-of-war, and also hidden during
+    // DM preview-as-player so preview genuinely shows what that player sees.
+    const visibleTokens = isDmUnmasked ? tokens : tokens.filter((t) => !t.hidden)
     const charactersById = new Map(characters.map((c) => [c.id, c]))
-    const resolvedHpByTokenId = new Map(tokens.map((t) => [t.id, resolveTokenHp(t, charactersById)]))
+    const resolvedHpByTokenId = new Map(visibleTokens.map((t) => [t.id, resolveTokenHp(t, charactersById)]))
     tokenLayerRef.current.update(
       doc,
-      tokens,
+      visibleTokens,
       activeScene.gridSizePx,
       isDmUnmasked && toolMode === 'move',
       toolMode === 'move',

@@ -1,6 +1,8 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useSession } from '../session/useSession'
 import { useScenes } from '../map/useScenes'
+import { exportScene, importSceneFile } from '../dmtools/sceneFile'
+import { readJsonFile } from '../dmtools/fileUtils'
 import type { GridType } from '../map/types'
 
 interface ScenePreset {
@@ -43,7 +45,9 @@ export function SceneToolbar() {
   const [newSceneName, setNewSceneName] = useState('')
   const [newScenePresetId, setNewScenePresetId] = useState(SCENE_PRESETS[0].id)
   const [mapUploading, setMapUploading] = useState(false)
+  const [sceneImportError, setSceneImportError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const sceneFileInputRef = useRef<HTMLInputElement>(null)
 
   if (!doc) return null
 
@@ -93,6 +97,24 @@ export function SceneToolbar() {
     }
   }
 
+  const handleImportScene = async (file: File | undefined) => {
+    if (!doc || !file) return
+    setSceneImportError(null)
+    try {
+      const parsed = await readJsonFile(file)
+      const newSceneId = importSceneFile(doc, parsed)
+      if (!newSceneId) {
+        setSceneImportError('Not a recognizable scene file.')
+        return
+      }
+      await switchToScene(newSceneId)
+    } catch (err) {
+      setSceneImportError(err instanceof Error ? err.message : 'Could not import that file.')
+    } finally {
+      if (sceneFileInputRef.current) sceneFileInputRef.current.value = ''
+    }
+  }
+
   const handleResetExploration = () => {
     if (!activeScene) return
     if (window.confirm(`Reset players' memory of "${activeScene.name}"? They'll see it fogged again until they re-explore.`)) {
@@ -125,6 +147,25 @@ export function SceneToolbar() {
             Reset scene
           </button>
         </div>
+
+        <div className="scene-toolbar__row">
+          <button
+            type="button"
+            onClick={() => activeScene && exportScene(doc, activeScene.id)}
+            disabled={!activeScene}
+          >
+            Export this scene
+          </button>
+          <label htmlFor="scene-import-file">Import scene file</label>
+          <input
+            id="scene-import-file"
+            ref={sceneFileInputRef}
+            type="file"
+            accept=".json"
+            onChange={(event) => void handleImportScene(event.target.files?.[0])}
+          />
+        </div>
+        {sceneImportError && <p className="compendium-drawer__errors">{sceneImportError}</p>}
 
         <form className="scene-toolbar__row" onSubmit={handleCreateScene}>
           <input

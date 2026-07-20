@@ -408,6 +408,135 @@
   margin-bottom: 8px;
 }
 
+.token-hp-condition-editor__advanced {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.token-hp-condition-editor__advanced label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.token-hp-condition-editor__advanced input[type='number'] {
+  width: 70px;
+}
+
+.encounter-builder {
+  margin-bottom: 12px;
+}
+
+.encounter-builder__list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.encounter-builder__list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.encounter-notification-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.dm-notes-panel__new {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dm-notes-panel__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dm-notes-panel__item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dm-notes-panel__item-header button:first-child {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.dm-notes-panel__item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.handouts-panel__image {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.random-generators__row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.random-generators__names {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.random-generators__loot p {
+  margin: 0 0 4px;
+}
+
+.soundboard-panel__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.soundboard-panel__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.soundboard-panel__list li span {
+  flex: 1 1 auto;
+}
+
 .token-hp-condition-editor__conditions {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));

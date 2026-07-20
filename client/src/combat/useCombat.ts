@@ -9,7 +9,7 @@ function combatMap(doc: Y.Doc) {
 }
 
 function defaultCombat(sceneId: string): CombatStateRecord {
-  return { sceneId, active: false, round: 0, currentTokenId: null, monsterInitiativeMode: 'group' }
+  return { sceneId, active: false, round: 0, currentTokenId: null, monsterInitiativeMode: 'group', startedAt: null }
 }
 
 export interface UseCombatResult {
@@ -94,7 +94,7 @@ export function useCombat(doc: Y.Doc | null, sceneId: string | null): UseCombatR
       // from the initiative values just rolled, not stale ones.
       const patchedTokens = tokens.map((t) => (assigned.has(t.id) ? { ...t, initiative: assigned.get(t.id)! } : t))
       const order = computeInitiativeOrder(patchedTokens)
-      patchCombat({ active: true, round: 1, currentTokenId: order[0]?.id ?? null })
+      patchCombat({ active: true, round: 1, currentTokenId: order[0]?.id ?? null, startedAt: Date.now() })
     },
     [sceneId, combat.monsterInitiativeMode, patchCombat],
   )

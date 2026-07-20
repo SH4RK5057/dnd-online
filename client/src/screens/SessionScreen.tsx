@@ -22,6 +22,13 @@ import { CompendiumDrawer } from '../components/CompendiumDrawer'
 import { HomebrewEditor } from '../components/HomebrewEditor'
 import { RuleOverridesPanel } from '../components/RuleOverridesPanel'
 import { TokenInspector } from '../components/TokenInspector'
+import { DmNotesPanel } from '../components/DmNotesPanel'
+import { HandoutsPanel, PlayerHandoutsView } from '../components/HandoutsPanel'
+import { RandomGenerators } from '../components/RandomGenerators'
+import { SoundboardPanel } from '../components/SoundboardPanel'
+import { CampaignFilesPanel } from '../components/CampaignFilesPanel'
+import { EncounterNotificationBanner } from '../components/EncounterNotificationBanner'
+import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { MapCanvas } from '../canvas/MapCanvas'
 import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken'
 import type { MonsterData } from '../content/types'
@@ -31,7 +38,8 @@ import type { PendingTokenPlacement } from './pendingTokenPlacement'
 export function SessionScreen() {
   const { session, sessionMeta, leaveSession } = useSession()
   const { status, peers, failure, retry } = useConnectionStatus(session)
-  const { activeSceneId, activeScene } = useScenes(session?.doc ?? null)
+  const { scenes, activeSceneId, activeScene, switchToScene } = useScenes(session?.doc ?? null)
+  const { notification, dismiss: dismissNotification } = useEncounterNotifications(session?.doc ?? null, scenes)
   const { tokens, createToken, setTokenArt, initTokenFromMonster } = useTokens(session?.doc ?? null, activeSceneId)
   const [toolMode, setToolMode] = useState<ToolMode>('move')
   const [snapWalls, setSnapWalls] = useState(false)
@@ -45,6 +53,17 @@ export function SessionScreen() {
   const [showCompendium, setShowCompendium] = useState(false)
   const [showHomebrewEditor, setShowHomebrewEditor] = useState(false)
   const [showRuleOverrides, setShowRuleOverrides] = useState(false)
+  const [showDmNotes, setShowDmNotes] = useState(false)
+  const [showHandouts, setShowHandouts] = useState(false)
+  const [showRandomGenerators, setShowRandomGenerators] = useState(false)
+  const [showSoundboard, setShowSoundboard] = useState(false)
+  const [showCampaignFiles, setShowCampaignFiles] = useState(false)
+
+  useEffect(() => {
+    if (!notification) return
+    const timer = setTimeout(dismissNotification, 12_000)
+    return () => clearTimeout(timer)
+  }, [notification, dismissNotification])
 
   useEffect(() => {
     if (!pendingPlacement) return
@@ -114,6 +133,18 @@ export function SessionScreen() {
 
       {failure && <ConnectionErrorPanel failure={failure} onRetry={retry} />}
 
+      {notification && (
+        <EncounterNotificationBanner
+          notification={notification}
+          isViewingScene={notification.sceneId === activeSceneId}
+          onGoToScene={() => {
+            void switchToScene(notification.sceneId)
+            dismissNotification()
+          }}
+          onDismiss={dismissNotification}
+        />
+      )}
+
       <div className="session-screen__body">
         <div className="session-screen__panel">
           {session.role === 'dm' && (
@@ -163,6 +194,33 @@ export function SessionScreen() {
                 {showRuleOverrides ? 'Hide rule overrides' : 'Show rule overrides'}
               </button>
               {showRuleOverrides && <RuleOverridesPanel doc={session.doc} activeSceneId={activeSceneId} />}
+
+              <button type="button" onClick={() => setShowDmNotes((v) => !v)}>
+                {showDmNotes ? 'Hide DM notes' : 'Show DM notes'}
+              </button>
+              {showDmNotes && <DmNotesPanel doc={session.doc} />}
+
+              <button type="button" onClick={() => setShowHandouts((v) => !v)}>
+                {showHandouts ? 'Hide handouts' : 'Show handouts'}
+              </button>
+              {showHandouts && <HandoutsPanel doc={session.doc} />}
+
+              <button type="button" onClick={() => setShowRandomGenerators((v) => !v)}>
+                {showRandomGenerators ? 'Hide random generators' : 'Show random generators'}
+              </button>
+              {showRandomGenerators && <RandomGenerators doc={session.doc} />}
+
+              <button type="button" onClick={() => setShowSoundboard((v) => !v)}>
+                {showSoundboard ? 'Hide soundboard' : 'Show soundboard'}
+              </button>
+              {showSoundboard && <SoundboardPanel />}
+
+              <button type="button" onClick={() => setShowCampaignFiles((v) => !v)}>
+                {showCampaignFiles ? 'Hide campaign files' : 'Show campaign files'}
+              </button>
+              {showCampaignFiles && (
+                <CampaignFilesPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />
+              )}
             </>
           )}
 
@@ -195,6 +253,11 @@ export function SessionScreen() {
                 {showCompendium ? 'Hide compendium' : 'Show compendium'}
               </button>
               {showCompendium && <CompendiumDrawer doc={session.doc} isDm={false} />}
+
+              <button type="button" onClick={() => setShowHandouts((v) => !v)}>
+                {showHandouts ? 'Hide handouts' : 'Show handouts'}
+              </button>
+              {showHandouts && <PlayerHandoutsView doc={session.doc} />}
             </>
           )}
 

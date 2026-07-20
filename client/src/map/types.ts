@@ -1,6 +1,6 @@
 export type SizeCategory = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan'
 
-export type AssetKind = 'map' | 'token'
+export type AssetKind = 'map' | 'token' | 'handout' | 'audio'
 
 export type GridType = 'square' | 'hex'
 
@@ -96,6 +96,19 @@ export interface TokenRecord {
    * monsterKey or characterId instead of stored here). Empty string = DM
    * hasn't written one; players see nothing in that case, not a placeholder. */
   description: string
+  /** DM-only visibility — a token the DM has placed (a trap, mimic, or
+   * stealthy enemy) but not yet revealed. Independent of fog-of-war: even a
+   * player who can otherwise see this exact spot won't see a hidden token
+   * there. Never affects the DM's own view, or a DM's normal (non-preview)
+   * editing — see canvas/MapCanvas.tsx's token effect for where this is
+   * actually filtered out of what gets rendered. */
+  hidden: boolean
+  /** Altitude in grid cells above (positive) or below (negative) the map
+   * plane, e.g. a flying creature or something in a pit. Not rendered as
+   * actual 3D — token art still draws flat on the map — but visible on
+   * inspection and usable for range/line-of-sight math (see
+   * map/distance3D.ts). Defaults to 0 (same plane as everything else). */
+  z: number
   createdAt: number
 }
 

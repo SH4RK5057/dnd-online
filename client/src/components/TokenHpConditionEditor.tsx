@@ -24,7 +24,8 @@ export function TokenHpConditionEditor({
   const isDm = session?.role === 'dm'
   const myPlayerId = getOrCreatePlayerId()
 
-  const { tokens, setTokenHp, setTokenConditions, setTokenInitiative, linkCharacter } = useTokens(doc, sceneId)
+  const { tokens, setTokenHp, setTokenConditions, setTokenInitiative, linkCharacter, setTokenHidden, setTokenZ } =
+    useTokens(doc, sceneId)
   const { characters, updateCharacter } = useCharacters(doc)
 
   const token = tokens.find((t) => t.id === selectedTokenId)
@@ -72,6 +73,19 @@ export function TokenHpConditionEditor({
             ))}
           </select>
         </label>
+      )}
+
+      {isDm && (
+        <div className="token-hp-condition-editor__advanced">
+          <label>
+            <input type="checkbox" checked={token.hidden} onChange={(e) => setTokenHidden(token.id, e.target.checked)} />
+            Hidden from players (independent of fog)
+          </label>
+          <label>
+            Altitude (cells)
+            <input type="number" value={token.z} onChange={(e) => setTokenZ(token.id, Number(e.target.value))} />
+          </label>
+        </div>
       )}
 
       <h3>Hit points</h3>

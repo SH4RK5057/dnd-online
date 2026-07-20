@@ -20,6 +20,8 @@ function token(overrides: Partial<TokenRecord>): TokenRecord {
     ac: null,
     speed: null,
     description: '',
+    hidden: false,
+    z: 0,
     createdAt: 0,
     ...overrides,
   }

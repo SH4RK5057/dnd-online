@@ -131,6 +131,7 @@ export class TokenLayer {
       hp: this.resolvedHpByTokenId.get(tokenId) ?? null,
       conditions: token.conditions,
       selected: token.id === this.selectedTokenId,
+      hidden: token.hidden,
     })
   }
 

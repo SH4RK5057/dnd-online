@@ -78,8 +78,14 @@ export class TokenSprite {
     hp: { current: number; max: number; temp: number } | null
     conditions: string[]
     selected: boolean
+    /** Only ever true in the DM's own unmasked view — hidden tokens never
+     * reach TokenLayer at all for anyone else (see MapCanvas.tsx's token
+     * effect). Rendered translucent with a dashed ring so the DM can tell
+     * at a glance which tokens players can't see. */
+    hidden: boolean
   }): void {
-    const { name, sizeCategory, gridX, gridY, gridSizePx, texture, hp, conditions, selected } = options
+    const { name, sizeCategory, gridX, gridY, gridSizePx, texture, hp, conditions, selected, hidden } = options
+    this.container.alpha = hidden ? 0.55 : 1
     this.gridSizePx = gridSizePx
     const footprint = footprintCells(sizeCategory) * gridSizePx
     const side = footprint * renderScale(sizeCategory)
@@ -101,8 +107,13 @@ export class TokenSprite {
     }
 
     this.selectionRing.clear()
+    if (hidden) {
+      this.selectionRing
+        .rect(inset - 3, inset - 3, side + 6, side + 6)
+        .stroke({ width: 2, color: 0x9a6bff, alpha: 0.9, alignment: 0.5 })
+    }
     if (selected) {
-      this.selectionRing.rect(inset - 3, inset - 3, side + 6, side + 6).stroke({ width: 3, color: 0xffd54a, alpha: 0.95 })
+      this.selectionRing.rect(inset - 6, inset - 6, side + 12, side + 12).stroke({ width: 3, color: 0xffd54a, alpha: 0.95 })
     }
 
     this.hpBar.clear()

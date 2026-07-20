@@ -22,6 +22,8 @@ export const MAP_IMAGE_MAX_DIMENSION = 2400
 export const MAP_IMAGE_QUALITY = 0.85
 export const TOKEN_IMAGE_MAX_DIMENSION = 256
 export const TOKEN_IMAGE_QUALITY = 0.8
+export const HANDOUT_IMAGE_MAX_DIMENSION = 1600
+export const HANDOUT_IMAGE_QUALITY = 0.85
 
 export const SIZE_FOOTPRINT_CELLS: Record<SizeCategory, number> = {
   tiny: 1,

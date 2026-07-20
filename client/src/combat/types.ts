@@ -20,4 +20,11 @@ export interface CombatStateRecord {
    * no separate monster-type field yet), one roll per group, applied to every
    * token in it. Player-owned tokens always roll individually either way. */
   monsterInitiativeMode: MonsterInitiativeMode
+  /** Timestamp of the most recent `startCombat` call, or null if combat has
+   * never been started on this scene. Distinct from `active` so a global
+   * notification (dmtools/useEncounterNotifications.ts) can tell "combat is
+   * still active, nothing new happened" apart from "combat just started" —
+   * `active` alone can't distinguish a fresh start from a re-render of the
+   * same still-active fight. */
+  startedAt: number | null
 }

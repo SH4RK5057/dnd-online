@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type * as Y from 'yjs'
 import { useHomebrewContent } from '../content/useHomebrewContent'
+import { downloadJson, readJsonFile } from '../dmtools/fileUtils'
 import type { HomebrewItemRecord, HomebrewMonsterRecord, HomebrewSpellRecord, MonsterAction } from '../content/types'
 
 type Tab = 'spells' | 'monsters' | 'items'
@@ -76,6 +77,8 @@ export function HomebrewEditor({ doc }: { doc: Y.Doc | null }) {
   const [spellDraft, setSpellDraft] = useState(BLANK_SPELL)
   const [monsterDraft, setMonsterDraft] = useState(BLANK_MONSTER)
   const [itemDraft, setItemDraft] = useState(BLANK_ITEM)
+  const [importError, setImportError] = useState<string | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const resetDrafts = () => {
     setEditingId(null)
@@ -103,8 +106,44 @@ export function HomebrewEditor({ doc }: { doc: Y.Doc | null }) {
     resetDrafts()
   }
 
+  const handleImport = async (file: File | undefined) => {
+    if (!file) return
+    setImportError(null)
+    try {
+      const parsed = (await readJsonFile(file)) as Record<string, unknown>
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.name !== 'string') {
+        throw new Error('Not a recognizable homebrew file.')
+      }
+      const { id: _id, createdAt: _createdAt, ...rest } = parsed
+      if ('abilities' in parsed) {
+        homebrew.createHomebrewMonster(rest as Omit<HomebrewMonsterRecord, 'id' | 'createdAt'>)
+        setTab('monsters')
+      } else if ('level' in parsed && 'school' in parsed) {
+        homebrew.createHomebrewSpell(rest as Omit<HomebrewSpellRecord, 'id' | 'createdAt'>)
+        setTab('spells')
+      } else {
+        homebrew.createHomebrewItem(rest as Omit<HomebrewItemRecord, 'id' | 'createdAt'>)
+        setTab('items')
+      }
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Could not import that file.')
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="homebrew-editor">
+      <div className="dm-notes-panel__new">
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".json"
+          onChange={(e) => void handleImport(e.target.files?.[0])}
+        />
+      </div>
+      {importError && <p className="compendium-drawer__errors">{importError}</p>}
+
       <div className="compendium-drawer__tabs">
         <button type="button" aria-pressed={tab === 'spells'} onClick={() => { setTab('spells'); resetDrafts() }}>
           Spells ({homebrew.homebrewSpells.length})
@@ -125,6 +164,9 @@ export function HomebrewEditor({ doc }: { doc: Y.Doc | null }) {
                 {s.name}
                 <button type="button" onClick={() => { setEditingId(s.id); setSpellDraft(s) }}>
                   Edit
+                </button>
+                <button type="button" onClick={() => downloadJson(`${s.name || 'spell'}.json`, s)}>
+                  Export
                 </button>
                 <button type="button" onClick={() => homebrew.deleteHomebrewSpell(s.id)}>
                   Delete
@@ -172,6 +214,9 @@ export function HomebrewEditor({ doc }: { doc: Y.Doc | null }) {
                 {m.name}
                 <button type="button" onClick={() => { setEditingId(m.id); setMonsterDraft(m) }}>
                   Edit
+                </button>
+                <button type="button" onClick={() => downloadJson(`${m.name || 'monster'}.json`, m)}>
+                  Export
                 </button>
                 <button type="button" onClick={() => homebrew.deleteHomebrewMonster(m.id)}>
                   Delete
@@ -237,6 +282,9 @@ export function HomebrewEditor({ doc }: { doc: Y.Doc | null }) {
                 {i.name}
                 <button type="button" onClick={() => { setEditingId(i.id); setItemDraft(i) }}>
                   Edit
+                </button>
+                <button type="button" onClick={() => downloadJson(`${i.name || 'item'}.json`, i)}>
+                  Export
                 </button>
                 <button type="button" onClick={() => homebrew.deleteHomebrewItem(i.id)}>
                   Delete
