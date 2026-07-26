@@ -18,6 +18,12 @@ export interface MirrorContent {
   monsters: MonsterData[]
   items: ItemData[]
   importedAt: number
+  /** Empty for a local-file import (nothing shareable to key off of).
+   * Otherwise matches contentSourceTypes.ts's sourceKeyFor() for whatever
+   * URL/repo this was fetched from, so useCompendium can tell whether this
+   * cached content already matches the campaign's currently-configured
+   * shared source or needs re-fetching. */
+  sourceKey: string
 }
 
 export interface MirrorImportResult {
@@ -107,7 +113,7 @@ function ingestFile(filename: string, json: unknown, into: MirrorContent, errors
  * content. Bad/unrecognized files are skipped and reported in `errors`
  * rather than aborting the whole import. */
 export async function importMirrorFiles(files: FileList | File[]): Promise<MirrorImportResult> {
-  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now() }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey: '' }
   const errors: string[] = []
   for (const file of Array.from(files)) {
     try {
@@ -144,10 +150,13 @@ async function tryFetchJson(url: string, token: string): Promise<unknown | null>
  * couple of conventional single-file names if no index is found — a
  * mirror's exact layout can vary, so this stays best-effort/resilient
  * rather than requiring one fixed structure. Never throws; every failure is
- * collected into `errors` instead. */
-export async function fetchMirrorFromUrl(baseUrl: string, token = ''): Promise<MirrorImportResult> {
+ * collected into `errors` instead. `sourceKey` is optional — pass
+ * contentSourceTypes.ts's sourceKeyFor() when this fetch corresponds to the
+ * campaign's shared content source, so useCompendium can recognize this
+ * cache as matching it later. */
+export async function fetchMirrorFromUrl(baseUrl: string, token = '', sourceKey = ''): Promise<MirrorImportResult> {
   const base = baseUrl.replace(/\/+$/, '')
-  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now() }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
 
   // 5etools-2014-src splits items across two files: items.json (magic items)
@@ -178,15 +187,17 @@ interface GithubTreeEntry {
  * `.json` file under `path` (or the whole repo if `path` is empty),
  * recognizing the same {spell:[...]}/{monster:[...]}/{item:[...]} shapes via
  * ingestFile. Lets a DM point this at any subset of their own private
- * dataset without needing to match 5etools' exact folder/file naming. */
+ * dataset without needing to match 5etools' exact folder/file naming.
+ * `sourceKey` is optional — see fetchMirrorFromUrl's doc comment. */
 export async function fetchGithubRepo(
   owner: string,
   repo: string,
   branch: string,
   path: string,
   token = '',
+  sourceKey = '',
 ): Promise<MirrorImportResult> {
-  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now() }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
   if (token) headers.Authorization = `token ${token}`

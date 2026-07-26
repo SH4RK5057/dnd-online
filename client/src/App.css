@@ -1068,9 +1068,22 @@
   gap: 8px;
 }
 
-.compendium-drawer__mirror h4 {
+.compendium-drawer__mirror h4,
+.compendium-drawer__content-source h4 {
   margin: 10px 0 0;
   font-size: 13px;
+}
+
+.compendium-drawer__content-source {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.compendium-drawer__source-sync {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .compendium-drawer__attribution {

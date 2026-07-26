@@ -3,6 +3,7 @@ import type * as Y from 'yjs'
 import { useCompendium } from '../content/useCompendium'
 import { filterItems, filterMonsters, filterSpells } from '../content/search'
 import { loadSavedMirrorToken, loadSavedMirrorUrl, saveMirrorToken, saveMirrorUrl } from '../content/constants'
+import { describeContentSource } from '../content/contentSourceTypes'
 import { StatBlockCard } from './StatBlockCard'
 import type { MonsterData } from '../content/types'
 
@@ -42,6 +43,7 @@ export function CompendiumDrawer({
   const [ghBranch, setGhBranch] = useState('main')
   const [ghPath, setGhPath] = useState('')
   const [ghToken, setGhToken] = useState(() => loadSavedMirrorToken())
+  const [syncToken, setSyncToken] = useState(() => loadSavedMirrorToken())
 
   const spells = filterSpells(compendium.spells, query, spellLevel, spellSchool)
   const monsters = filterMonsters(compendium.monsters, query, monsterCr, monsterType)
@@ -91,6 +93,11 @@ export function CompendiumDrawer({
     } finally {
       setMirrorBusy(false)
     }
+  }
+
+  const handleSyncNow = () => {
+    saveMirrorToken(syncToken.trim())
+    compendium.retrySync()
   }
 
   return (
@@ -194,9 +201,49 @@ export function CompendiumDrawer({
         )}
       </div>
 
+      <div className="compendium-drawer__content-source">
+        <h4>Campaign content source</h4>
+        <p className="compendium-drawer__hint">{describeContentSource(compendium.contentSource.record)}</p>
+        {compendium.contentSource.record.mode !== 'none' && (
+          <>
+            <p className="compendium-drawer__hint">
+              Every player fetches this same source directly, using their own saved access token below (needed only
+              if it's a private repo) — nothing here goes through the DM or any server.
+            </p>
+            <div className="compendium-drawer__source-sync">
+              <input
+                type="password"
+                value={syncToken}
+                onChange={(e) => setSyncToken(e.target.value)}
+                placeholder="Your access token (only for a private repo)"
+              />
+              <button type="button" onClick={handleSyncNow}>
+                Sync now
+              </button>
+              {isDm && (
+                <button type="button" onClick={() => compendium.contentSource.clearSource()}>
+                  Clear shared source
+                </button>
+              )}
+            </div>
+            {compendium.contentSourceSynced && compendium.mirrorErrors.length > 0 && (
+              <ul className="compendium-drawer__errors">
+                {compendium.mirrorErrors.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+
       {isDm && (
         <details className="compendium-drawer__mirror">
           <summary>Private mirror import</summary>
+          <p className="compendium-drawer__hint">
+            Setting a mirror URL or GitHub repo below also saves it as this campaign's shared content source (above)
+            — every connected player will fetch the same dataset automatically.
+          </p>
           <p className="compendium-drawer__hint">
             Import your own content from local files, a local folder, or a GitHub repo you point it at — public or
             private. Nothing here is bundled with the app; this only ever fetches from wherever you tell it to,
