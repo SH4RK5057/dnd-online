@@ -207,7 +207,10 @@ export function MapCanvas({
       const size =
         mapLayer.size ??
         (activeScene
-          ? { width: BLANK_SCENE_WIDTH_CELLS * activeScene.gridSizePx, height: BLANK_SCENE_HEIGHT_CELLS * activeScene.gridSizePx }
+          ? {
+              width: (activeScene.blankWidthCells ?? BLANK_SCENE_WIDTH_CELLS) * activeScene.gridSizePx,
+              height: (activeScene.blankHeightCells ?? BLANK_SCENE_HEIGHT_CELLS) * activeScene.gridSizePx,
+            }
           : null)
       setMapSize(size)
       gridLayer.update({

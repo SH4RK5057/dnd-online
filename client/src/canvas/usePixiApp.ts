@@ -50,9 +50,22 @@ export function usePixiApp(containerRef: RefObject<HTMLDivElement | null>): Appl
       cancelled = true
       resizeObserver.disconnect()
       if (appRef.current) {
-        appRef.current.destroy(true, { children: true, texture: true })
+        const instance = appRef.current
         appRef.current = null
         setApp(null)
+        // MapCanvas's other effects (layer graph, resize/wheel/dblclick
+        // listeners, ...) are declared after this hook's own effect, and
+        // React runs a component's effect cleanups in the same order they
+        // were set up (not reversed) — so on unmount, THEIR cleanups run
+        // right after this one, in the same synchronous pass, still holding
+        // closures over `instance`. Destroying it synchronously here first
+        // would leave those cleanups touching an already-torn-down
+        // Application (e.g. app.renderer/app.ticker nulled out internally
+        // by destroy()), which throws and — with no error boundary in this
+        // tree — unmounts the whole app. Deferring the actual teardown to a
+        // microtask lets every other cleanup in this same commit finish
+        // first, while `instance` is still fully alive.
+        queueMicrotask(() => instance.destroy(true, { children: true, texture: true }))
       }
     }
   }, [containerRef])

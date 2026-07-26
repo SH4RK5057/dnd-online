@@ -74,6 +74,13 @@ export interface SceneRecord {
    * for town/landscape scenes — null if they haven't moved yet, or this is
    * a dungeon scene where the concept doesn't apply. Read as `?? null`. */
   currentPoiId: string | null
+  /** Working-area size (grid cells) used only while this scene has no map
+   * image — once a map is uploaded, MapLayer's actual texture dimensions
+   * take over instead. Read as `?? BLANK_SCENE_WIDTH_CELLS` /
+   * `?? BLANK_SCENE_HEIGHT_CELLS` (map/constants.ts) for scenes created
+   * before these fields existed. */
+  blankWidthCells: number
+  blankHeightCells: number
   createdAt: number
 }
 

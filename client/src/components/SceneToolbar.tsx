@@ -3,6 +3,7 @@ import { useSession } from '../session/useSession'
 import { useScenes } from '../map/useScenes'
 import { exportScene, importSceneFile } from '../dmtools/sceneFile'
 import { readJsonFile } from '../dmtools/fileUtils'
+import { BLANK_SCENE_HEIGHT_CELLS, BLANK_SCENE_WIDTH_CELLS } from '../map/constants'
 import type { GridType } from '../map/types'
 
 interface ScenePreset {
@@ -244,6 +245,31 @@ export function SceneToolbar() {
                 <option value="hex">Hexagon</option>
               </select>
             </div>
+
+            {!activeScene.mapAssetId && (
+              <div className="scene-toolbar__row">
+                <label htmlFor="blank-width">Canvas size (cells), no background yet</label>
+                <input
+                  id="blank-width"
+                  type="number"
+                  min={5}
+                  max={200}
+                  value={activeScene.blankWidthCells ?? BLANK_SCENE_WIDTH_CELLS}
+                  onChange={(event) => updateGrid(activeScene.id, { blankWidthCells: Number(event.target.value) })}
+                  title="Width (cells)"
+                />
+                <span>×</span>
+                <input
+                  id="blank-height"
+                  type="number"
+                  min={5}
+                  max={200}
+                  value={activeScene.blankHeightCells ?? BLANK_SCENE_HEIGHT_CELLS}
+                  onChange={(event) => updateGrid(activeScene.id, { blankHeightCells: Number(event.target.value) })}
+                  title="Height (cells)"
+                />
+              </div>
+            )}
           </section>
 
           <section className="scene-toolbar__section">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from '../session/useSession'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
@@ -8,8 +8,10 @@ import { useCharacters, newBlankCharacter } from '../character/useCharacters'
 import { useInventoryActions } from '../character/useInventoryActions'
 import { useCampaignSettings } from '../character/useCampaignSettings'
 import { applyLongRest, applyShortRest, hitDiceAvailable, shortRestHealingNotation } from '../character/rest'
+import { takePendingCharacterBind } from '../character/pendingBind'
 import {
   exportCharacterToFile,
+  getStandaloneCharacter,
   importCharacterFromFile,
   listStandaloneCharacters,
   saveStandaloneCharacter,
@@ -47,6 +49,20 @@ export function CharacterPanel() {
   const [hitDiceToSpend, setHitDiceToSpend] = useState(1)
 
   const character = myCharacter(myPlayerId)
+
+  // Completes the flow JoinSetupScreen started: a player picks/creates/
+  // imports a character before the campaign doc even exists (see
+  // pendingBind.ts), so the actual bindCharacter call — which needs the doc
+  // and this session's roomName — happens here instead, the first time this
+  // panel mounts with a doc available and no character bound yet.
+  useEffect(() => {
+    if (!doc || !session || character) return
+    const pendingId = takePendingCharacterBind()
+    if (!pendingId) return
+    const standalone = getStandaloneCharacter(pendingId)
+    if (!standalone) return
+    bindCharacter(standalone, myPlayerId, session.roomName)
+  }, [doc, session, character, myPlayerId, bindCharacter])
 
   const refreshStandaloneList = () => setStandaloneList(listStandaloneCharacters())
 

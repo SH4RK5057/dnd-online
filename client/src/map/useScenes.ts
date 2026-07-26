@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as Y from 'yjs'
 import { isAssetFullyLive, publishAsset, pruneAssetChunks, republishAssetFromCache } from './assetSync'
-import { DEFAULT_GRID_SIZE_PX, MAP_IMAGE_MAX_DIMENSION, MAP_IMAGE_QUALITY } from './constants'
+import {
+  BLANK_SCENE_HEIGHT_CELLS,
+  BLANK_SCENE_WIDTH_CELLS,
+  DEFAULT_GRID_SIZE_PX,
+  MAP_IMAGE_MAX_DIMENSION,
+  MAP_IMAGE_QUALITY,
+} from './constants'
 import { compressImage } from './imageCompress'
 import { purgeExplorationForScene } from './useExploration'
 import type { ConsensusMode, LightRecord, NavigationMode, SceneRecord, SceneScale, TokenRecord, WallRecord } from './types'
@@ -14,7 +20,9 @@ function sessionMap(doc: Y.Doc) {
   return doc.getMap<string>('session')
 }
 
-type GridPatch = Partial<Pick<SceneRecord, 'gridSizePx' | 'gridOffsetX' | 'gridOffsetY' | 'gridVisible' | 'gridType'>>
+type GridPatch = Partial<
+  Pick<SceneRecord, 'gridSizePx' | 'gridOffsetX' | 'gridOffsetY' | 'gridVisible' | 'gridType' | 'blankWidthCells' | 'blankHeightCells'>
+>
 
 export interface UseScenesResult {
   scenes: SceneRecord[]
@@ -89,6 +97,8 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         consensusMode: 'vote',
         partyLeaderId: null,
         currentPoiId: null,
+        blankWidthCells: BLANK_SCENE_WIDTH_CELLS,
+        blankHeightCells: BLANK_SCENE_HEIGHT_CELLS,
         createdAt: Date.now(),
       }
       scenesMap(doc).set(id, record)

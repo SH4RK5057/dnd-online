@@ -52,6 +52,9 @@ export class WallLayer {
   private readonly hitPlane = new Graphics()
 
   private active = false
+  private hitPlaneActive = false
+  private hitPlaneWidth = -1
+  private hitPlaneHeight = -1
   private gridSizePx = 1
   private snapToGrid = false
   private gridType: GridType = 'square'
@@ -60,6 +63,11 @@ export class WallLayer {
   private walls: WallRecord[] = []
   private callbacks: WallLayerCallbacks | null = null
   private pendingStart: { x: number; y: number } | null = null
+  /** Where the currently in-progress press started, if any — distinct from
+   * pendingStart (the last *committed* chain point): a click's own down/up
+   * pair is tracked here until pointerUp resolves what it means. See
+   * handlePointerUp's doc comment. */
+  private downPoint: { x: number; y: number } | null = null
   private draggingEndpoint: EndpointHit | null = null
   private lastWriteAt = 0
 
@@ -103,15 +111,27 @@ export class WallLayer {
 
     if (this.active !== active) {
       this.pendingStart = null
+      this.downPoint = null
       this.draggingEndpoint = null
       this.previewGraphics.clear()
     }
     this.active = active
 
-    this.hitPlane.clear()
-    this.hitPlane.eventMode = active && mapSize ? 'static' : 'none'
-    if (active && mapSize) {
-      this.hitPlane.rect(0, 0, mapSize.width, mapSize.height).fill({ color: 0x000000, alpha: 0.001 })
+    // Only touch the hitPlane's geometry when its inputs actually changed —
+    // rebuilding it on every update() (which fires on every wall-list change,
+    // i.e. after every commit) needlessly churns the hit-test target while a
+    // click-chain gesture may still be in flight.
+    const mapWidth = mapSize?.width ?? 0
+    const mapHeight = mapSize?.height ?? 0
+    if (this.hitPlaneActive !== active || this.hitPlaneWidth !== mapWidth || this.hitPlaneHeight !== mapHeight) {
+      this.hitPlaneActive = active
+      this.hitPlaneWidth = mapWidth
+      this.hitPlaneHeight = mapHeight
+      this.hitPlane.clear()
+      this.hitPlane.eventMode = active && mapSize ? 'static' : 'none'
+      if (active && mapSize) {
+        this.hitPlane.rect(0, 0, mapSize.width, mapSize.height).fill({ color: 0x000000, alpha: 0.001 })
+      }
     }
 
     this.redrawWalls()
@@ -227,17 +247,16 @@ export class WallLayer {
       }
     }
 
-    if (this.pendingStart) {
-      this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y, this.thickness)
-      this.pendingStart = point
-    } else {
-      this.pendingStart = point
-    }
+    // Every commit decision is made in handlePointerUp instead of here — see
+    // its comment for why. This just remembers where the current press
+    // started.
+    this.downPoint = point
   }
 
   private handleRightDown = (event: FederatedPointerEvent) => {
     event.preventDefault()
     this.pendingStart = null
+    this.downPoint = null
     this.previewGraphics.clear()
   }
 
@@ -253,11 +272,15 @@ export class WallLayer {
       return
     }
 
-    if (!this.pendingStart) return
+    // Preview from the last committed chain point while just hovering
+    // (pendingStart), or from wherever the current press started if one's
+    // in progress and hasn't resolved into a commit yet (downPoint).
+    const anchor = this.pendingStart ?? this.downPoint
+    if (!anchor) return
     const point = this.toGridPoint(event)
     this.previewGraphics.clear()
     this.previewGraphics
-      .moveTo(this.pendingStart.x * this.gridSizePx, this.pendingStart.y * this.gridSizePx)
+      .moveTo(anchor.x * this.gridSizePx, anchor.y * this.gridSizePx)
       .lineTo(point.x * this.gridSizePx, point.y * this.gridSizePx)
       .stroke({ width: this.thickness, color: 0xffffff, alpha: 0.6 })
   }
@@ -272,19 +295,40 @@ export class WallLayer {
     }
     this.draggingEndpoint = null
 
-    // Click-and-drag support: a chain segment's down click sets pendingStart
-    // (see handlePointerDown) without creating anything yet, on the
-    // assumption the user might be starting a multi-click chain. If instead
-    // they drag a meaningful distance before releasing, that's a "draw one
-    // wall" gesture — commit it here and end the chain. A release with
-    // little/no movement is a stationary click, which leaves pendingStart
-    // open so the next click can continue the chain, same as before.
-    if (!this.active || !this.callbacks || !this.pendingStart) return
+    if (!this.active || !this.callbacks || !this.downPoint) return
     const point = this.toGridPoint(event)
-    const dragDistancePx = Math.hypot(point.x - this.pendingStart.x, point.y - this.pendingStart.y) * this.gridSizePx * this.viewScale
-    if (dragDistancePx < DRAG_COMMIT_THRESHOLD_PX) return
-    this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y, this.thickness)
-    this.pendingStart = null
+    const downPoint = this.downPoint
+    this.downPoint = null
+
+    if (this.pendingStart) {
+      // Continuing an existing chain: committing (and where the previous
+      // handlePointerDown-based version fired the commit) used to happen on
+      // *this same click's* pointerdown, which could kick off a React
+      // re-render (new wall -> Yjs observer -> setState) whose effects
+      // rebuild this layer's hitPlane geometry while the click's own button
+      // was still physically down — an unreliable position for a hit-test
+      // target to change under. Committing here instead means the whole
+      // down-then-up gesture has already finished by the time anything
+      // downstream can react to it. Every chain-continuation click commits
+      // unconditionally, regardless of how far the pointer drifted between
+      // its own down and up — unlike the chain's first point (below),
+      // there's no "was this a click or a drag" ambiguity once a chain is
+      // already open.
+      this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y, this.thickness)
+      this.pendingStart = point
+      this.previewGraphics.clear()
+      return
+    }
+
+    // No chain yet. A stationary click just starts one (leaves pendingStart
+    // open for the next click); a click-and-drag draws one wall immediately
+    // and ends there, since real mouse use rarely lands perfectly still.
+    const dragDistancePx = Math.hypot(point.x - downPoint.x, point.y - downPoint.y) * this.gridSizePx * this.viewScale
+    if (dragDistancePx < DRAG_COMMIT_THRESHOLD_PX) {
+      this.pendingStart = downPoint
+      return
+    }
+    this.callbacks.onCreateWall(downPoint.x, downPoint.y, point.x, point.y, this.thickness)
     this.previewGraphics.clear()
   }
 

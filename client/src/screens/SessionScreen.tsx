@@ -29,10 +29,12 @@ import { SoundboardPanel } from '../components/SoundboardPanel'
 import { CampaignFilesPanel } from '../components/CampaignFilesPanel'
 import { ChatPanel } from '../components/ChatPanel'
 import { SceneNavigationPanel } from '../components/SceneNavigationPanel'
+import { CharacterManagerScreen } from './CharacterManagerScreen'
 import { EncounterNotificationBanner } from '../components/EncounterNotificationBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { MapCanvas } from '../canvas/MapCanvas'
 import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken'
+import { footprintCells, snapToSlot } from '../map/sizeCategory'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
 import type { MonsterData } from '../content/types'
@@ -47,6 +49,8 @@ export function SessionScreen() {
   const { notification, dismiss: dismissNotification } = useEncounterNotifications(session?.doc ?? null, scenes)
   const { tokens, createToken, setTokenArt, initTokenFromMonster } = useTokens(session?.doc ?? null, activeSceneId)
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
+  const [dmMode, setDmMode] = useState<'build' | 'run'>('build')
+  const [showCharacterManager, setShowCharacterManager] = useState(false)
   const [toolMode, setToolMode] = useState<ToolMode>('move')
   const [snapWalls, setSnapWalls] = useState(false)
   const [wallThickness, setWallThickness] = useState(DEFAULT_WALL_THICKNESS_PX)
@@ -104,6 +108,15 @@ export function SessionScreen() {
 
   if (!session) return null
 
+  if (showCharacterManager) {
+    // Character building/editing is entirely local-storage-based and doesn't
+    // touch the campaign doc at all, so it can run as a full swap-in view —
+    // the session/WebRTC connection stays alive underneath (owned by
+    // SessionProvider above this component, not by anything unmounted here)
+    // and picks back up exactly where it was once the DM returns.
+    return <CharacterManagerScreen onBack={() => setShowCharacterManager(false)} />
+  }
+
   const isUnassignedPlayer =
     session.role === 'player' && !!activeScene?.fogEnabled && !tokens.some((t) => t.ownerId === getOrCreatePlayerId())
   const isUnpublishedForPlayer = session.role === 'player' && !!activeScene && activeScene.published === false
@@ -133,7 +146,10 @@ export function SessionScreen() {
     const { name, sizeCategory, file, monsterInit } = pendingPlacement
     setPendingPlacement(null)
     try {
-      const tokenId = createToken({ sceneId: activeSceneId, name, sizeCategory, x, y })
+      const footprint = footprintCells(sizeCategory)
+      const snappedX = snapToSlot(x, footprint)
+      const snappedY = snapToSlot(y, footprint)
+      const tokenId = createToken({ sceneId: activeSceneId, name, sizeCategory, x: snappedX, y: snappedY })
       if (file) void setTokenArt(tokenId, file)
       if (monsterInit) initTokenFromMonster(tokenId, monsterInit)
     } catch (err) {
@@ -194,58 +210,78 @@ export function SessionScreen() {
         <div className="session-screen__panel">
           {session.role === 'dm' && (
             <>
-              <SceneToolbar />
+              <div className="session-screen__mode-switcher">
+                <button type="button" aria-pressed={dmMode === 'build'} onClick={() => setDmMode('build')}>
+                  Scene Builder
+                </button>
+                <button type="button" aria-pressed={dmMode === 'run'} onClick={() => setDmMode('run')}>
+                  Run Campaign
+                </button>
+                <button type="button" onClick={() => setShowCharacterManager(true)}>
+                  Character Builder
+                </button>
+              </div>
 
-              {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
+              {dmMode === 'build' && (
+                <>
+                  <SceneToolbar />
 
-              <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />
+                  {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
 
-              <button type="button" onClick={() => setShowCompendium((v) => !v)}>
-                {showCompendium ? 'Hide compendium' : 'Show compendium'}
-              </button>
-              {showCompendium && (
-                <CompendiumDrawer
-                  doc={session.doc}
-                  isDm
-                  onAddMonsterToScene={activeSceneId && !isPreviewingPlayer ? handleAddMonsterToScene : undefined}
-                />
+                  <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />
+
+                  <button type="button" onClick={() => setShowCompendium((v) => !v)}>
+                    {showCompendium ? 'Hide compendium' : 'Show compendium'}
+                  </button>
+                  {showCompendium && (
+                    <CompendiumDrawer
+                      doc={session.doc}
+                      isDm
+                      onAddMonsterToScene={activeSceneId && !isPreviewingPlayer ? handleAddMonsterToScene : undefined}
+                    />
+                  )}
+
+                  <button type="button" onClick={() => setShowHomebrewEditor((v) => !v)}>
+                    {showHomebrewEditor ? 'Hide homebrew editor' : 'Show homebrew editor'}
+                  </button>
+                  {showHomebrewEditor && <HomebrewEditor doc={session.doc} />}
+
+                  <button type="button" onClick={() => setShowRuleOverrides((v) => !v)}>
+                    {showRuleOverrides ? 'Hide rule overrides' : 'Show rule overrides'}
+                  </button>
+                  {showRuleOverrides && <RuleOverridesPanel doc={session.doc} activeSceneId={activeSceneId} />}
+                </>
               )}
 
-              <button type="button" onClick={() => setShowHomebrewEditor((v) => !v)}>
-                {showHomebrewEditor ? 'Hide homebrew editor' : 'Show homebrew editor'}
-              </button>
-              {showHomebrewEditor && <HomebrewEditor doc={session.doc} />}
+              {dmMode === 'run' && (
+                <>
+                  <button type="button" onClick={() => setShowDmNotes((v) => !v)}>
+                    {showDmNotes ? 'Hide DM notes' : 'Show DM notes'}
+                  </button>
+                  {showDmNotes && <DmNotesPanel doc={session.doc} />}
 
-              <button type="button" onClick={() => setShowRuleOverrides((v) => !v)}>
-                {showRuleOverrides ? 'Hide rule overrides' : 'Show rule overrides'}
-              </button>
-              {showRuleOverrides && <RuleOverridesPanel doc={session.doc} activeSceneId={activeSceneId} />}
+                  <button type="button" onClick={() => setShowHandouts((v) => !v)}>
+                    {showHandouts ? 'Hide handouts' : 'Show handouts'}
+                  </button>
+                  {showHandouts && <HandoutsPanel doc={session.doc} />}
 
-              <button type="button" onClick={() => setShowDmNotes((v) => !v)}>
-                {showDmNotes ? 'Hide DM notes' : 'Show DM notes'}
-              </button>
-              {showDmNotes && <DmNotesPanel doc={session.doc} />}
+                  <button type="button" onClick={() => setShowRandomGenerators((v) => !v)}>
+                    {showRandomGenerators ? 'Hide random generators' : 'Show random generators'}
+                  </button>
+                  {showRandomGenerators && <RandomGenerators doc={session.doc} />}
 
-              <button type="button" onClick={() => setShowHandouts((v) => !v)}>
-                {showHandouts ? 'Hide handouts' : 'Show handouts'}
-              </button>
-              {showHandouts && <HandoutsPanel doc={session.doc} />}
+                  <button type="button" onClick={() => setShowSoundboard((v) => !v)}>
+                    {showSoundboard ? 'Hide soundboard' : 'Show soundboard'}
+                  </button>
+                  {showSoundboard && <SoundboardPanel />}
 
-              <button type="button" onClick={() => setShowRandomGenerators((v) => !v)}>
-                {showRandomGenerators ? 'Hide random generators' : 'Show random generators'}
-              </button>
-              {showRandomGenerators && <RandomGenerators doc={session.doc} />}
-
-              <button type="button" onClick={() => setShowSoundboard((v) => !v)}>
-                {showSoundboard ? 'Hide soundboard' : 'Show soundboard'}
-              </button>
-              {showSoundboard && <SoundboardPanel />}
-
-              <button type="button" onClick={() => setShowCampaignFiles((v) => !v)}>
-                {showCampaignFiles ? 'Hide campaign files' : 'Show campaign files'}
-              </button>
-              {showCampaignFiles && (
-                <CampaignFilesPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />
+                  <button type="button" onClick={() => setShowCampaignFiles((v) => !v)}>
+                    {showCampaignFiles ? 'Hide campaign files' : 'Show campaign files'}
+                  </button>
+                  {showCampaignFiles && (
+                    <CampaignFilesPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />
+                  )}
+                </>
               )}
             </>
           )}

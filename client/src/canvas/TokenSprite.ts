@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Text, type FederatedPointerEvent, type Texture } from 'pixi.js'
-import { footprintCells, renderScale } from '../map/sizeCategory'
+import { footprintCells, renderScale, snapToSlot } from '../map/sizeCategory'
 import type { SizeCategory } from '../map/types'
 
 export interface TokenSpriteCallbacks {
@@ -46,6 +46,7 @@ export class TokenSprite {
   private readonly callbacks: TokenSpriteCallbacks
   private readonly draggable: boolean
   private gridSizePx = 1
+  private footprintInCells = 1
   private dragging = false
   private dragPointerOffset = { x: 0, y: 0 }
   private pointerDownLocal: { x: number; y: number } | null = null
@@ -87,6 +88,7 @@ export class TokenSprite {
     const { name, sizeCategory, gridX, gridY, gridSizePx, texture, hp, conditions, selected, hidden } = options
     this.container.alpha = hidden ? 0.55 : 1
     this.gridSizePx = gridSizePx
+    this.footprintInCells = footprintCells(sizeCategory)
     const footprint = footprintCells(sizeCategory) * gridSizePx
     const side = footprint * renderScale(sizeCategory)
     const inset = (footprint - side) / 2
@@ -194,10 +196,13 @@ export class TokenSprite {
       this.container.cursor = 'grab'
       const x = local.x - this.dragPointerOffset.x
       const y = local.y - this.dragPointerOffset.y
-      // Snap to the nearest whole grid cell on release — intermediate throttled
-      // writes during the drag stay fractional for smooth remote-viewer motion.
-      const gridX = Math.round(x / this.gridSizePx)
-      const gridY = Math.round(y / this.gridSizePx)
+      // Snap to whichever slot the token's current position falls within on
+      // release — intermediate throttled writes during the drag stay
+      // fractional for smooth remote-viewer motion. See snapToSlot's doc
+      // comment for why this isn't a plain Math.round (that's corner-snapping,
+      // correct for walls but not for a token that should fill one slot).
+      const gridX = snapToSlot(x / this.gridSizePx, this.footprintInCells)
+      const gridY = snapToSlot(y / this.gridSizePx, this.footprintInCells)
       this.container.position.set(gridX * this.gridSizePx, gridY * this.gridSizePx)
       this.callbacks.onDragEnd(gridX, gridY)
     }
