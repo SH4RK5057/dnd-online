@@ -36,6 +36,12 @@ export function CompendiumDrawer({
   const [mirrorToken, setMirrorToken] = useState(() => loadSavedMirrorToken())
   const [mirrorBusy, setMirrorBusy] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
+  const [ghOwner, setGhOwner] = useState('')
+  const [ghRepo, setGhRepo] = useState('')
+  const [ghBranch, setGhBranch] = useState('main')
+  const [ghPath, setGhPath] = useState('')
+  const [ghToken, setGhToken] = useState(() => loadSavedMirrorToken())
 
   const spells = filterSpells(compendium.spells, query, spellLevel, spellSchool)
   const monsters = filterMonsters(compendium.monsters, query, monsterCr, monsterType)
@@ -60,6 +66,7 @@ export function CompendiumDrawer({
     } finally {
       setMirrorBusy(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+      if (folderInputRef.current) folderInputRef.current.value = ''
     }
   }
 
@@ -70,6 +77,17 @@ export function CompendiumDrawer({
     setMirrorBusy(true)
     try {
       await compendium.importMirrorUrl(mirrorUrl.trim(), mirrorToken.trim())
+    } finally {
+      setMirrorBusy(false)
+    }
+  }
+
+  const handleImportGithubRepo = async () => {
+    if (!ghOwner.trim() || !ghRepo.trim()) return
+    saveMirrorToken(ghToken.trim())
+    setMirrorBusy(true)
+    try {
+      await compendium.importGithubRepo(ghOwner.trim(), ghRepo.trim(), ghBranch.trim() || 'main', ghPath.trim(), ghToken.trim())
     } finally {
       setMirrorBusy(false)
     }
@@ -180,11 +198,35 @@ export function CompendiumDrawer({
         <details className="compendium-drawer__mirror">
           <summary>Private mirror import</summary>
           <p className="compendium-drawer__hint">
-            Import your own local 5etools-2014-src-shaped JSON files (data/spells/*.json, data/bestiary/*.json,
-            data/items.json), or fetch from any mirror URL you point it at — public or private. Nothing here is
-            bundled with the app; this only ever fetches from wherever you tell it to, straight from your browser.
+            Import your own content from local files, a local folder, or a GitHub repo you point it at — public or
+            private. Nothing here is bundled with the app; this only ever fetches from wherever you tell it to,
+            straight from your browser.
           </p>
-          <input ref={fileInputRef} type="file" accept=".json" multiple onChange={(e) => void handleImportFiles(e.target.files)} disabled={mirrorBusy} />
+
+          <h4>Local files or folder</h4>
+          <p className="compendium-drawer__hint">
+            Pick individual 5etools-2014-src-shaped JSON files, or an entire folder — every recognized file inside
+            (at any nesting depth) gets ingested, so folder layout doesn't matter.
+          </p>
+          <div className="compendium-drawer__mirror-files">
+            <input ref={fileInputRef} type="file" accept=".json" multiple onChange={(e) => void handleImportFiles(e.target.files)} disabled={mirrorBusy} />
+            <input
+              ref={folderInputRef}
+              type="file"
+              // @ts-expect-error -- webkitdirectory/directory aren't in React's DOM typings but are supported by Chromium/Firefox for folder selection
+              webkitdirectory=""
+              directory=""
+              multiple
+              onChange={(e) => void handleImportFiles(e.target.files)}
+              disabled={mirrorBusy}
+            />
+          </div>
+
+          <h4>5etools-shaped mirror URL</h4>
+          <p className="compendium-drawer__hint">
+            Fetches the conventional 5etools-2014-src layout (data/items.json, data/spells/index.json + files,
+            data/bestiary/index.json + files) from a raw.githubusercontent.com base URL.
+          </p>
           <div className="compendium-drawer__mirror-url">
             <input
               value={mirrorUrl}
@@ -201,10 +243,35 @@ export function CompendiumDrawer({
               {mirrorBusy ? 'Importing…' : 'Fetch'}
             </button>
           </div>
+
+          <h4>GitHub repo or folder (any layout)</h4>
           <p className="compendium-drawer__hint">
-            For a private GitHub repo: use a raw.githubusercontent.com URL (owner/repo/branch, no trailing path) and
-            a personal access token with read access to that repo. The token is saved only in this browser's local
-            storage and sent only to the URL above.
+            Points at any repo (or a subfolder within it) and ingests every .json file found, whatever it's named or
+            however it's organized — use this if your repo doesn't match 5etools' exact file layout.
+          </p>
+          <div className="compendium-drawer__mirror-github">
+            <input value={ghOwner} onChange={(e) => setGhOwner(e.target.value)} placeholder="owner" />
+            <input value={ghRepo} onChange={(e) => setGhRepo(e.target.value)} placeholder="repo" />
+            <input value={ghBranch} onChange={(e) => setGhBranch(e.target.value)} placeholder="branch (default: main)" />
+            <input value={ghPath} onChange={(e) => setGhPath(e.target.value)} placeholder="folder path (optional, e.g. data)" />
+            <input
+              type="password"
+              value={ghToken}
+              onChange={(e) => setGhToken(e.target.value)}
+              placeholder="Access token (only for a private repo)"
+            />
+            <button
+              type="button"
+              onClick={() => void handleImportGithubRepo()}
+              disabled={mirrorBusy || !ghOwner.trim() || !ghRepo.trim()}
+            >
+              {mirrorBusy ? 'Importing…' : 'Fetch'}
+            </button>
+          </div>
+
+          <p className="compendium-drawer__hint">
+            For a private GitHub repo: use a personal access token with read access to that repo. The token is saved
+            only in this browser's local storage and sent only to GitHub's API/raw-content hosts.
           </p>
           {compendium.mirrorImportedAt && (
             <p className="compendium-drawer__hint">Last imported {new Date(compendium.mirrorImportedAt).toLocaleString()}</p>
@@ -218,6 +285,15 @@ export function CompendiumDrawer({
           )}
         </details>
       )}
+
+      <p className="compendium-drawer__attribution">
+        Built-in reference content is drawn from the D&amp;D 5.1 System Reference Document, © Wizards of the Coast
+        LLC, licensed under{' '}
+        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
+          CC BY 4.0
+        </a>
+        .
+      </p>
     </div>
   )
 }

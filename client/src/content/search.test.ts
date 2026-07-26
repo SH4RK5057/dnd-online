@@ -16,7 +16,7 @@ describe('filterSpells', () => {
 
   it('filters by school', () => {
     const results = filterSpells(SRD_SPELLS, '', 'all', 'Abjuration')
-    expect(results.map((s) => s.name)).toEqual(['Shield'])
+    expect(results.map((s) => s.name).sort()).toEqual(['Mage Armor', 'Shield'].sort())
   })
 
   it('returns everything when filters are all "all" and query is empty', () => {
@@ -30,11 +30,15 @@ describe('filterMonsters', () => {
   })
 
   it('filters by challenge rating', () => {
-    expect(filterMonsters(SRD_MONSTERS, '', '1/4', 'all').map((m) => m.name).sort()).toEqual(['Goblin', 'Skeleton', 'Wolf'].sort())
+    expect(filterMonsters(SRD_MONSTERS, '', '1/4', 'all').map((m) => m.name).sort()).toEqual(
+      ['Goblin', 'Skeleton', 'Wolf', 'Zombie'].sort(),
+    )
   })
 
   it('filters by type substring', () => {
-    expect(filterMonsters(SRD_MONSTERS, '', 'all', 'humanoid').map((m) => m.name).sort()).toEqual(['Goblin', 'Orc'].sort())
+    expect(filterMonsters(SRD_MONSTERS, '', 'all', 'humanoid').map((m) => m.name).sort()).toEqual(
+      ['Bandit', 'Goblin', 'Kobold', 'Orc'].sort(),
+    )
   })
 })
 

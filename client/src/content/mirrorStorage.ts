@@ -167,6 +167,71 @@ export async function fetchMirrorFromUrl(baseUrl: string, token = ''): Promise<M
   return { content, errors }
 }
 
+interface GithubTreeEntry {
+  path: string
+  type: string
+}
+
+/** Imports from any GitHub repo/folder regardless of its internal layout —
+ * unlike fetchMirrorFromUrl (which only looks for the fixed 5etools-2014-src
+ * filenames), this lists the whole repo tree in one call and ingests every
+ * `.json` file under `path` (or the whole repo if `path` is empty),
+ * recognizing the same {spell:[...]}/{monster:[...]}/{item:[...]} shapes via
+ * ingestFile. Lets a DM point this at any subset of their own private
+ * dataset without needing to match 5etools' exact folder/file naming. */
+export async function fetchGithubRepo(
+  owner: string,
+  repo: string,
+  branch: string,
+  path: string,
+  token = '',
+): Promise<MirrorImportResult> {
+  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now() }
+  const errors: string[] = []
+  const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
+  if (token) headers.Authorization = `token ${token}`
+
+  let treeJson: unknown
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+      { headers },
+    )
+    if (!res.ok) {
+      errors.push(`Could not list ${owner}/${repo}@${branch}: ${res.status} ${res.statusText}`)
+      return { content, errors }
+    }
+    treeJson = await res.json()
+  } catch (err) {
+    errors.push(`Could not reach the GitHub API: ${err instanceof Error ? err.message : 'network error'}`)
+    return { content, errors }
+  }
+
+  const tree = treeJson as { tree?: GithubTreeEntry[]; truncated?: boolean }
+  const prefix = path.replace(/^\/+|\/+$/g, '')
+  const jsonPaths = (tree.tree ?? [])
+    .filter((e) => e.type === 'blob' && e.path.endsWith('.json'))
+    .filter((e) => !prefix || e.path === prefix || e.path.startsWith(`${prefix}/`))
+    .map((e) => e.path)
+
+  if (tree.truncated) {
+    errors.push('GitHub truncated this repo\'s file listing (very large repo) — narrow the folder path to make sure everything under it is fetched.')
+  }
+  if (jsonPaths.length === 0) {
+    errors.push(`No .json files found under "${prefix || '/'}" in ${owner}/${repo}@${branch}.`)
+  }
+
+  const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`
+  for (const filePath of jsonPaths) {
+    const json = await tryFetchJson(`${rawBase}/${filePath}`, token)
+    if (json) ingestFile(filePath, json, content, errors)
+    else errors.push(`${filePath}: not found or unreachable`)
+  }
+
+  await putCachedMirrorContent(content)
+  return { content, errors }
+}
+
 async function fetchIndexedFamily(
   base: string,
   folder: string,

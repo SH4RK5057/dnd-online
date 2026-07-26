@@ -3,6 +3,7 @@ import type * as Y from 'yjs'
 import { SRD_ITEMS, SRD_MONSTERS, SRD_SPELLS } from './srdData'
 import { useHomebrewContent } from './useHomebrewContent'
 import {
+  fetchGithubRepo,
   fetchMirrorFromUrl,
   getCachedMirrorContent,
   importMirrorFiles,
@@ -38,6 +39,10 @@ export interface UseCompendiumResult {
   /** `token` is optional — a bearer token (e.g. GitHub PAT) for a private
    * mirror repo. See mirrorStorage.ts's fetchMirrorFromUrl. */
   importMirrorUrl: (url: string, token?: string) => Promise<void>
+  /** Imports from any GitHub repo/folder regardless of layout — see
+   * mirrorStorage.ts's fetchGithubRepo. `path` restricts to a subfolder;
+   * pass '' for the whole repo. */
+  importGithubRepo: (owner: string, repo: string, branch: string, path: string, token?: string) => Promise<void>
   homebrew: ReturnType<typeof useHomebrewContent>
 }
 
@@ -73,6 +78,15 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     setMirrorErrors(errors)
   }, [])
 
+  const importGithubRepo = useCallback(
+    async (owner: string, repo: string, branch: string, path: string, token = '') => {
+      const { content, errors } = await fetchGithubRepo(owner, repo, branch, path, token)
+      setMirror(content)
+      setMirrorErrors(errors)
+    },
+    [],
+  )
+
   const spells = useMemo(
     () => [...SRD_SPELLS, ...(mirror?.spells ?? []), ...homebrew.homebrewSpells.map(homebrewSpellToData)],
     [mirror, homebrew.homebrewSpells],
@@ -94,6 +108,7 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     mirrorImportedAt: mirror?.importedAt ?? null,
     importMirrorLocalFiles,
     importMirrorUrl,
+    importGithubRepo,
     homebrew,
   }
 }
