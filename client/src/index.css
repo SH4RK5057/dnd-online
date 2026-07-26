@@ -1,24 +1,33 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --danger: #d1273d;
-  --danger-bg: rgba(209, 39, 61, 0.1);
-  --ok: #1a9c5c;
+  /* Parchment / fantasy palette — warm cream paper, ink-brown text, a
+   * bronze-gold accent (like tooled leather or a wax seal), against a
+   * subtle mottled-paper texture (layered radial gradients, no image
+   * assets needed). */
+  --text: #4a3524;
+  --text-h: #2c1d12;
+  --bg: #e8dbb8;
+  --bg-texture:
+    radial-gradient(circle at 18% 22%, rgba(120, 88, 44, 0.06), transparent 45%),
+    radial-gradient(circle at 82% 68%, rgba(120, 88, 44, 0.06), transparent 45%),
+    radial-gradient(circle at 55% 45%, rgba(120, 88, 44, 0.04), transparent 65%);
+  --panel-bg: rgba(232, 219, 184, 0.94);
+  --border: #a9825a;
+  --code-bg: #ddc89c;
+  --accent: #8a6417;
+  --accent-bg: rgba(138, 100, 23, 0.14);
+  --accent-border: rgba(138, 100, 23, 0.55);
+  --danger: #8b2318;
+  --danger-bg: rgba(139, 35, 24, 0.12);
+  --ok: #3f6b34;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --sans: Georgia, 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
   --mono: ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light dark;
   color: var(--text);
-  background: var(--bg);
+  background: var(--bg-texture), var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -31,17 +40,24 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --danger: #f47c8c;
-    --danger-bg: rgba(244, 124, 140, 0.15);
-    --ok: #4ade80;
+    /* Aged leather / dungeon torchlight — dark brown ground, warm cream
+     * ink, a brighter gold accent that reads like torchlight against it. */
+    --text: #d3c2a0;
+    --text-h: #f1e4c4;
+    --bg: #2a2015;
+    --bg-texture:
+      radial-gradient(circle at 18% 22%, rgba(0, 0, 0, 0.25), transparent 45%),
+      radial-gradient(circle at 82% 68%, rgba(0, 0, 0, 0.25), transparent 45%),
+      radial-gradient(circle at 55% 45%, rgba(0, 0, 0, 0.15), transparent 65%);
+    --panel-bg: rgba(42, 32, 21, 0.94);
+    --border: #6b5230;
+    --code-bg: #3a2c1a;
+    --accent: #cda233;
+    --accent-bg: rgba(205, 162, 51, 0.18);
+    --accent-border: rgba(205, 162, 51, 0.6);
+    --danger: #d1725f;
+    --danger-bg: rgba(209, 114, 95, 0.18);
+    --ok: #82b06a;
   }
 }
 
@@ -71,20 +87,21 @@ body {
 h1,
 h2 {
   font-family: var(--sans);
-  font-weight: 500;
+  font-weight: 700;
   color: var(--text-h);
+  letter-spacing: 0.3px;
 }
 
 h1 {
   font-size: 40px;
-  letter-spacing: -1.2px;
+  letter-spacing: 0.5px;
   margin: 0 0 16px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 h2 {
   font-size: 20px;
   line-height: 118%;
-  letter-spacing: -0.24px;
   margin: 0 0 8px;
 }
 
@@ -99,12 +116,18 @@ button {
   border-radius: 6px;
   color: var(--text-h);
   background: var(--accent-bg);
-  border: 2px solid transparent;
+  border: 1.5px solid var(--border);
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 button:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+button[aria-pressed='true'] {
+  background: var(--accent-bg);
   border-color: var(--accent-border);
 }
 
@@ -118,16 +141,23 @@ button:disabled {
   cursor: not-allowed;
 }
 
-input {
+input,
+select {
   font: inherit;
   font-size: 16px;
   padding: 8px 12px;
   border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg);
+  border: 1.5px solid var(--border);
+  background: var(--code-bg);
   color: var(--text-h);
   width: 100%;
   box-sizing: border-box;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  width: auto;
+  flex: 0 0 auto;
 }
 
 label {

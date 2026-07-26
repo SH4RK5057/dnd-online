@@ -12,6 +12,8 @@ export interface CreateWallInput {
   y1: number
   x2: number
   y2: number
+  /** Screen-pixel render thickness at 1x grid scale — see WallRecord. */
+  thickness: number
 }
 
 export interface UseWallsResult {
@@ -49,6 +51,7 @@ export function useWalls(doc: Y.Doc | null, sceneId: string | null): UseWallsRes
         y1: input.y1,
         x2: input.x2,
         y2: input.y2,
+        thickness: input.thickness,
         createdAt: Date.now(),
       }
       wallsMap(doc).set(id, record)

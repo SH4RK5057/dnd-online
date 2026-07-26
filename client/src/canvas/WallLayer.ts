@@ -24,9 +24,10 @@ const ENDPOINT_MAGNET_RADIUS_PX = 22
  * ends the chain) — see handlePointerUp. */
 const DRAG_COMMIT_THRESHOLD_PX = 6
 const DRAG_WRITE_INTERVAL_MS = 75
+export const DEFAULT_WALL_THICKNESS_PX = 4
 
 export interface WallLayerCallbacks {
-  onCreateWall: (x1: number, y1: number, x2: number, y2: number) => void
+  onCreateWall: (x1: number, y1: number, x2: number, y2: number, thickness: number) => void
   onUpdateWallEndpoint: (wallId: string, which: 'start' | 'end', x: number, y: number) => void
   onDeleteWall: (wallId: string) => void
 }
@@ -55,6 +56,7 @@ export class WallLayer {
   private snapToGrid = false
   private gridType: GridType = 'square'
   private viewScale = 1
+  private thickness = DEFAULT_WALL_THICKNESS_PX
   private walls: WallRecord[] = []
   private callbacks: WallLayerCallbacks | null = null
   private pendingStart: { x: number; y: number } | null = null
@@ -89,12 +91,14 @@ export class WallLayer {
     active: boolean,
     snapToGrid: boolean,
     gridType: GridType,
+    thickness: number,
     callbacks: WallLayerCallbacks,
   ): void {
     this.walls = walls
     this.gridSizePx = gridSizePx
     this.snapToGrid = snapToGrid
     this.gridType = gridType
+    this.thickness = thickness
     this.callbacks = callbacks
 
     if (this.active !== active) {
@@ -115,12 +119,15 @@ export class WallLayer {
 
   private redrawWalls(): void {
     this.wallsGraphics.clear()
+    // Each wall gets its own moveTo/lineTo/stroke() so its own thickness
+    // applies — Graphics.stroke() styles whatever path has been built up
+    // since the last stroke/clear, so a single shared call (as before
+    // per-wall thickness existed) would force one width for every segment.
     for (const wall of this.walls) {
-      this.wallsGraphics.moveTo(wall.x1 * this.gridSizePx, wall.y1 * this.gridSizePx)
-      this.wallsGraphics.lineTo(wall.x2 * this.gridSizePx, wall.y2 * this.gridSizePx)
-    }
-    if (this.walls.length > 0) {
-      this.wallsGraphics.stroke({ width: 3, color: 0xff4444, alpha: 0.9 })
+      this.wallsGraphics
+        .moveTo(wall.x1 * this.gridSizePx, wall.y1 * this.gridSizePx)
+        .lineTo(wall.x2 * this.gridSizePx, wall.y2 * this.gridSizePx)
+        .stroke({ width: wall.thickness ?? DEFAULT_WALL_THICKNESS_PX, color: 0xff4444, alpha: 0.9 })
     }
     // Endpoint dots as a second pass so they sit on top of the lines.
     for (const wall of this.walls) {
@@ -221,7 +228,7 @@ export class WallLayer {
     }
 
     if (this.pendingStart) {
-      this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y)
+      this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y, this.thickness)
       this.pendingStart = point
     } else {
       this.pendingStart = point
@@ -252,7 +259,7 @@ export class WallLayer {
     this.previewGraphics
       .moveTo(this.pendingStart.x * this.gridSizePx, this.pendingStart.y * this.gridSizePx)
       .lineTo(point.x * this.gridSizePx, point.y * this.gridSizePx)
-      .stroke({ width: 2, color: 0xffffff, alpha: 0.6 })
+      .stroke({ width: this.thickness, color: 0xffffff, alpha: 0.6 })
   }
 
   private handlePointerUp = (event: FederatedPointerEvent) => {
@@ -276,7 +283,7 @@ export class WallLayer {
     const point = this.toGridPoint(event)
     const dragDistancePx = Math.hypot(point.x - this.pendingStart.x, point.y - this.pendingStart.y) * this.gridSizePx * this.viewScale
     if (dragDistancePx < DRAG_COMMIT_THRESHOLD_PX) return
-    this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y)
+    this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y, this.thickness)
     this.pendingStart = null
     this.previewGraphics.clear()
   }

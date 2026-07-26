@@ -40,6 +40,7 @@ const ZOOM_WHEEL_FACTOR = 1.1
 interface MapCanvasProps {
   toolMode: ToolMode
   snapWalls: boolean
+  wallThickness: number
   onPlaceToken?: (x: number, y: number) => void
   onPlacePoi?: (x: number, y: number) => void
   /** DM-only: when set, the DM's own canvas renders exactly what this
@@ -56,6 +57,7 @@ interface MapCanvasProps {
 export function MapCanvas({
   toolMode,
   snapWalls,
+  wallThickness,
   onPlaceToken,
   onPlacePoi,
   previewPlayerId = null,
@@ -228,6 +230,19 @@ export function MapCanvas({
 
     mapLayer.setTexture(mapUrl, applySize)
     applySize()
+
+    // usePixiApp's ResizeObserver keeps the renderer itself in sync with the
+    // container's size (e.g. entering/leaving fullscreen), but that alone
+    // doesn't re-fit the map into the new dimensions — app.screen.width/
+    // height above are only read once, at mount. Re-running applySize on
+    // every renderer resize keeps the map correctly scaled/centered no
+    // matter how the container is resized, without disturbing the camera's
+    // own zoom/pan (world.scale/position here is the base fit-to-viewport
+    // transform the camera then multiplies on top of).
+    app.renderer.on('resize', applySize)
+    return () => {
+      app.renderer.off('resize', applySize)
+    }
   }, [app, mapUrl, activeScene])
 
   // Update tokens. Selection is allowed only in Move mode, same as dragging —
@@ -267,13 +282,14 @@ export function MapCanvas({
       isDmUnmasked && toolMode === 'draw-walls',
       snapWalls,
       activeScene.gridType ?? 'square',
+      wallThickness,
       {
-        onCreateWall: (x1, y1, x2, y2) => createWall({ sceneId: activeScene.id, x1, y1, x2, y2 }),
+        onCreateWall: (x1, y1, x2, y2, thickness) => createWall({ sceneId: activeScene.id, x1, y1, x2, y2, thickness }),
         onUpdateWallEndpoint: updateWallEndpoint,
         onDeleteWall: deleteWall,
       },
     )
-  }, [walls, activeScene, mapSize, isDmUnmasked, toolMode, snapWalls, createWall, updateWallEndpoint, deleteWall])
+  }, [walls, activeScene, mapSize, isDmUnmasked, toolMode, snapWalls, wallThickness, createWall, updateWallEndpoint, deleteWall])
 
   // Update lights.
   useEffect(() => {

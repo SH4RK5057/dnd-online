@@ -149,6 +149,11 @@ export interface WallRecord {
   y1: number
   x2: number
   y2: number
+  /** Render thickness in screen pixels (at 1x grid scale) — set once at
+   * creation time from whatever the wall tool's thickness slider was at,
+   * like a brush size. Read as `?? 4` for walls created before this field
+   * existed. Purely cosmetic; doesn't affect line-of-sight math. */
+  thickness: number
   createdAt: number
 }
 

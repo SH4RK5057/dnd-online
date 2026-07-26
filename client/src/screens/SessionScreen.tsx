@@ -10,8 +10,7 @@ import { PeerList } from '../components/PeerList'
 import { CopyJoinCode } from '../components/CopyJoinCode'
 import { ConnectionErrorPanel } from '../components/ConnectionErrorPanel'
 import { SceneToolbar } from '../components/SceneToolbar'
-import { TokenUploadButton } from '../components/TokenUploadButton'
-import { DrawingToolbar } from '../components/DrawingToolbar'
+import { MapToolRail } from '../components/MapToolRail'
 import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
 import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
 import { CharacterPanel } from '../components/CharacterPanel'
@@ -34,6 +33,8 @@ import { EncounterNotificationBanner } from '../components/EncounterNotification
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { MapCanvas } from '../canvas/MapCanvas'
 import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken'
+import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
+import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
 import type { MonsterData } from '../content/types'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingTokenPlacement } from './pendingTokenPlacement'
@@ -48,6 +49,8 @@ export function SessionScreen() {
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
   const [toolMode, setToolMode] = useState<ToolMode>('move')
   const [snapWalls, setSnapWalls] = useState(false)
+  const [wallThickness, setWallThickness] = useState(DEFAULT_WALL_THICKNESS_PX)
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false)
   const [showJoinCode, setShowJoinCode] = useState(true)
   const [pendingPlacement, setPendingPlacement] = useState<PendingTokenPlacement | null>(null)
   const [pendingPoiPlacement, setPendingPoiPlacement] = useState<PendingPoiPlacement | null>(null)
@@ -89,6 +92,15 @@ export function SessionScreen() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [pendingPoiPlacement])
+
+  useEffect(() => {
+    if (!isMapFullscreen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMapFullscreen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isMapFullscreen])
 
   if (!session) return null
 
@@ -183,25 +195,6 @@ export function SessionScreen() {
           {session.role === 'dm' && (
             <>
               <SceneToolbar />
-
-              {activeSceneId && !isPreviewingPlayer && (
-                <DrawingToolbar
-                  sceneId={activeSceneId}
-                  toolMode={toolMode}
-                  onToolModeChange={setToolMode}
-                  snapWalls={snapWalls}
-                  onSnapWallsChange={setSnapWalls}
-                />
-              )}
-
-              {activeSceneId && !isPreviewingPlayer && (
-                <TokenUploadButton
-                  sceneId={activeSceneId}
-                  pendingPlacement={pendingPlacement}
-                  onRequestPlacement={setPendingPlacement}
-                  onCancelPlacement={() => setPendingPlacement(null)}
-                />
-              )}
 
               {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
 
@@ -317,7 +310,7 @@ export function SessionScreen() {
           )}
         </div>
 
-        <div className="session-screen__main">
+        <div className={`session-screen__main${isMapFullscreen ? ' session-screen__main--fullscreen' : ''}`}>
           {isUnpublishedForPlayer ? (
             <p className="session-screen__notice">Your DM is still setting up this scene. Hang tight!</p>
           ) : (
@@ -328,12 +321,35 @@ export function SessionScreen() {
               <MapCanvas
                 toolMode={effectiveToolMode}
                 snapWalls={snapWalls}
+                wallThickness={wallThickness}
                 onPlaceToken={handlePlaceToken}
                 onPlacePoi={handlePlacePoi}
                 previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
                 selectedTokenId={selectedTokenId}
                 onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
               />
+              {session.role === 'dm' && activeSceneId && !isPreviewingPlayer && (
+                <MapToolRail
+                  sceneId={activeSceneId}
+                  toolMode={toolMode}
+                  onToolModeChange={setToolMode}
+                  snapWalls={snapWalls}
+                  onSnapWallsChange={setSnapWalls}
+                  wallThickness={wallThickness}
+                  onWallThicknessChange={setWallThickness}
+                  pendingPlacement={pendingPlacement}
+                  onRequestPlacement={setPendingPlacement}
+                  onCancelPlacement={() => setPendingPlacement(null)}
+                />
+              )}
+              <button
+                type="button"
+                className="session-screen__fullscreen-toggle"
+                onClick={() => setIsMapFullscreen((v) => !v)}
+                title={isMapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
+              >
+                {isMapFullscreen ? <FullscreenExitIcon /> : <FullscreenEnterIcon />}
+              </button>
             </>
           )}
         </div>
