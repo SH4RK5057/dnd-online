@@ -1086,6 +1086,19 @@
   gap: 8px;
 }
 
+.compendium-drawer__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.compendium-drawer__categories label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
 .compendium-drawer__attribution {
   font-size: 11px;
   color: var(--text-muted, var(--text));

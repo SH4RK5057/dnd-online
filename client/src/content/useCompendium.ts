@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type * as Y from 'yjs'
 import { loadSavedMirrorToken } from './constants'
-import { sourceKeyFor, type ContentSourceRecord } from './contentSourceTypes'
+import { defaultContentCategories, sourceKeyFor, type ContentCategories, type ContentSourceRecord } from './contentSourceTypes'
 import { useContentSource, type UseContentSourceResult } from './useContentSource'
 import { SRD_ITEMS, SRD_MONSTERS, SRD_SPELLS } from './srdData'
 import { useHomebrewContent } from './useHomebrewContent'
@@ -28,8 +28,8 @@ import type {
  * useContentSource.ts). Returns null for mode 'none' (nothing configured). */
 async function fetchForSource(source: ContentSourceRecord, sourceKey: string): Promise<MirrorImportResult | null> {
   const token = loadSavedMirrorToken()
-  if (source.mode === 'url') return fetchMirrorFromUrl(source.url, token, sourceKey)
-  if (source.mode === 'github') return fetchGithubRepo(source.owner, source.repo, source.branch, source.path, token, sourceKey)
+  if (source.mode === 'url') return fetchMirrorFromUrl(source.url, token, sourceKey, source)
+  if (source.mode === 'github') return fetchGithubRepo(source.owner, source.repo, source.branch, source.path, token, sourceKey, source)
   return null
 }
 
@@ -49,17 +49,28 @@ export interface UseCompendiumResult {
   items: ItemData[]
   mirrorErrors: string[]
   mirrorImportedAt: number | null
-  importMirrorLocalFiles: (files: FileList | File[]) => Promise<void>
+  /** `categories` (default: all) limits which of spells/monsters/items get
+   * ingested — pass e.g. `{includeSpells: false, includeMonsters: true,
+   * includeItems: false}` to bring in just monsters. */
+  importMirrorLocalFiles: (files: FileList | File[], categories?: ContentCategories) => Promise<void>
   /** `token` is optional — a bearer token (e.g. GitHub PAT) for a private
    * mirror repo. See mirrorStorage.ts's fetchMirrorFromUrl. Also persists
-   * this as the campaign's shared content source (contentSource.record), so
-   * every other connected client fetches the same dataset. */
-  importMirrorUrl: (url: string, token?: string) => Promise<void>
+   * this (including `categories`) as the campaign's shared content source
+   * (contentSource.record), so every other connected client fetches the
+   * same dataset. */
+  importMirrorUrl: (url: string, token?: string, categories?: ContentCategories) => Promise<void>
   /** Imports from any GitHub repo/folder regardless of layout — see
    * mirrorStorage.ts's fetchGithubRepo. `path` restricts to a subfolder;
-   * pass '' for the whole repo. Also persists this as the campaign's shared
-   * content source. */
-  importGithubRepo: (owner: string, repo: string, branch: string, path: string, token?: string) => Promise<void>
+   * pass '' for the whole repo. Also persists this (including `categories`)
+   * as the campaign's shared content source. */
+  importGithubRepo: (
+    owner: string,
+    repo: string,
+    branch: string,
+    path: string,
+    token?: string,
+    categories?: ContentCategories,
+  ) => Promise<void>
   /** The campaign's shared content source pointer (Yjs-synced) — what every
    * client tries to auto-fetch, and what setting a new mirror URL/GitHub
    * repo above writes to. */
@@ -130,32 +141,32 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     setAttemptedSourceKey('')
   }, [])
 
-  const importMirrorLocalFiles = useCallback(async (files: FileList | File[]) => {
-    const { content, errors } = await importMirrorFiles(files)
+  const importMirrorLocalFiles = useCallback(async (files: FileList | File[], categories = defaultContentCategories()) => {
+    const { content, errors } = await importMirrorFiles(files, categories)
     setMirror(content)
     setMirrorErrors(errors)
   }, [])
 
   const importMirrorUrl = useCallback(
-    async (url: string, token = '') => {
-      const key = sourceKeyFor({ mode: 'url', url, owner: '', repo: '', branch: '', path: '', updatedAt: 0 })
-      const { content, errors } = await fetchMirrorFromUrl(url, token, key)
+    async (url: string, token = '', categories = defaultContentCategories()) => {
+      const key = sourceKeyFor({ mode: 'url', url, owner: '', repo: '', branch: '', path: '', updatedAt: 0, ...categories })
+      const { content, errors } = await fetchMirrorFromUrl(url, token, key, categories)
       setMirror(content)
       setMirrorErrors(errors)
       setAttemptedSourceKey(key)
-      contentSource.setUrlSource(url)
+      contentSource.setUrlSource(url, categories)
     },
     [contentSource],
   )
 
   const importGithubRepo = useCallback(
-    async (owner: string, repo: string, branch: string, path: string, token = '') => {
-      const key = sourceKeyFor({ mode: 'github', owner, repo, branch, path, url: '', updatedAt: 0 })
-      const { content, errors } = await fetchGithubRepo(owner, repo, branch, path, token, key)
+    async (owner: string, repo: string, branch: string, path: string, token = '', categories = defaultContentCategories()) => {
+      const key = sourceKeyFor({ mode: 'github', owner, repo, branch, path, url: '', updatedAt: 0, ...categories })
+      const { content, errors } = await fetchGithubRepo(owner, repo, branch, path, token, key, categories)
       setMirror(content)
       setMirrorErrors(errors)
       setAttemptedSourceKey(key)
-      contentSource.setGithubSource(owner, repo, branch, path)
+      contentSource.setGithubSource(owner, repo, branch, path, categories)
     },
     [contentSource],
   )

@@ -8,6 +8,7 @@
  * need to re-import/re-fetch every session. */
 import type { ItemData, MonsterData, SpellData } from './types'
 import { normalizeItem, normalizeMonster, normalizeSpell } from './mirrorNormalize'
+import { defaultContentCategories, type ContentCategories } from './contentSourceTypes'
 
 const DB_NAME = 'dndonline-content-mirror'
 const STORE_NAME = 'content'
@@ -81,24 +82,29 @@ function nextKey(prefix: string): string {
 /** Classifies one parsed JSON file by its top-level array key — 5etools
  * spell files are `{spell: [...]}`, bestiary files `{monster: [...]}`, the
  * items file `{item: [...]}`. Anything else is reported as an error rather
- * than silently ignored, so a DM importing the wrong file finds out why. */
-function ingestFile(filename: string, json: unknown, into: MirrorContent, errors: string[]): void {
+ * than silently ignored, so a DM importing the wrong file finds out why.
+ * A category the DM excluded (per `categories`) is skipped silently — that's
+ * a deliberate choice, not an error. */
+export function ingestFile(filename: string, json: unknown, into: MirrorContent, errors: string[], categories: ContentCategories): void {
   if (!json || typeof json !== 'object') {
     errors.push(`${filename}: not a JSON object`)
     return
   }
   const obj = json as Record<string, unknown>
   if (Array.isArray(obj.spell)) {
+    if (!categories.includeSpells) return
     for (const raw of obj.spell) {
       const spell = normalizeSpell(raw, nextKey('spell'))
       if (spell) into.spells.push(spell)
     }
   } else if (Array.isArray(obj.monster)) {
+    if (!categories.includeMonsters) return
     for (const raw of obj.monster) {
       const monster = normalizeMonster(raw, nextKey('monster'))
       if (monster) into.monsters.push(monster)
     }
   } else if (Array.isArray(obj.item)) {
+    if (!categories.includeItems) return
     for (const raw of obj.item) {
       const item = normalizeItem(raw, nextKey('item'))
       if (item) into.items.push(item)
@@ -111,14 +117,20 @@ function ingestFile(filename: string, json: unknown, into: MirrorContent, errors
 /** Imports a set of local files the DM picked (a FileList from an
  * `<input type="file" multiple>`), replacing any previously-cached mirror
  * content. Bad/unrecognized files are skipped and reported in `errors`
- * rather than aborting the whole import. */
-export async function importMirrorFiles(files: FileList | File[]): Promise<MirrorImportResult> {
+ * rather than aborting the whole import. `categories` (default: all) limits
+ * which of spells/monsters/items get ingested — e.g. pass only
+ * `includeMonsters: true` to import just monsters from a folder that also
+ * has spell/item files mixed in. */
+export async function importMirrorFiles(
+  files: FileList | File[],
+  categories: ContentCategories = defaultContentCategories(),
+): Promise<MirrorImportResult> {
   const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey: '' }
   const errors: string[] = []
   for (const file of Array.from(files)) {
     try {
       const text = await file.text()
-      ingestFile(file.name, JSON.parse(text), content, errors)
+      ingestFile(file.name, JSON.parse(text), content, errors, categories)
     } catch (err) {
       errors.push(`${file.name}: ${err instanceof Error ? err.message : 'failed to read/parse'}`)
     }
@@ -153,24 +165,33 @@ async function tryFetchJson(url: string, token: string): Promise<unknown | null>
  * collected into `errors` instead. `sourceKey` is optional — pass
  * contentSourceTypes.ts's sourceKeyFor() when this fetch corresponds to the
  * campaign's shared content source, so useCompendium can recognize this
- * cache as matching it later. */
-export async function fetchMirrorFromUrl(baseUrl: string, token = '', sourceKey = ''): Promise<MirrorImportResult> {
+ * cache as matching it later. `categories` (default: all) skips fetching
+ * whole file families that aren't wanted — e.g. with `includeSpells: false`
+ * this never even requests the spells index/files. */
+export async function fetchMirrorFromUrl(
+  baseUrl: string,
+  token = '',
+  sourceKey = '',
+  categories: ContentCategories = defaultContentCategories(),
+): Promise<MirrorImportResult> {
   const base = baseUrl.replace(/\/+$/, '')
   const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
 
-  // 5etools-2014-src splits items across two files: items.json (magic items)
-  // and items-base.json (mundane gear) — fetch both, items-base.json is
-  // optional (older/simpler mirrors may only have one).
-  const itemsJson = await tryFetchJson(`${base}/data/items.json`, token)
-  if (itemsJson) ingestFile('items.json', itemsJson, content, errors)
-  else errors.push('data/items.json: not found or unreachable (check the URL, and the token if this is a private repo)')
+  if (categories.includeItems) {
+    // 5etools-2014-src splits items across two files: items.json (magic
+    // items) and items-base.json (mundane gear) — fetch both,
+    // items-base.json is optional (older/simpler mirrors may only have one).
+    const itemsJson = await tryFetchJson(`${base}/data/items.json`, token)
+    if (itemsJson) ingestFile('items.json', itemsJson, content, errors, categories)
+    else errors.push('data/items.json: not found or unreachable (check the URL, and the token if this is a private repo)')
 
-  const itemsBaseJson = await tryFetchJson(`${base}/data/items-base.json`, token)
-  if (itemsBaseJson) ingestFile('items-base.json', itemsBaseJson, content, errors)
+    const itemsBaseJson = await tryFetchJson(`${base}/data/items-base.json`, token)
+    if (itemsBaseJson) ingestFile('items-base.json', itemsBaseJson, content, errors, categories)
+  }
 
-  await fetchIndexedFamily(base, 'spells', token, content, errors)
-  await fetchIndexedFamily(base, 'bestiary', token, content, errors)
+  if (categories.includeSpells) await fetchIndexedFamily(base, 'spells', token, content, errors, categories)
+  if (categories.includeMonsters) await fetchIndexedFamily(base, 'bestiary', token, content, errors, categories)
 
   await putCachedMirrorContent(content)
   return { content, errors }
@@ -188,7 +209,11 @@ interface GithubTreeEntry {
  * recognizing the same {spell:[...]}/{monster:[...]}/{item:[...]} shapes via
  * ingestFile. Lets a DM point this at any subset of their own private
  * dataset without needing to match 5etools' exact folder/file naming.
- * `sourceKey` is optional — see fetchMirrorFromUrl's doc comment. */
+ * `sourceKey`/`categories` are optional — see fetchMirrorFromUrl's doc
+ * comment. Since files here can be named/organized arbitrarily, excluded
+ * categories are filtered at ingest time (post-fetch) rather than skipping
+ * network requests up front — every .json under `path` still gets fetched,
+ * just not all of it kept. */
 export async function fetchGithubRepo(
   owner: string,
   repo: string,
@@ -196,6 +221,7 @@ export async function fetchGithubRepo(
   path: string,
   token = '',
   sourceKey = '',
+  categories: ContentCategories = defaultContentCategories(),
 ): Promise<MirrorImportResult> {
   const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
@@ -235,7 +261,7 @@ export async function fetchGithubRepo(
   const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`
   for (const filePath of jsonPaths) {
     const json = await tryFetchJson(`${rawBase}/${filePath}`, token)
-    if (json) ingestFile(filePath, json, content, errors)
+    if (json) ingestFile(filePath, json, content, errors, categories)
     else errors.push(`${filePath}: not found or unreachable`)
   }
 
@@ -249,6 +275,7 @@ async function fetchIndexedFamily(
   token: string,
   content: MirrorContent,
   errors: string[],
+  categories: ContentCategories,
 ): Promise<void> {
   const index = await tryFetchJson(`${base}/data/${folder}/index.json`, token)
   const filenames: string[] = []
@@ -261,7 +288,7 @@ async function fetchIndexedFamily(
   }
   for (const filename of filenames) {
     const json = await tryFetchJson(`${base}/data/${folder}/${filename}`, token)
-    if (json) ingestFile(`${folder}/${filename}`, json, content, errors)
+    if (json) ingestFile(`${folder}/${filename}`, json, content, errors, categories)
     else errors.push(`${folder}/${filename}: not found or unreachable`)
   }
 }

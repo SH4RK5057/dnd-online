@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as Y from 'yjs'
-import { defaultContentSource, type ContentSourceRecord } from './contentSourceTypes'
+import { defaultContentSource, type ContentCategories, type ContentSourceRecord } from './contentSourceTypes'
 
 const SOURCE_KEY = 'source'
 
@@ -10,8 +10,8 @@ function sourceMap(doc: Y.Doc) {
 
 export interface UseContentSourceResult {
   record: ContentSourceRecord
-  setUrlSource: (url: string) => void
-  setGithubSource: (owner: string, repo: string, branch: string, path: string) => void
+  setUrlSource: (url: string, categories: ContentCategories) => void
+  setGithubSource: (owner: string, repo: string, branch: string, path: string, categories: ContentCategories) => void
   clearSource: () => void
 }
 
@@ -40,18 +40,19 @@ export function useContentSource(doc: Y.Doc | null): UseContentSourceResult {
   }, [doc])
 
   const setUrlSource = useCallback(
-    (url: string) => {
+    (url: string, categories: ContentCategories) => {
       if (!doc) return
-      sourceMap(doc).set(SOURCE_KEY, { ...defaultContentSource(), mode: 'url', url, updatedAt: Date.now() })
+      sourceMap(doc).set(SOURCE_KEY, { ...defaultContentSource(), ...categories, mode: 'url', url, updatedAt: Date.now() })
     },
     [doc],
   )
 
   const setGithubSource = useCallback(
-    (owner: string, repo: string, branch: string, path: string) => {
+    (owner: string, repo: string, branch: string, path: string, categories: ContentCategories) => {
       if (!doc) return
       sourceMap(doc).set(SOURCE_KEY, {
         ...defaultContentSource(),
+        ...categories,
         mode: 'github',
         owner,
         repo,

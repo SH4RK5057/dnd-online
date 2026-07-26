@@ -44,6 +44,10 @@ export function CompendiumDrawer({
   const [ghPath, setGhPath] = useState('')
   const [ghToken, setGhToken] = useState(() => loadSavedMirrorToken())
   const [syncToken, setSyncToken] = useState(() => loadSavedMirrorToken())
+  const [includeSpells, setIncludeSpells] = useState(true)
+  const [includeMonsters, setIncludeMonsters] = useState(true)
+  const [includeItems, setIncludeItems] = useState(true)
+  const importCategories = { includeSpells, includeMonsters, includeItems }
 
   const spells = filterSpells(compendium.spells, query, spellLevel, spellSchool)
   const monsters = filterMonsters(compendium.monsters, query, monsterCr, monsterType)
@@ -64,7 +68,7 @@ export function CompendiumDrawer({
     if (!files || files.length === 0) return
     setMirrorBusy(true)
     try {
-      await compendium.importMirrorLocalFiles(files)
+      await compendium.importMirrorLocalFiles(files, importCategories)
     } finally {
       setMirrorBusy(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -78,7 +82,7 @@ export function CompendiumDrawer({
     saveMirrorToken(mirrorToken.trim())
     setMirrorBusy(true)
     try {
-      await compendium.importMirrorUrl(mirrorUrl.trim(), mirrorToken.trim())
+      await compendium.importMirrorUrl(mirrorUrl.trim(), mirrorToken.trim(), importCategories)
     } finally {
       setMirrorBusy(false)
     }
@@ -89,7 +93,14 @@ export function CompendiumDrawer({
     saveMirrorToken(ghToken.trim())
     setMirrorBusy(true)
     try {
-      await compendium.importGithubRepo(ghOwner.trim(), ghRepo.trim(), ghBranch.trim() || 'main', ghPath.trim(), ghToken.trim())
+      await compendium.importGithubRepo(
+        ghOwner.trim(),
+        ghRepo.trim(),
+        ghBranch.trim() || 'main',
+        ghPath.trim(),
+        ghToken.trim(),
+        importCategories,
+      )
     } finally {
       setMirrorBusy(false)
     }
@@ -250,13 +261,40 @@ export function CompendiumDrawer({
             straight from your browser.
           </p>
 
+          <h4>What to bring in</h4>
+          <p className="compendium-drawer__hint">
+            Applies to all three import methods below — uncheck a category to skip it entirely, e.g. import just
+            monsters from a repo that also has spells and items.
+          </p>
+          <div className="compendium-drawer__categories">
+            <label>
+              <input type="checkbox" checked={includeSpells} onChange={(e) => setIncludeSpells(e.target.checked)} />
+              Spells
+            </label>
+            <label>
+              <input type="checkbox" checked={includeMonsters} onChange={(e) => setIncludeMonsters(e.target.checked)} />
+              Monsters
+            </label>
+            <label>
+              <input type="checkbox" checked={includeItems} onChange={(e) => setIncludeItems(e.target.checked)} />
+              Items
+            </label>
+          </div>
+
           <h4>Local files or folder</h4>
           <p className="compendium-drawer__hint">
             Pick individual 5etools-2014-src-shaped JSON files, or an entire folder — every recognized file inside
             (at any nesting depth) gets ingested, so folder layout doesn't matter.
           </p>
           <div className="compendium-drawer__mirror-files">
-            <input ref={fileInputRef} type="file" accept=".json" multiple onChange={(e) => void handleImportFiles(e.target.files)} disabled={mirrorBusy} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              multiple
+              onChange={(e) => void handleImportFiles(e.target.files)}
+              disabled={mirrorBusy || !(includeSpells || includeMonsters || includeItems)}
+            />
             <input
               ref={folderInputRef}
               type="file"
@@ -265,7 +303,7 @@ export function CompendiumDrawer({
               directory=""
               multiple
               onChange={(e) => void handleImportFiles(e.target.files)}
-              disabled={mirrorBusy}
+              disabled={mirrorBusy || !(includeSpells || includeMonsters || includeItems)}
             />
           </div>
 
@@ -286,7 +324,11 @@ export function CompendiumDrawer({
               onChange={(e) => setMirrorToken(e.target.value)}
               placeholder="Access token (only for a private repo)"
             />
-            <button type="button" onClick={() => void handleImportUrl()} disabled={mirrorBusy || !mirrorUrl.trim()}>
+            <button
+              type="button"
+              onClick={() => void handleImportUrl()}
+              disabled={mirrorBusy || !mirrorUrl.trim() || !(includeSpells || includeMonsters || includeItems)}
+            >
               {mirrorBusy ? 'Importing…' : 'Fetch'}
             </button>
           </div>
@@ -310,7 +352,9 @@ export function CompendiumDrawer({
             <button
               type="button"
               onClick={() => void handleImportGithubRepo()}
-              disabled={mirrorBusy || !ghOwner.trim() || !ghRepo.trim()}
+              disabled={
+                mirrorBusy || !ghOwner.trim() || !ghRepo.trim() || !(includeSpells || includeMonsters || includeItems)
+              }
             >
               {mirrorBusy ? 'Importing…' : 'Fetch'}
             </button>

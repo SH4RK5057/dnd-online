@@ -10,7 +10,7 @@ describe('sourceKeyFor', () => {
 
   it('keys a url source by its url', () => {
     const key = sourceKeyFor({ ...defaultContentSource(), mode: 'url', url: 'https://example.com/data' })
-    expect(key).toBe('url:https://example.com/data')
+    expect(key).toBe('url:https://example.com/data|smi')
   })
 
   it('keys a github source by owner/repo/branch/path', () => {
@@ -22,7 +22,7 @@ describe('sourceKeyFor', () => {
       branch: 'main',
       path: 'data',
     })
-    expect(key).toBe('github:me/my-data@main:data')
+    expect(key).toBe('github:me/my-data@main:data|smi')
   })
 
   it('produces different keys when any github field changes', () => {
@@ -30,6 +30,15 @@ describe('sourceKeyFor', () => {
     const key = sourceKeyFor(base)
     expect(sourceKeyFor({ ...base, branch: 'dev' })).not.toBe(key)
     expect(sourceKeyFor({ ...base, path: 'data' })).not.toBe(key)
+  })
+
+  it('produces different keys when the selected categories change', () => {
+    const base = { ...defaultContentSource(), mode: 'url' as const, url: 'https://x.test' }
+    const key = sourceKeyFor(base)
+    expect(sourceKeyFor({ ...base, includeSpells: false })).not.toBe(key)
+    expect(sourceKeyFor({ ...base, includeMonsters: false })).not.toBe(key)
+    expect(sourceKeyFor({ ...base, includeItems: false })).not.toBe(key)
+    expect(sourceKeyFor({ ...base, includeMonsters: false })).toBe('url:https://x.test|si')
   })
 })
 
@@ -64,5 +73,29 @@ describe('describeContentSource', () => {
     })
     expect(withoutPath).toContain('me/r@main')
     expect(withoutPath).not.toContain('/data')
+  })
+
+  it('lists which categories are included, or says so when none are', () => {
+    const allThree = describeContentSource({ ...defaultContentSource(), mode: 'url', url: 'https://x.test' })
+    expect(allThree).toContain('spells, monsters, items')
+
+    const onlyMonsters = describeContentSource({
+      ...defaultContentSource(),
+      mode: 'url',
+      url: 'https://x.test',
+      includeSpells: false,
+      includeItems: false,
+    })
+    expect(onlyMonsters).toContain('(monsters)')
+
+    const none = describeContentSource({
+      ...defaultContentSource(),
+      mode: 'url',
+      url: 'https://x.test',
+      includeSpells: false,
+      includeMonsters: false,
+      includeItems: false,
+    })
+    expect(none).toContain('nothing selected')
   })
 })
