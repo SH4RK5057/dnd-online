@@ -14,6 +14,7 @@ import { FogLightingPanel } from '../components/FogLightingPanel'
 import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
 import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
 import { AnnotationsPanel } from '../components/AnnotationsPanel'
+import { TokenUploadButton } from '../components/TokenUploadButton'
 import { DiceRollerPanel } from '../components/DiceRollerPanel'
 import { RollLog } from '../components/RollLog'
 import { InitiativeTracker } from '../components/InitiativeTracker'
@@ -34,27 +35,31 @@ import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { MapCanvas } from '../canvas/MapCanvas'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
+import { footprintCells, snapToSlot } from '../map/sizeCategory'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingPoiPlacement } from './pendingPoiPlacement'
+import type { PendingTokenPlacement } from './pendingTokenPlacement'
 
 export function SessionScreen() {
   const { session, sessionMeta, leaveSession } = useSession()
   const { status, peers, failure, retry } = useConnectionStatus(session)
   const { scenes, activeSceneId, activeScene, switchToScene } = useScenes(session?.doc ?? null)
   const { notification, dismiss: dismissNotification } = useEncounterNotifications(session?.doc ?? null, scenes)
-  const { tokens } = useTokens(session?.doc ?? null, activeSceneId)
+  const { tokens, createToken, setTokenArt } = useTokens(session?.doc ?? null, activeSceneId)
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
   const [showCharacterManager, setShowCharacterManager] = useState(false)
   const [showSceneBuilder, setShowSceneBuilder] = useState(false)
   const [isMapFullscreen, setIsMapFullscreen] = useState(false)
   const [showJoinCode, setShowJoinCode] = useState(true)
   const [pendingPoiPlacement, setPendingPoiPlacement] = useState<PendingPoiPlacement | null>(null)
+  const [pendingTokenPlacement, setPendingTokenPlacement] = useState<PendingTokenPlacement | null>(null)
   const [previewPlayerId, setPreviewPlayerId] = useState<string | null>(null)
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null)
   const [showCharacterSheet, setShowCharacterSheet] = useState(true)
   const [showDiceRoller, setShowDiceRoller] = useState(true)
   const [showInitiativeTracker, setShowInitiativeTracker] = useState(true)
   const [showCompendium, setShowCompendium] = useState(false)
+  const [showTokenPlacement, setShowTokenPlacement] = useState(false)
   const [showDmNotes, setShowDmNotes] = useState(false)
   const [showHandouts, setShowHandouts] = useState(false)
   const [showRandomGenerators, setShowRandomGenerators] = useState(false)
@@ -76,6 +81,15 @@ export function SessionScreen() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [pendingPoiPlacement])
+
+  useEffect(() => {
+    if (!pendingTokenPlacement) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingTokenPlacement(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [pendingTokenPlacement])
 
   useEffect(() => {
     if (!isMapFullscreen) return
@@ -105,7 +119,13 @@ export function SessionScreen() {
   const isUnpublishedForPlayer = session.role === 'player' && !!activeScene && activeScene.published === false
 
   const isPreviewingPlayer = session.role === 'dm' && previewPlayerId !== null
-  const effectiveToolMode: ToolMode = isPreviewingPlayer ? 'move' : pendingPoiPlacement ? 'place-pois' : 'move'
+  const effectiveToolMode: ToolMode = isPreviewingPlayer
+    ? 'move'
+    : pendingTokenPlacement
+      ? 'place-tokens'
+      : pendingPoiPlacement
+        ? 'place-pois'
+        : 'move'
 
   const handlePlacePoi = (x: number, y: number) => {
     if (!pendingPoiPlacement || !activeSceneId) return
@@ -115,6 +135,21 @@ export function SessionScreen() {
       createPoi(activeSceneId, name, x, y)
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not add that POI.')
+    }
+  }
+
+  const handlePlaceToken = (x: number, y: number) => {
+    if (!pendingTokenPlacement || !activeSceneId) return
+    const { name, sizeCategory, file } = pendingTokenPlacement
+    setPendingTokenPlacement(null)
+    try {
+      const footprint = footprintCells(sizeCategory)
+      const snappedX = snapToSlot(x, footprint)
+      const snappedY = snapToSlot(y, footprint)
+      const tokenId = createToken({ sceneId: activeSceneId, name, sizeCategory, x: snappedX, y: snappedY })
+      if (file) void setTokenArt(tokenId, file)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not add that token.')
     }
   }
 
@@ -171,6 +206,22 @@ export function SessionScreen() {
               {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
 
               <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />
+
+              {activeSceneId && (
+                <>
+                  <button type="button" onClick={() => setShowTokenPlacement((v) => !v)}>
+                    {showTokenPlacement ? 'Hide token placement' : 'Show token placement'}
+                  </button>
+                  {showTokenPlacement && (
+                    <TokenUploadButton
+                      sceneId={activeSceneId}
+                      pendingPlacement={pendingTokenPlacement}
+                      onRequestPlacement={setPendingTokenPlacement}
+                      onCancelPlacement={() => setPendingTokenPlacement(null)}
+                    />
+                  )}
+                </>
+              )}
 
               <button type="button" onClick={() => setShowDmNotes((v) => !v)}>
                 {showDmNotes ? 'Hide DM notes' : 'Show DM notes'}
@@ -276,6 +327,7 @@ export function SessionScreen() {
                 toolMode={effectiveToolMode}
                 snapWalls={false}
                 wallThickness={DEFAULT_WALL_THICKNESS_PX}
+                onPlaceToken={handlePlaceToken}
                 onPlacePoi={handlePlacePoi}
                 previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
                 selectedTokenId={selectedTokenId}
