@@ -75,14 +75,6 @@ export async function clearCachedMirrorContent(): Promise<void> {
   })
 }
 
-/** 5etools-2014-src has no single classes.json / class index — one file per
- * class, conventionally named class-<lowercase-name>.json. Used by
- * fetchMirrorFromUrl to probe for the core 12 SRD classes directly. */
-const CORE_CLASS_FILENAMES = [
-  'barbarian', 'bard', 'cleric', 'druid', 'fighter', 'monk',
-  'paladin', 'ranger', 'rogue', 'sorcerer', 'warlock', 'wizard',
-]
-
 let keyCounter = 0
 function nextKey(prefix: string): string {
   keyCounter += 1
@@ -207,17 +199,7 @@ export async function fetchMirrorFromUrl(
     else errors.push('data/races.json: not found or unreachable')
   }
 
-  if (categories.includeClasses) {
-    // 5etools-2014-src splits classes one-file-per-class rather than a
-    // single classes.json — there's no reliable index, so this tries the
-    // core 12 SRD class filenames directly and silently skips any that
-    // don't exist on this particular mirror (a mirror covering only a
-    // subset of classes is expected, not an error).
-    for (const className of CORE_CLASS_FILENAMES) {
-      const classJson = await tryFetchJson(`${base}/data/class/class-${className}.json`, token)
-      if (classJson) ingestFile(`class/class-${className}.json`, classJson, content, errors, categories)
-    }
-  }
+  if (categories.includeClasses) await fetchIndexedFamily(base, 'class', token, content, errors, categories, 'class-fighter.json')
 
   if (categories.includeItems) {
     // 5etools-2014-src splits items across two files: items.json (magic
@@ -231,8 +213,8 @@ export async function fetchMirrorFromUrl(
     if (itemsBaseJson) ingestFile('items-base.json', itemsBaseJson, content, errors, categories)
   }
 
-  if (categories.includeSpells) await fetchIndexedFamily(base, 'spells', token, content, errors, categories)
-  if (categories.includeMonsters) await fetchIndexedFamily(base, 'bestiary', token, content, errors, categories)
+  if (categories.includeSpells) await fetchIndexedFamily(base, 'spells', token, content, errors, categories, 'spells-phb.json')
+  if (categories.includeMonsters) await fetchIndexedFamily(base, 'bestiary', token, content, errors, categories, 'bestiary-mm.json')
 
   await putCachedMirrorContent(content)
   return { content, errors }
@@ -317,6 +299,7 @@ async function fetchIndexedFamily(
   content: MirrorContent,
   errors: string[],
   categories: ContentCategories,
+  fallbackFilename: string,
 ): Promise<void> {
   const index = await tryFetchJson(`${base}/data/${folder}/index.json`, token)
   const filenames: string[] = []
@@ -325,7 +308,7 @@ async function fetchIndexedFamily(
   }
   if (filenames.length === 0) {
     // No index — fall back to the most common single-source filename for this family.
-    filenames.push(folder === 'spells' ? 'spells-phb.json' : 'bestiary-mm.json')
+    filenames.push(fallbackFilename)
   }
   for (const filename of filenames) {
     const json = await tryFetchJson(`${base}/data/${folder}/${filename}`, token)
