@@ -39,6 +39,26 @@ describe('normalizeRace', () => {
     expect(normalizeRace({ size: 'M' }, 'k')).toBeNull()
     expect(normalizeRace(null, 'k')).toBeNull()
   })
+
+  it('preserves each trait\'s name when entries are real 5etools-shaped {name, entries} objects', () => {
+    const raw = {
+      name: 'Dwarf',
+      size: ['M'],
+      speed: 25,
+      ability: [{ con: 2 }],
+      entries: [
+        { name: 'Age', entries: ['Dwarves mature at the same rate as humans.'] },
+        { name: 'Darkvision', entries: ['You can see in dim light within 60 feet as if it were bright light.'] },
+        { name: 'Speed', type: 'entries', entries: ['Your speed is not reduced by wearing heavy armor.'] },
+      ],
+    }
+    const race = normalizeRace(raw, 'mirror:dwarf')
+    expect(race?.traits).toEqual([
+      'Age: Dwarves mature at the same rate as humans.',
+      'Darkvision: You can see in dim light within 60 feet as if it were bright light.',
+      'Speed: Your speed is not reduced by wearing heavy armor.',
+    ])
+  })
 })
 
 describe('normalizeClass', () => {

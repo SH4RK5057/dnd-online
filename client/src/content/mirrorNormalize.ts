@@ -249,6 +249,32 @@ function normalizeRaceSpeed(speed: unknown): number {
   return 30
 }
 
+/** Race trait entries are a flat array where each item is typically
+ * `{name: "Darkvision", entries: [...]}` — unlike flattenEntries (used for
+ * spell/monster description text, where nothing at this level carries its
+ * own name), this keeps the "Name: description" pairing instead of
+ * discarding the name and flattening straight to the prose. Plain strings
+ * pass through unchanged. */
+function flattenNamedTraits(entries: unknown): string[] {
+  if (!Array.isArray(entries)) return []
+  const out: string[] = []
+  for (const entry of entries) {
+    if (typeof entry === 'string') {
+      out.push(entry)
+    } else if (entry && typeof entry === 'object') {
+      const obj = entry as Record<string, unknown>
+      const body = Array.isArray(obj.entries)
+        ? flattenEntries(obj.entries).join(' ')
+        : Array.isArray(obj.items)
+          ? flattenEntries(obj.items).join(' ')
+          : ''
+      if (typeof obj.name === 'string') out.push(body ? `${obj.name}: ${body}` : obj.name)
+      else if (body) out.push(body)
+    }
+  }
+  return out
+}
+
 export function normalizeRace(raw: unknown, key: string): RaceData | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
@@ -261,7 +287,7 @@ export function normalizeRace(raw: unknown, key: string): RaceData | null {
     size: SIZE_CODES[sizeRaw] ?? sizeRaw ?? 'Medium',
     speed: normalizeRaceSpeed(r.speed),
     abilityBonuses: normalizeAbilityBonuses(r.ability),
-    traits: flattenEntries(r.entries).slice(0, 5),
+    traits: flattenNamedTraits(r.entries).slice(0, 10),
   }
 }
 
