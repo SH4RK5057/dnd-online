@@ -21,8 +21,15 @@ const ENDPOINT_MAGNET_RADIUS_PX = 22
 /** Below this on-screen movement between a chain segment's down and up, a
  * gesture counts as a stationary click (leaves the chain open for another
  * click) rather than a click-and-drag (commits the segment immediately and
- * ends the chain) — see handlePointerUp. */
-const DRAG_COMMIT_THRESHOLD_PX = 6
+ * ends the chain) — see handlePointerUp. This was originally 6px, which
+ * turned out to be far tighter than real mouse clicks actually are: ordinary
+ * hand tremor between mousedown and mouseup routinely exceeds 6px, which
+ * silently misread an intended "start a chain" click as a click-and-drag —
+ * committing a tiny, barely-visible micro-wall AND leaving no chain open, so
+ * the click that should have connected to it did nothing at all. 20px
+ * comfortably absorbs normal click jitter while still being much smaller
+ * than any deliberate drag-across-the-map gesture. */
+const DRAG_COMMIT_THRESHOLD_PX = 20
 const DRAG_WRITE_INTERVAL_MS = 75
 export const DEFAULT_WALL_THICKNESS_PX = 4
 
