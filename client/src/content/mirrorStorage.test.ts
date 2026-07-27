@@ -7,7 +7,7 @@ const MONSTER_FILE = { monster: [{ name: 'Test Monster', cr: '1' }] }
 const ITEM_FILE = { item: [{ name: 'Test Item' }] }
 
 function emptyContent(): MirrorContent {
-  return { spells: [], monsters: [], items: [], races: [], classes: [], importedAt: 0, sourceKey: '' }
+  return { spells: [], monsters: [], items: [], races: [], classes: [], subclasses: [], importedAt: 0, sourceKey: '' }
 }
 
 describe('ingestFile category filtering', () => {
@@ -52,7 +52,7 @@ describe('ingestFile category filtering', () => {
     const content = emptyContent()
     const errors: string[] = []
     ingestFile('junk.json', { notARecognizedKey: [] }, content, errors, defaultContentCategories())
-    expect(errors).toEqual(['junk.json: no recognized "spell"/"monster"/"item"/"race"/"class" array — expected 5etools-2014-src shape'])
+    expect(errors).toEqual(['junk.json: no recognized "spell"/"monster"/"item"/"race"/"class"/"subclass" array — expected 5etools-2014-src shape'])
   })
 
   it('reports non-object JSON as an error regardless of categories', () => {

@@ -1,4 +1,4 @@
-import type { ClassData, ItemData, MonsterData, RaceData, SpellData } from './types'
+import type { ClassData, ItemData, MonsterData, RaceData, SpellData, SubclassData } from './types'
 import type { SkillId } from '../character/types'
 
 /**
@@ -1182,17 +1182,315 @@ const ALL_SKILLS_FOR_BARD: SkillId[] = [
   'stealth', 'survival',
 ]
 
+/** Standard 5e Ability Score Improvement levels — Fighter and Rogue get
+ * extras beyond the common [4,8,12,16,19]. */
+const STANDARD_ASI_LEVELS = [4, 8, 12, 16, 19]
+
 export const SRD_CLASSES: ClassData[] = [
-  { key: 'srd:barbarian', source: 'srd', name: 'Barbarian', hitDie: 12, savingThrows: ['str', 'con'], skillChoiceCount: 2, skillChoices: ['animalHandling', 'athletics', 'intimidation', 'nature', 'perception', 'survival'] },
-  { key: 'srd:bard', source: 'srd', name: 'Bard', hitDie: 8, savingThrows: ['dex', 'cha'], skillChoiceCount: 3, skillChoices: ALL_SKILLS_FOR_BARD },
-  { key: 'srd:cleric', source: 'srd', name: 'Cleric', hitDie: 8, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['history', 'insight', 'medicine', 'persuasion', 'religion'] },
-  { key: 'srd:druid', source: 'srd', name: 'Druid', hitDie: 8, savingThrows: ['int', 'wis'], skillChoiceCount: 2, skillChoices: ['arcana', 'animalHandling', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'] },
-  { key: 'srd:fighter', source: 'srd', name: 'Fighter', hitDie: 10, savingThrows: ['str', 'con'], skillChoiceCount: 2, skillChoices: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'perception', 'survival'] },
-  { key: 'srd:monk', source: 'srd', name: 'Monk', hitDie: 8, savingThrows: ['str', 'dex'], skillChoiceCount: 2, skillChoices: ['acrobatics', 'athletics', 'history', 'insight', 'religion', 'stealth'] },
-  { key: 'srd:paladin', source: 'srd', name: 'Paladin', hitDie: 10, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['athletics', 'insight', 'intimidation', 'medicine', 'persuasion', 'religion'] },
-  { key: 'srd:ranger', source: 'srd', name: 'Ranger', hitDie: 10, savingThrows: ['str', 'dex'], skillChoiceCount: 3, skillChoices: ['animalHandling', 'athletics', 'insight', 'investigation', 'nature', 'perception', 'stealth', 'survival'] },
-  { key: 'srd:rogue', source: 'srd', name: 'Rogue', hitDie: 8, savingThrows: ['dex', 'int'], skillChoiceCount: 4, skillChoices: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'performance', 'persuasion', 'sleightOfHand', 'stealth'] },
-  { key: 'srd:sorcerer', source: 'srd', name: 'Sorcerer', hitDie: 6, savingThrows: ['con', 'cha'], skillChoiceCount: 2, skillChoices: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'] },
-  { key: 'srd:warlock', source: 'srd', name: 'Warlock', hitDie: 8, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['arcana', 'deception', 'history', 'intimidation', 'investigation', 'nature', 'religion'] },
-  { key: 'srd:wizard', source: 'srd', name: 'Wizard', hitDie: 6, savingThrows: ['int', 'wis'], skillChoiceCount: 2, skillChoices: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'] },
+  {
+    key: 'srd:barbarian', source: 'srd', name: 'Barbarian', hitDie: 12, savingThrows: ['str', 'con'], skillChoiceCount: 2,
+    skillChoices: ['animalHandling', 'athletics', 'intimidation', 'nature', 'perception', 'survival'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 3,
+    features: [
+      { level: 1, name: 'Rage', entries: ['Bonus melee damage and resistance to bludgeoning/piercing/slashing damage while raging; limited uses per long rest.'] },
+      { level: 1, name: 'Unarmored Defense', entries: ['AC = 10 + Dex mod + Con mod while not wearing armor.'] },
+      { level: 2, name: 'Reckless Attack', entries: ['Advantage on melee Strength attacks this turn, but attacks against you have advantage until your next turn.'] },
+      { level: 2, name: 'Danger Sense', entries: ['Advantage on Dex saves against effects you can see, like traps and spells.'] },
+      { level: 3, name: 'Primal Path', entries: ['Choose a subclass.'] },
+      { level: 5, name: 'Extra Attack', entries: ['Attack twice, instead of once, whenever you take the Attack action.'] },
+      { level: 5, name: 'Fast Movement', entries: ['+10 ft. speed while not wearing heavy armor.'] },
+      { level: 7, name: 'Feral Instinct', entries: ['Advantage on initiative; can act normally even if surprised, if you rage.'] },
+      { level: 9, name: 'Brutal Critical', entries: ['Roll one extra weapon damage die on a critical hit.'] },
+      { level: 11, name: 'Relentless Rage', entries: ['Chance to drop to 1 HP instead of 0 while raging.'] },
+      { level: 15, name: 'Persistent Rage', entries: ['Your rage only ends early if you fall unconscious or choose to end it.'] },
+      { level: 20, name: 'Primal Champion', entries: ['+4 Strength and Constitution, above the normal maximum.'] },
+    ],
+  },
+  {
+    key: 'srd:bard', source: 'srd', name: 'Bard', hitDie: 8, savingThrows: ['dex', 'cha'], skillChoiceCount: 3, skillChoices: ALL_SKILLS_FOR_BARD,
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 3,
+    features: [
+      { level: 1, name: 'Spellcasting', entries: ['Cast bard spells using Charisma.'] },
+      { level: 1, name: 'Bardic Inspiration (d6)', entries: ['Give an ally a bonus die to add to one ability check, attack roll, or saving throw.'] },
+      { level: 2, name: 'Jack of All Trades', entries: ['Add half your proficiency bonus to ability checks that don\'t already include it.'] },
+      { level: 2, name: 'Song of Rest', entries: ['Extra healing for allies during a short rest.'] },
+      { level: 3, name: 'Bard College', entries: ['Choose a subclass.'] },
+      { level: 3, name: 'Expertise', entries: ['Double proficiency bonus on two chosen skill proficiencies.'] },
+      { level: 5, name: 'Bardic Inspiration (d8)', entries: ['Bardic Inspiration die improves.'] },
+      { level: 5, name: 'Font of Inspiration', entries: ['Regain all Bardic Inspiration uses on a short or long rest.'] },
+      { level: 6, name: 'Countercharm', entries: ['Grant allies advantage on saves against being frightened or charmed.'] },
+      { level: 10, name: 'Bardic Inspiration (d10)', entries: ['Bardic Inspiration die improves further.'] },
+      { level: 10, name: 'Magical Secrets', entries: ['Learn spells from any class\'s spell list.'] },
+      { level: 18, name: 'Bardic Inspiration (d12)', entries: ['Bardic Inspiration die improves further.'] },
+      { level: 20, name: 'Superior Inspiration', entries: ['Regain one use of Bardic Inspiration when you roll initiative with none left.'] },
+    ],
+  },
+  {
+    key: 'srd:cleric', source: 'srd', name: 'Cleric', hitDie: 8, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['history', 'insight', 'medicine', 'persuasion', 'religion'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 1,
+    features: [
+      { level: 1, name: 'Spellcasting', entries: ['Cast cleric spells using Wisdom.'] },
+      { level: 1, name: 'Divine Domain', entries: ['Choose a subclass.'] },
+      { level: 2, name: 'Channel Divinity', entries: ['Use a divine effect once per rest, refreshing on a short or long rest.'] },
+      { level: 5, name: 'Destroy Undead', entries: ['Turned undead of low CR are destroyed instead of just fleeing.'] },
+      { level: 6, name: 'Channel Divinity (2/rest)', entries: ['A second use of Channel Divinity between rests.'] },
+      { level: 10, name: 'Divine Intervention', entries: ['Call on your deity for a powerful effect, chance-based.'] },
+      { level: 18, name: 'Channel Divinity (3/rest)', entries: ['A third use of Channel Divinity between rests.'] },
+      { level: 20, name: 'Divine Intervention Improvement', entries: ['Divine Intervention no longer requires a roll to succeed.'] },
+    ],
+  },
+  {
+    key: 'srd:druid', source: 'srd', name: 'Druid', hitDie: 8, savingThrows: ['int', 'wis'], skillChoiceCount: 2, skillChoices: ['arcana', 'animalHandling', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 2,
+    features: [
+      { level: 1, name: 'Druidic', entries: ['Know the secret language of druids.'] },
+      { level: 1, name: 'Spellcasting', entries: ['Cast druid spells using Wisdom.'] },
+      { level: 2, name: 'Wild Shape', entries: ['Transform into a beast you\'ve seen, twice per short/long rest.'] },
+      { level: 2, name: 'Druid Circle', entries: ['Choose a subclass.'] },
+      { level: 18, name: 'Timeless Body', entries: ['Age much more slowly.'] },
+      { level: 18, name: 'Beast Spells', entries: ['Cast spells while in Wild Shape form.'] },
+      { level: 20, name: 'Archdruid', entries: ['Unlimited Wild Shape uses.'] },
+    ],
+  },
+  {
+    key: 'srd:fighter', source: 'srd', name: 'Fighter', hitDie: 10, savingThrows: ['str', 'con'], skillChoiceCount: 2, skillChoices: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'perception', 'survival'],
+    asiLevels: [4, 6, 8, 12, 14, 16, 19], subclassLevel: 3,
+    features: [
+      { level: 1, name: 'Fighting Style', entries: ['Choose a combat specialization (e.g. Archery, Defense, Dueling, Great Weapon Fighting).'] },
+      { level: 1, name: 'Second Wind', entries: ['Bonus action to regain 1d10 + fighter level HP, once per short/long rest.'] },
+      { level: 2, name: 'Action Surge', entries: ['Take one additional action on your turn, once per short/long rest.'] },
+      { level: 3, name: 'Martial Archetype', entries: ['Choose a subclass.'] },
+      { level: 5, name: 'Extra Attack', entries: ['Attack twice, instead of once, whenever you take the Attack action.'] },
+      { level: 9, name: 'Indomitable', entries: ['Reroll a failed saving throw, once per long rest.'] },
+      { level: 11, name: 'Extra Attack (2)', entries: ['Attack three times, instead of once, whenever you take the Attack action.'] },
+      { level: 17, name: 'Action Surge (2 uses)', entries: ['A second use of Action Surge between rests.'] },
+      { level: 20, name: 'Extra Attack (3)', entries: ['Attack four times, instead of once, whenever you take the Attack action.'] },
+    ],
+  },
+  {
+    key: 'srd:monk', source: 'srd', name: 'Monk', hitDie: 8, savingThrows: ['str', 'dex'], skillChoiceCount: 2, skillChoices: ['acrobatics', 'athletics', 'history', 'insight', 'religion', 'stealth'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 3,
+    features: [
+      { level: 1, name: 'Unarmored Defense', entries: ['AC = 10 + Dex mod + Wis mod while not wearing armor or a shield.'] },
+      { level: 1, name: 'Martial Arts', entries: ['Use Dex for unarmed strikes/monk weapons; bonus-action unarmed strike; scaling martial arts die.'] },
+      { level: 2, name: 'Ki', entries: ['A pool of Ki points (equal to monk level) fuels Flurry of Blows, Patient Defense, and Step of the Wind.'] },
+      { level: 2, name: 'Unarmored Movement', entries: ['Speed increases while not wearing armor or a shield.'] },
+      { level: 3, name: 'Monastic Tradition', entries: ['Choose a subclass.'] },
+      { level: 3, name: 'Deflect Missiles', entries: ['Reduce ranged weapon damage, and can catch and throw it back.'] },
+      { level: 4, name: 'Slow Fall', entries: ['Reduce fall damage using a reaction.'] },
+      { level: 5, name: 'Extra Attack', entries: ['Attack twice, instead of once, whenever you take the Attack action.'] },
+      { level: 5, name: 'Stunning Strike', entries: ['Spend a Ki point to attempt to stun a creature you hit.'] },
+      { level: 6, name: 'Ki-Empowered Strikes', entries: ['Unarmed strikes count as magical for overcoming resistance/immunity.'] },
+      { level: 7, name: 'Evasion', entries: ['Take no damage on a successful Dex save against an area effect, half on a failure.'] },
+      { level: 7, name: 'Stillness of Mind', entries: ['End one effect causing you to be charmed or frightened, as an action.'] },
+      { level: 10, name: 'Purity of Body', entries: ['Immune to disease and poison.'] },
+      { level: 14, name: 'Diamond Soul', entries: ['Proficiency in all saving throws; spend a Ki point to reroll a failed save.'] },
+      { level: 18, name: 'Empty Body', entries: ['Become invisible for a Ki cost; or spend Ki to astral project.'] },
+      { level: 20, name: 'Perfect Self', entries: ['Regain 4 Ki points automatically if you roll initiative with none left.'] },
+    ],
+  },
+  {
+    key: 'srd:paladin', source: 'srd', name: 'Paladin', hitDie: 10, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['athletics', 'insight', 'intimidation', 'medicine', 'persuasion', 'religion'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 3,
+    features: [
+      { level: 1, name: 'Divine Sense', entries: ['Detect celestials, fiends, and undead nearby, limited uses per long rest.'] },
+      { level: 1, name: 'Lay on Hands', entries: ['A pool of HP (5 x paladin level) usable to heal, refreshing on a long rest.'] },
+      { level: 2, name: 'Fighting Style', entries: ['Choose a combat specialization.'] },
+      { level: 2, name: 'Spellcasting', entries: ['Cast paladin spells using Charisma.'] },
+      { level: 2, name: 'Divine Smite', entries: ['Expend a spell slot on a melee hit for extra radiant damage.'] },
+      { level: 3, name: 'Divine Health', entries: ['Immune to disease.'] },
+      { level: 3, name: 'Sacred Oath', entries: ['Choose a subclass.'] },
+      { level: 5, name: 'Extra Attack', entries: ['Attack twice, instead of once, whenever you take the Attack action.'] },
+      { level: 6, name: 'Aura of Protection', entries: ['You and nearby allies add your Charisma modifier to saving throws.'] },
+      { level: 10, name: 'Aura of Courage', entries: ['You and nearby allies can\'t be frightened while you are conscious.'] },
+      { level: 14, name: 'Cleansing Touch', entries: ['End one spell affecting you or a willing creature you touch.'] },
+    ],
+  },
+  {
+    key: 'srd:ranger', source: 'srd', name: 'Ranger', hitDie: 10, savingThrows: ['str', 'dex'], skillChoiceCount: 3, skillChoices: ['animalHandling', 'athletics', 'insight', 'investigation', 'nature', 'perception', 'stealth', 'survival'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 3,
+    features: [
+      { level: 1, name: 'Favored Enemy', entries: ['Bonuses tracking/recalling info about a chosen creature type.'] },
+      { level: 1, name: 'Natural Explorer', entries: ['Bonuses to travel and exploration within a chosen favored terrain.'] },
+      { level: 2, name: 'Fighting Style', entries: ['Choose a combat specialization.'] },
+      { level: 2, name: 'Spellcasting', entries: ['Cast ranger spells using Wisdom.'] },
+      { level: 3, name: 'Ranger Archetype', entries: ['Choose a subclass.'] },
+      { level: 3, name: 'Primeval Awareness', entries: ['Expend a spell slot to sense certain creature types nearby.'] },
+      { level: 5, name: 'Extra Attack', entries: ['Attack twice, instead of once, whenever you take the Attack action.'] },
+      { level: 8, name: "Land's Stride", entries: ['Move through nonmagical difficult terrain at no cost.'] },
+      { level: 10, name: 'Hide in Plain Sight', entries: ['Camouflage yourself for a large bonus to Stealth while stationary.'] },
+      { level: 14, name: 'Vanish', entries: ['Hide as a bonus action; can\'t be tracked by nonmagical means.'] },
+      { level: 18, name: 'Feral Senses', entries: ['Fight invisible creatures without disadvantage.'] },
+      { level: 20, name: 'Foe Slayer', entries: ['Add your Wisdom modifier to an attack or damage roll against your favored enemy.'] },
+    ],
+  },
+  {
+    key: 'srd:rogue', source: 'srd', name: 'Rogue', hitDie: 8, savingThrows: ['dex', 'int'], skillChoiceCount: 4, skillChoices: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'performance', 'persuasion', 'sleightOfHand', 'stealth'],
+    asiLevels: [4, 8, 10, 12, 16, 19], subclassLevel: 3,
+    features: [
+      { level: 1, name: 'Expertise', entries: ['Double proficiency bonus on two chosen skill (or thieves\' tools) proficiencies.'] },
+      { level: 1, name: 'Sneak Attack', entries: ['Extra damage once per turn when you have advantage or an ally is adjacent to the target; dice scale with level.'] },
+      { level: 1, name: "Thieves' Cant", entries: ['A secret rogue mode of communication.'] },
+      { level: 2, name: 'Cunning Action', entries: ['Bonus action to Dash, Disengage, or Hide.'] },
+      { level: 3, name: 'Roguish Archetype', entries: ['Choose a subclass.'] },
+      { level: 5, name: 'Uncanny Dodge', entries: ['Halve damage from one attack you can see hitting you, as a reaction.'] },
+      { level: 7, name: 'Evasion', entries: ['Take no damage on a successful Dex save against an area effect, half on a failure.'] },
+      { level: 11, name: 'Reliable Talent', entries: ['Treat any ability check roll of 9 or lower as a 10, for proficient skills.'] },
+      { level: 14, name: 'Blindsense', entries: ['Sense hidden or invisible creatures within 10 ft.'] },
+      { level: 15, name: 'Slippery Mind', entries: ['Proficiency in Wisdom saving throws.'] },
+      { level: 18, name: 'Elusive', entries: ['No attack roll has advantage against you while you aren\'t incapacitated.'] },
+      { level: 20, name: 'Stroke of Luck', entries: ['Turn a missed attack into a hit, or a failed ability check into a 20.'] },
+    ],
+  },
+  {
+    key: 'srd:sorcerer', source: 'srd', name: 'Sorcerer', hitDie: 6, savingThrows: ['con', 'cha'], skillChoiceCount: 2, skillChoices: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 1,
+    features: [
+      { level: 1, name: 'Spellcasting', entries: ['Cast sorcerer spells using Charisma.'] },
+      { level: 1, name: 'Sorcerous Origin', entries: ['Choose a subclass.'] },
+      { level: 2, name: 'Font of Magic', entries: ['A pool of Sorcery Points (equal to sorcerer level) usable to create spell slots or fuel Metamagic.'] },
+      { level: 3, name: 'Metamagic', entries: ['Choose two ways to alter your spells using Sorcery Points (e.g. Quickened, Twinned).'] },
+      { level: 20, name: 'Sorcerous Restoration', entries: ['Regain 4 Sorcery Points on a short rest.'] },
+    ],
+  },
+  {
+    key: 'srd:warlock', source: 'srd', name: 'Warlock', hitDie: 8, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['arcana', 'deception', 'history', 'intimidation', 'investigation', 'nature', 'religion'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 1,
+    features: [
+      { level: 1, name: 'Otherworldly Patron', entries: ['Choose a subclass.'] },
+      { level: 1, name: 'Pact Magic', entries: ['Cast warlock spells using Charisma, from a small number of slots that recharge on a short rest.'] },
+      { level: 2, name: 'Eldritch Invocations', entries: ['Learn magical abilities that customize your warlock powers.'] },
+      { level: 3, name: 'Pact Boon', entries: ['Choose a Pact Boon (Blade, Chain, or Tome).'] },
+      { level: 11, name: 'Mystic Arcanum (6th level)', entries: ['Learn one 6th-level spell, castable once per long rest without a slot.'] },
+      { level: 20, name: 'Eldritch Master', entries: ['Beg your patron to regain all Pact Magic slots, once per long rest.'] },
+    ],
+  },
+  {
+    key: 'srd:wizard', source: 'srd', name: 'Wizard', hitDie: 6, savingThrows: ['int', 'wis'], skillChoiceCount: 2, skillChoices: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'],
+    asiLevels: STANDARD_ASI_LEVELS, subclassLevel: 2,
+    features: [
+      { level: 1, name: 'Spellcasting', entries: ['Cast wizard spells using Intelligence, prepared daily from your spellbook.'] },
+      { level: 1, name: 'Arcane Recovery', entries: ['Recover some expended spell slots on a short rest, once per day.'] },
+      { level: 2, name: 'Arcane Tradition', entries: ['Choose a subclass.'] },
+      { level: 18, name: 'Spell Mastery', entries: ['Cast a chosen 1st- and 2nd-level spell at will without expending a slot.'] },
+      { level: 20, name: 'Signature Spells', entries: ['Cast two chosen 3rd-level spells once each per short rest without expending a slot.'] },
+    ],
+  },
+]
+
+/** The SRD 5.1's one subclass per core class — same hand-authored,
+ * mechanics-fact style as SRD_CLASSES/SRD_RACES above; a DM's imported
+ * mirror is the path to the rest (see character-creation scope notes). */
+export const SRD_SUBCLASSES: SubclassData[] = [
+  {
+    key: 'srd:barbarian-berserker', source: 'srd', name: 'Path of the Berserker', className: 'Barbarian',
+    features: [
+      { level: 3, name: 'Frenzy', entries: ['Make a bonus-action melee attack each turn you rage, at the cost of exhaustion once the rage ends.'] },
+      { level: 6, name: 'Mindless Rage', entries: ['Can\'t be charmed or frightened while raging.'] },
+      { level: 10, name: 'Intimidating Presence', entries: ['Frighten a creature as an action.'] },
+      { level: 14, name: 'Retaliation', entries: ['Make a melee attack as a reaction against a creature that just damaged you.'] },
+    ],
+  },
+  {
+    key: 'srd:bard-lore', source: 'srd', name: 'College of Lore', className: 'Bard',
+    features: [
+      { level: 3, name: 'Bonus Proficiencies', entries: ['Proficiency in three additional skills.'] },
+      { level: 3, name: 'Cutting Words', entries: ['Use Bardic Inspiration to subtract from an enemy\'s roll.'] },
+      { level: 6, name: 'Additional Magical Secrets', entries: ['Learn two extra spells from any class\'s spell list.'] },
+      { level: 14, name: 'Peerless Skill', entries: ['Add Bardic Inspiration to your own ability checks.'] },
+    ],
+  },
+  {
+    key: 'srd:cleric-life', source: 'srd', name: 'Life Domain', className: 'Cleric',
+    features: [
+      { level: 1, name: 'Bonus Proficiency & Disciple of Life', entries: ['Heavy armor proficiency; your healing spells restore extra hit points.'] },
+      { level: 2, name: 'Channel Divinity: Preserve Life', entries: ['Restore a pool of hit points among nearby creatures.'] },
+      { level: 6, name: 'Blessed Healer', entries: ['You also regain hit points when you heal others.'] },
+      { level: 8, name: 'Divine Strike', entries: ['Extra radiant damage once per turn on a weapon hit.'] },
+      { level: 17, name: 'Supreme Healing', entries: ['Healing spells restore the maximum possible amount instead of rolling.'] },
+    ],
+  },
+  {
+    key: 'srd:druid-land', source: 'srd', name: 'Circle of the Land', className: 'Druid',
+    features: [
+      { level: 2, name: 'Bonus Cantrip & Natural Recovery', entries: ['Learn an extra druid cantrip; recover some spell slots on a short rest.'] },
+      { level: 3, name: 'Circle Spells', entries: ['Always-prepared bonus spells tied to your chosen land.'] },
+      { level: 6, name: "Land's Stride", entries: ['Move through nonmagical difficult terrain at no cost.'] },
+      { level: 10, name: "Nature's Ward", entries: ['Immune to poison and disease; can\'t be frightened by elementals or fey.'] },
+      { level: 14, name: "Nature's Sanctuary", entries: ['Beasts and plants must save or be unable to attack you.'] },
+    ],
+  },
+  {
+    key: 'srd:fighter-champion', source: 'srd', name: 'Champion', className: 'Fighter',
+    features: [
+      { level: 3, name: 'Improved Critical', entries: ['Weapon attacks score a critical hit on a roll of 19 or 20.'] },
+      { level: 7, name: 'Remarkable Athlete', entries: ['Add half proficiency bonus to Strength/Dexterity/Constitution checks that don\'t already use it.'] },
+      { level: 10, name: 'Additional Fighting Style', entries: ['Learn a second Fighting Style.'] },
+      { level: 15, name: 'Superior Critical', entries: ['Critical hit range expands to 18-20.'] },
+      { level: 18, name: 'Survivor', entries: ['Regain hit points each turn if badly hurt.'] },
+    ],
+  },
+  {
+    key: 'srd:monk-open-hand', source: 'srd', name: 'Way of the Open Hand', className: 'Monk',
+    features: [
+      { level: 3, name: 'Open Hand Technique', entries: ['A hit from Flurry of Blows can knock prone, push, or prevent reactions.'] },
+      { level: 6, name: 'Wholeness of Body', entries: ['Heal yourself using Ki, once per long rest.'] },
+      { level: 11, name: 'Tranquility', entries: ['Effectively under a sanctuary spell between long rests.'] },
+      { level: 17, name: 'Quivering Palm', entries: ['Set up lethal vibrations in a creature that can be triggered later.'] },
+    ],
+  },
+  {
+    key: 'srd:paladin-devotion', source: 'srd', name: 'Oath of Devotion', className: 'Paladin',
+    features: [
+      { level: 3, name: 'Channel Divinity: Sacred Weapon / Turn the Unholy', entries: ['Make your weapon magical and glowing, or turn fiends/undead.'] },
+      { level: 7, name: 'Aura of Devotion', entries: ['You and nearby allies can\'t be charmed.'] },
+      { level: 15, name: 'Purity of Spirit', entries: ['Effectively under a protection from evil and good spell at all times.'] },
+      { level: 20, name: 'Holy Nimbus', entries: ['Emanate sunlight that damages fiends/undead and grants advantage vs. their spells.'] },
+    ],
+  },
+  {
+    key: 'srd:ranger-hunter', source: 'srd', name: 'Hunter', className: 'Ranger',
+    features: [
+      { level: 3, name: "Hunter's Prey", entries: ['Choose a combat option like Colossus Slayer or Horde Breaker.'] },
+      { level: 7, name: 'Defensive Tactics', entries: ['Choose a defensive option like Escape the Horde or Multiattack Defense.'] },
+      { level: 11, name: 'Multiattack', entries: ['Choose Volley or Whirlwind Attack to hit multiple nearby targets.'] },
+      { level: 15, name: "Superior Hunter's Defense", entries: ['Choose a reaction option like Evasion or Stand Against the Tide.'] },
+    ],
+  },
+  {
+    key: 'srd:rogue-thief', source: 'srd', name: 'Thief', className: 'Rogue',
+    features: [
+      { level: 3, name: 'Fast Hands & Second-Story Work', entries: ['Cunning Action can also be used for object interaction/tools; better climbing and jumping.'] },
+      { level: 9, name: 'Supreme Sneak', entries: ['Advantage on Stealth checks if you move at half speed.'] },
+      { level: 13, name: 'Use Magic Device', entries: ['Ignore class/race/level requirements on using magic items.'] },
+      { level: 17, name: "Thief's Reflexes", entries: ['Take two turns during the first round of combat.'] },
+    ],
+  },
+  {
+    key: 'srd:sorcerer-draconic', source: 'srd', name: 'Draconic Bloodline', className: 'Sorcerer',
+    features: [
+      { level: 1, name: 'Dragon Ancestor & Draconic Resilience', entries: ['Choose a dragon type; extra hit points and a natural armor bonus.'] },
+      { level: 6, name: 'Elemental Affinity', entries: ['Add Charisma modifier to damage of spells matching your dragon type.'] },
+      { level: 14, name: 'Dragon Wings', entries: ['Sprout wings and gain a flying speed.'] },
+      { level: 18, name: 'Draconic Presence', entries: ['Awe or frighten creatures with your draconic presence.'] },
+    ],
+  },
+  {
+    key: 'srd:warlock-fiend', source: 'srd', name: 'The Fiend', className: 'Warlock',
+    features: [
+      { level: 1, name: "Dark One's Blessing", entries: ['Regain temporary hit points when you reduce a hostile creature to 0 HP.'] },
+      { level: 6, name: "Dark One's Own Luck", entries: ['Add a bonus to one ability check or saving throw, once per rest.'] },
+      { level: 10, name: 'Fiendish Resilience', entries: ['Choose a damage type to resist, changeable after a rest.'] },
+      { level: 14, name: 'Hurl Through Hell', entries: ['Banish a creature you hit to another plane briefly, dealing psychic damage.'] },
+    ],
+  },
+  {
+    key: 'srd:wizard-evocation', source: 'srd', name: 'School of Evocation', className: 'Wizard',
+    features: [
+      { level: 2, name: 'Evocation Savant & Sculpt Spells', entries: ['Halved gold/time to copy evocation spells; protect allies from your own area spells.'] },
+      { level: 6, name: 'Potent Cantrip', entries: ['Creatures that save against your cantrips still take half damage.'] },
+      { level: 10, name: 'Empowered Evocation', entries: ['Add Intelligence modifier to one damage roll of an evocation spell.'] },
+      { level: 14, name: 'Overchannel', entries: ['Deal maximum damage with a spell, at the cost of taking damage yourself on repeat use.'] },
+    ],
+  },
 ]

@@ -2,27 +2,34 @@ import { useState } from 'react'
 import type { AbilityKey, AbilityScores, CharacterRecord, SkillId, SkillProficiency } from '../character/types'
 import { ABILITY_LABELS, SKILL_LABELS } from '../character/types'
 import {
+  applyAbilityScoreImprovement,
   applyRacialBonus,
+  computeClassResourceGrants,
   computeInitiativeBonus,
   computeMaxHp,
   computeModifier,
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
+  isValidAbilityScoreImprovement,
   isValidPointBuy,
   isValidStandardArray,
+  mergeClassResourceGrants,
   parseHitDiceCount,
   pointBuyCost,
   POINT_BUY_BUDGET,
   SKILL_ABILITY_MAP,
   STANDARD_ARRAY,
+  xpToLevel,
 } from '../character/rules'
 import type { RollCategory } from '../dice/conditions'
 import type { UseInventoryActionsResult } from '../character/useInventoryActions'
-import type { ClassData, RaceData } from '../content/types'
+import type { ClassData, RaceData, SubclassData } from '../content/types'
 import { CharacterInventory } from './CharacterInventory'
 import { CharacterSpells } from './CharacterSpells'
 import { InventoryHistoryList } from './InventoryHistoryPanel'
+
+const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 
 const ABILITY_KEYS: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha']
 const SKILL_IDS = Object.keys(SKILL_ABILITY_MAP) as SkillId[]
@@ -51,6 +58,7 @@ export function CharacterSheet({
   otherCharacters,
   races,
   classes,
+  subclasses,
 }: {
   character: CharacterRecord
   /** isDm || isOwner — gates every edit control. */
@@ -71,6 +79,7 @@ export function CharacterSheet({
    * choice cap, computed max HP). */
   races: RaceData[]
   classes: ClassData[]
+  subclasses: SubclassData[]
 }) {
   const [tab, setTab] = useState<Tab>('stats')
   const blueprintEditable = canEdit && !character.locked
@@ -81,11 +90,89 @@ export function CharacterSheet({
 
   const selectedRace = races.find((r) => r.name === character.race) ?? null
   const selectedClass = classes.find((c) => c.name === character.className) ?? null
+  const selectedSubclass = subclasses.find((s) => s.name === character.subclassName && s.className === character.className) ?? null
   const allowedSkillIds = selectedClass ? new Set(selectedClass.skillChoices) : null
   const restrictSkillsToClass = blueprintEditable && !!selectedClass
   const proficientSkillCount = SKILL_IDS.filter(
     (id) => allowedSkillIds?.has(id) && character.skillProficiencies[id],
   ).length
+  const availableSubclasses = selectedClass ? subclasses.filter((s) => s.className === selectedClass.name) : []
+  const needsSubclassChoice = !!selectedClass && character.level >= selectedClass.subclassLevel && !character.subclassName
+
+  // Level-up wizard: a guided, rule-following mutation of level/abilities/HP/
+  // resources/subclass, gated by `canEdit` rather than `blueprintEditable` —
+  // unlike the free-text blueprint inputs above (locked once bound to a
+  // campaign to prevent silent drift), progressing through XP thresholds
+  // during play is exactly the kind of change a "locked" character should
+  // still be able to do.
+  const eligibleLevel = xpToLevel(character.xp)
+  const canLevelUp = canEdit && character.level < 20 && eligibleLevel > character.level
+  const nextLevel = character.level + 1
+  const [levelUpOpen, setLevelUpOpen] = useState(false)
+  const [hpMethod, setHpMethod] = useState<'roll' | 'average'>('average')
+  const [rolledHp, setRolledHp] = useState<number | null>(null)
+  const [asiChoice, setAsiChoice] = useState<'asi' | 'feat'>('asi')
+  const [asiChanges, setAsiChanges] = useState<Partial<Record<AbilityKey, number>>>({})
+  const [featName, setFeatName] = useState('')
+  const [levelUpSubclass, setLevelUpSubclass] = useState('')
+  const needsAsiThisLevelUp = !!selectedClass?.asiLevels.includes(nextLevel) && !character.resolvedAsiLevels.includes(nextLevel)
+  const needsSubclassThisLevelUp = !!selectedClass && nextLevel >= selectedClass.subclassLevel && !character.subclassName
+  const asiValid = asiChoice === 'asi' ? isValidAbilityScoreImprovement(asiChanges) : featName.trim().length > 0
+  const canConfirmLevelUp = (!needsAsiThisLevelUp || asiValid) && (!needsSubclassThisLevelUp || levelUpSubclass !== '')
+
+  function openLevelUp() {
+    setLevelUpOpen(true)
+    setHpMethod('average')
+    setRolledHp(null)
+    setAsiChoice('asi')
+    setAsiChanges({})
+    setFeatName('')
+    setLevelUpSubclass('')
+  }
+
+  function handleConfirmLevelUp() {
+    let nextBaseAbilities = character.baseAbilities
+    let nextFeats = character.feats
+    let nextResolvedAsi = character.resolvedAsiLevels
+    if (needsAsiThisLevelUp) {
+      if (asiChoice === 'asi') {
+        nextBaseAbilities = applyAbilityScoreImprovement(character.baseAbilities, asiChanges)
+      } else {
+        nextFeats = [...character.feats, { id: crypto.randomUUID(), name: featName.trim(), notes: '' }]
+      }
+      nextResolvedAsi = [...character.resolvedAsiLevels, nextLevel]
+    }
+    const nextAbilities = applyRacialBonus(nextBaseAbilities, selectedRace?.abilityBonuses ?? {})
+    const patch: Partial<CharacterRecord> = {
+      level: nextLevel,
+      baseAbilities: nextBaseAbilities,
+      abilities: nextAbilities,
+      resolvedAsiLevels: nextResolvedAsi,
+      feats: nextFeats,
+    }
+    if (needsSubclassThisLevelUp && levelUpSubclass) patch.subclassName = levelUpSubclass
+    if (selectedClass) {
+      const average = Math.floor(selectedClass.hitDie / 2) + 1
+      const conMod = computeModifier(nextAbilities.con)
+      const hpGain = (hpMethod === 'roll' ? (rolledHp ?? average) : average) + conMod
+      patch.hitDice = `${nextLevel}d${selectedClass.hitDie}`
+      patch.hp = { ...character.hp, max: character.hp.max + hpGain, current: character.hp.current + hpGain }
+      patch.resources = mergeClassResourceGrants(character.resources, computeClassResourceGrants(character.className, nextLevel, nextAbilities))
+    }
+    onUpdate(patch)
+    setLevelUpOpen(false)
+  }
+
+  function handleAsiPointChange(key: AbilityKey, delta: number) {
+    const current = asiChanges[key] ?? 0
+    const next = current + delta
+    const nextChanges = { ...asiChanges }
+    if (next <= 0) delete nextChanges[key]
+    else nextChanges[key] = next
+    setAsiChanges(nextChanges)
+  }
+
+  const asiPointsSpent = Object.values(asiChanges).reduce((sum, v) => sum + (v ?? 0), 0)
 
   /** Recomputes `hp.max` (and clamps `hp.current` down if it now exceeds the
    * new max) from the currently-selected class's hit die — shared by every
@@ -137,7 +224,7 @@ export function CharacterSheet({
   function handleClassChange(name: string) {
     const cls = classes.find((c) => c.name === name) ?? null
     if (!cls) {
-      onUpdate({ className: name })
+      onUpdate({ className: name, subclassName: '' })
       return
     }
     const saveProficiencies = ABILITY_KEYS.reduce(
@@ -153,6 +240,9 @@ export function CharacterSheet({
     ) as Partial<Record<SkillId, SkillProficiency>>
     onUpdate({
       className: name,
+      // A subclass belongs to a specific class — switching classes always
+      // clears whatever subclass was chosen for the old one.
+      subclassName: '',
       saveProficiencies,
       skillProficiencies,
       hitDice: `${character.level}d${cls.hitDie}`,
@@ -223,16 +313,32 @@ export function CharacterSheet({
                 ))}
               </select>
             </label>
+            {selectedClass && character.level >= selectedClass.subclassLevel && (
+              <label>
+                Subclass
+                <select
+                  value={character.subclassName}
+                  disabled={!blueprintEditable}
+                  onChange={(e) => onUpdate({ subclassName: e.target.value })}
+                >
+                  <option value="">Select a subclass…</option>
+                  {availableSubclasses.map((s) => (
+                    <option key={s.key} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label>
               Level
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={character.level}
-                disabled={!blueprintEditable}
-                onChange={(e) => handleLevelChange(Number(e.target.value))}
-              />
+              <select value={character.level} disabled={!blueprintEditable} onChange={(e) => handleLevelChange(Number(e.target.value))}>
+                {LEVELS.map((lvl) => (
+                  <option key={lvl} value={lvl}>
+                    {lvl}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Background
@@ -251,8 +357,184 @@ export function CharacterSheet({
               />
             </label>
           </div>
+          {needsSubclassChoice && (
+            <p className="character-sheet__hint">A subclass must be chosen at level {selectedClass!.subclassLevel}.</p>
+          )}
 
           <p className="character-sheet__hint">Proficiency bonus: {fmtMod(profBonus)}</p>
+
+          {(selectedRace || selectedClass) && (
+            <>
+              <h3>Features & traits</h3>
+              {selectedRace && selectedRace.traits.length > 0 && (
+                <div className="character-sheet__features-group">
+                  <strong>{selectedRace.name}</strong>
+                  <ul className="character-sheet__row-list">
+                    {selectedRace.traits.map((trait, i) => (
+                      <li key={i}>{trait}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {selectedClass && (
+                <div className="character-sheet__features-group">
+                  <strong>{selectedClass.name}</strong>
+                  <ul className="character-sheet__row-list">
+                    {selectedClass.features
+                      .filter((f) => f.level <= character.level)
+                      .map((f) => (
+                        <li key={`${f.level}-${f.name}`}>
+                          <strong>
+                            Lvl {f.level} — {f.name}:
+                          </strong>{' '}
+                          {f.entries.join(' ')}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+              {selectedSubclass && (
+                <div className="character-sheet__features-group">
+                  <strong>{selectedSubclass.name}</strong>
+                  <ul className="character-sheet__row-list">
+                    {selectedSubclass.features
+                      .filter((f) => f.level <= character.level)
+                      .map((f) => (
+                        <li key={`${f.level}-${f.name}`}>
+                          <strong>
+                            Lvl {f.level} — {f.name}:
+                          </strong>{' '}
+                          {f.entries.join(' ')}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+
+          <h3>Experience & leveling</h3>
+          <div className="character-sheet__xp">
+            <label>
+              XP
+              <input
+                type="number"
+                min={0}
+                value={character.xp}
+                disabled={!canEdit}
+                onChange={(e) => onUpdate({ xp: Math.max(0, Number(e.target.value)) })}
+              />
+            </label>
+            <span className="character-sheet__hint">
+              {eligibleLevel > character.level ? `Eligible for level ${nextLevel}` : `Level ${character.level}`}
+            </span>
+            {canLevelUp && !levelUpOpen && (
+              <button type="button" onClick={openLevelUp}>
+                Level Up to {nextLevel}
+              </button>
+            )}
+          </div>
+
+          {levelUpOpen && (
+            <div className="character-sheet__level-up">
+              <h4>Leveling up to {nextLevel}</h4>
+              {selectedClass && (
+                <div className="character-sheet__level-up-section">
+                  <strong>Hit points</strong>
+                  <label>
+                    <input
+                      type="radio"
+                      name="hp-method"
+                      checked={hpMethod === 'average'}
+                      onChange={() => setHpMethod('average')}
+                    />
+                    Take average ({Math.floor(selectedClass.hitDie / 2) + 1} + Con modifier)
+                  </label>
+                  <label>
+                    <input type="radio" name="hp-method" checked={hpMethod === 'roll'} onChange={() => setHpMethod('roll')} />
+                    Roll 1d{selectedClass.hitDie} + Con modifier
+                  </label>
+                  {hpMethod === 'roll' && (
+                    <>
+                      <button type="button" onClick={() => setRolledHp(Math.floor(Math.random() * selectedClass.hitDie) + 1)}>
+                        Roll
+                      </button>
+                      {rolledHp !== null && <span>Rolled: {rolledHp}</span>}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {needsAsiThisLevelUp && (
+                <div className="character-sheet__level-up-section">
+                  <strong>Ability Score Improvement</strong>
+                  <label>
+                    <input type="radio" name="asi-choice" checked={asiChoice === 'asi'} onChange={() => setAsiChoice('asi')} />
+                    Increase ability scores (+2 to one, or +1 to two)
+                  </label>
+                  <label>
+                    <input type="radio" name="asi-choice" checked={asiChoice === 'feat'} onChange={() => setAsiChoice('feat')} />
+                    Take a feat instead
+                  </label>
+                  {asiChoice === 'asi' ? (
+                    <>
+                      <p className="character-sheet__hint">Points spent: {asiPointsSpent} / 2</p>
+                      <ul className="character-sheet__row-list">
+                        {ABILITY_KEYS.map((key) => (
+                          <li key={key}>
+                            {ABILITY_LABELS[key]}
+                            <button
+                              type="button"
+                              disabled={(asiChanges[key] ?? 0) <= 0}
+                              onClick={() => handleAsiPointChange(key, -1)}
+                            >
+                              −
+                            </button>
+                            {asiChanges[key] ?? 0}
+                            <button
+                              type="button"
+                              disabled={asiPointsSpent >= 2 || (asiChanges[key] ?? 0) >= 2}
+                              onClick={() => handleAsiPointChange(key, 1)}
+                            >
+                              +
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <label>
+                      Feat name
+                      <input value={featName} onChange={(e) => setFeatName(e.target.value)} placeholder="e.g. Alert" />
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {needsSubclassThisLevelUp && (
+                <div className="character-sheet__level-up-section">
+                  <strong>Choose a subclass</strong>
+                  <select value={levelUpSubclass} onChange={(e) => setLevelUpSubclass(e.target.value)}>
+                    <option value="">Select a subclass…</option>
+                    {availableSubclasses.map((s) => (
+                      <option key={s.key} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="character-sheet__level-up-actions">
+                <button type="button" onClick={handleConfirmLevelUp} disabled={!canConfirmLevelUp}>
+                  Confirm Level Up
+                </button>
+                <button type="button" onClick={() => setLevelUpOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           <h3>Abilities & saving throws</h3>
           <label>

@@ -4,7 +4,7 @@
  * fields degrade to empty strings/defaults rather than throwing) rather than
  * a full-fidelity reimplementation of 5etools' own parser. */
 import type { AbilityKey, SkillId } from '../character/types'
-import type { ClassData, ItemData, MonsterAction, MonsterData, RaceData, SpellData } from './types'
+import type { ClassData, ClassFeatureData, ItemData, MonsterAction, MonsterData, RaceData, SpellData, SubclassData } from './types'
 
 const SCHOOL_CODES: Record<string, string> = {
   A: 'Abjuration',
@@ -315,12 +315,64 @@ function normalizeSkillChoices(startingProficiencies: unknown): { choices: Skill
   return { choices: choices.length > 0 ? choices : ALL_SKILL_IDS, count }
 }
 
-export function normalizeClass(raw: unknown, key: string): ClassData | null {
+const STANDARD_ASI_LEVELS = [4, 8, 12, 16, 19]
+const SUBCLASS_CHOICE_NAME_PATTERN = /domain|archetype|circle|tradition|origin|patron|oath|path|college|conclave|bloodline/i
+
+/** Best-effort detection of which levels grant an Ability Score Improvement
+ * — scans feature names for "Ability Score Improvement" rather than relying
+ * on any fixed schema field, since 5etools' `classFeatures` reference-string
+ * array format varies and isn't worth parsing exactly. Falls back to the
+ * standard 5e levels when nothing is found (e.g. a thin/partial mirror). */
+function detectAsiLevels(features: ClassFeatureData[]): number[] {
+  const levels = features.filter((f) => /ability score improvement/i.test(f.name)).map((f) => f.level)
+  return levels.length > 0 ? levels : STANDARD_ASI_LEVELS
+}
+
+/** Best-effort detection of the level a subclass must be chosen at — scans
+ * feature names for common subclass-choice naming patterns (every core 5e
+ * class's subclass-choice feature is named things like "Divine Domain",
+ * "Martial Archetype", "Primal Path", etc.). Falls back to 3, the most
+ * common value, when nothing matches. */
+function detectSubclassLevel(features: ClassFeatureData[]): number {
+  const match = features.find((f) => SUBCLASS_CHOICE_NAME_PATTERN.test(f.name))
+  return match ? match.level : 3
+}
+
+function normalizeClassFeatureEntry(raw: unknown): ClassFeatureData | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (typeof r.name !== 'string') return null
+  return { level: typeof r.level === 'number' ? r.level : 1, name: r.name, entries: flattenEntries(r.entries) }
+}
+
+/** Parses a file's whole `classFeature` (or `subclassFeature`) array into
+ * per-class (or per-subclass) buckets, keyed by the raw `className` (or
+ * `subclassShortName`) field — callers look up the bucket matching the
+ * class/subclass they're currently normalizing. */
+export function groupFeaturesByKey(rawList: unknown, keyField: string): Map<string, ClassFeatureData[]> {
+  const groups = new Map<string, ClassFeatureData[]>()
+  if (!Array.isArray(rawList)) return groups
+  for (const raw of rawList) {
+    if (!raw || typeof raw !== 'object') continue
+    const r = raw as Record<string, unknown>
+    const groupKey = typeof r[keyField] === 'string' ? (r[keyField] as string) : null
+    if (!groupKey) continue
+    const feature = normalizeClassFeatureEntry(raw)
+    if (!feature) continue
+    const bucket = groups.get(groupKey) ?? []
+    bucket.push(feature)
+    groups.set(groupKey, bucket)
+  }
+  return groups
+}
+
+export function normalizeClass(raw: unknown, key: string, features: ClassFeatureData[] = []): ClassData | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   if (typeof r.name !== 'string') return null
   const hd = r.hd as { faces?: number } | undefined
   const { choices, count } = normalizeSkillChoices(r.startingProficiencies)
+  const sortedFeatures = [...features].sort((a, b) => a.level - b.level)
   return {
     key,
     source: 'mirror',
@@ -329,5 +381,21 @@ export function normalizeClass(raw: unknown, key: string): ClassData | null {
     savingThrows: normalizeSavingThrows(r.proficiency),
     skillChoices: choices,
     skillChoiceCount: count,
+    asiLevels: detectAsiLevels(sortedFeatures),
+    subclassLevel: detectSubclassLevel(sortedFeatures),
+    features: sortedFeatures,
+  }
+}
+
+export function normalizeSubclass(raw: unknown, key: string, features: ClassFeatureData[] = []): SubclassData | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (typeof r.name !== 'string' || typeof r.className !== 'string') return null
+  return {
+    key,
+    source: 'mirror',
+    name: r.name,
+    className: r.className,
+    features: [...features].sort((a, b) => a.level - b.level),
   }
 }

@@ -40,7 +40,7 @@ export function CharacterPanel() {
   const { tokens } = useTokens(doc, activeSceneId)
   const { combat } = useCombat(doc, activeSceneId)
   const { characters, myCharacter, bindCharacter, updateCharacter } = useCharacters(doc)
-  const { races, classes } = useCompendium(doc)
+  const { races, classes, subclasses } = useCompendium(doc)
   const { pushRoll } = useRollLog(doc, isDm)
   const inventoryActions = useInventoryActions(doc, isDm)
   const { settings: campaignSettings, setRestsEnabled } = useCampaignSettings(doc)
@@ -244,6 +244,7 @@ export function CharacterPanel() {
         otherCharacters={characters.filter((c) => c.id !== character.id).map((c) => ({ id: c.id, name: c.name }))}
         races={races}
         classes={classes}
+        subclasses={subclasses}
       />
     </div>
   )

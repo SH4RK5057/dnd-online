@@ -6,8 +6,16 @@
  * Parsed/normalized results are cached in a local IndexedDB store (separate
  * from y-indexeddb, same pattern as map/localAssetCache.ts) so a DM doesn't
  * need to re-import/re-fetch every session. */
-import type { ClassData, ItemData, MonsterData, RaceData, SpellData } from './types'
-import { normalizeClass, normalizeItem, normalizeMonster, normalizeRace, normalizeSpell } from './mirrorNormalize'
+import type { ClassData, ItemData, MonsterData, RaceData, SpellData, SubclassData } from './types'
+import {
+  groupFeaturesByKey,
+  normalizeClass,
+  normalizeItem,
+  normalizeMonster,
+  normalizeRace,
+  normalizeSpell,
+  normalizeSubclass,
+} from './mirrorNormalize'
 import { defaultContentCategories, type ContentCategories } from './contentSourceTypes'
 
 const DB_NAME = 'dndonline-content-mirror'
@@ -20,6 +28,7 @@ export interface MirrorContent {
   items: ItemData[]
   races: RaceData[]
   classes: ClassData[]
+  subclasses: SubclassData[]
   importedAt: number
   /** Empty for a local-file import (nothing shareable to key off of).
    * Otherwise matches contentSourceTypes.ts's sourceKeyFor() for whatever
@@ -81,51 +90,91 @@ function nextKey(prefix: string): string {
   return `mirror:${prefix}-${keyCounter}`
 }
 
-/** Classifies one parsed JSON file by its top-level array key — 5etools
+/** Classifies one parsed JSON file by its top-level array keys — 5etools
  * spell files are `{spell: [...]}`, bestiary files `{monster: [...]}`, the
- * items file `{item: [...]}`, race files `{race: [...]}`, class files
- * `{class: [...]}`. Anything else is reported as an error rather than
- * silently ignored, so a DM importing the wrong file finds out why.
- * A category the DM excluded (per `categories`) is skipped silently — that's
- * a deliberate choice, not an error. */
+ * items file `{item: [...]}`, race files `{race: [...]}`, and class files
+ * `{class: [...], subclass: [...], classFeature: [...], subclassFeature:
+ * [...]}` all in ONE file — so unlike the other content kinds, these keys
+ * are checked independently (not else-if) and the two feature arrays are
+ * joined onto their matching class/subclass by name before normalizing.
+ * A file with no recognized key at all is reported as an error, so a DM
+ * importing the wrong file finds out why; a category the DM excluded (per
+ * `categories`) is skipped silently — that's a deliberate choice, not an
+ * error. */
 export function ingestFile(filename: string, json: unknown, into: MirrorContent, errors: string[], categories: ContentCategories): void {
   if (!json || typeof json !== 'object') {
     errors.push(`${filename}: not a JSON object`)
     return
   }
   const obj = json as Record<string, unknown>
+  let recognized = false
+
   if (Array.isArray(obj.spell)) {
-    if (!categories.includeSpells) return
-    for (const raw of obj.spell) {
-      const spell = normalizeSpell(raw, nextKey('spell'))
-      if (spell) into.spells.push(spell)
+    recognized = true
+    if (categories.includeSpells) {
+      for (const raw of obj.spell) {
+        const spell = normalizeSpell(raw, nextKey('spell'))
+        if (spell) into.spells.push(spell)
+      }
     }
-  } else if (Array.isArray(obj.monster)) {
-    if (!categories.includeMonsters) return
-    for (const raw of obj.monster) {
-      const monster = normalizeMonster(raw, nextKey('monster'))
-      if (monster) into.monsters.push(monster)
+  }
+  if (Array.isArray(obj.monster)) {
+    recognized = true
+    if (categories.includeMonsters) {
+      for (const raw of obj.monster) {
+        const monster = normalizeMonster(raw, nextKey('monster'))
+        if (monster) into.monsters.push(monster)
+      }
     }
-  } else if (Array.isArray(obj.item)) {
-    if (!categories.includeItems) return
-    for (const raw of obj.item) {
-      const item = normalizeItem(raw, nextKey('item'))
-      if (item) into.items.push(item)
+  }
+  if (Array.isArray(obj.item)) {
+    recognized = true
+    if (categories.includeItems) {
+      for (const raw of obj.item) {
+        const item = normalizeItem(raw, nextKey('item'))
+        if (item) into.items.push(item)
+      }
     }
-  } else if (Array.isArray(obj.race)) {
-    if (!categories.includeRaces) return
-    for (const raw of obj.race) {
-      const race = normalizeRace(raw, nextKey('race'))
-      if (race) into.races.push(race)
+  }
+  if (Array.isArray(obj.race)) {
+    recognized = true
+    if (categories.includeRaces) {
+      for (const raw of obj.race) {
+        const race = normalizeRace(raw, nextKey('race'))
+        if (race) into.races.push(race)
+      }
     }
-  } else if (Array.isArray(obj.class)) {
-    if (!categories.includeClasses) return
-    for (const raw of obj.class) {
-      const cls = normalizeClass(raw, nextKey('class'))
-      if (cls) into.classes.push(cls)
+  }
+  if (Array.isArray(obj.class)) {
+    recognized = true
+    if (categories.includeClasses) {
+      const classFeaturesByClassName = groupFeaturesByKey(obj.classFeature, 'className')
+      for (const raw of obj.class) {
+        const className = raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).name === 'string'
+          ? (raw as Record<string, unknown>).name as string
+          : ''
+        const cls = normalizeClass(raw, nextKey('class'), classFeaturesByClassName.get(className) ?? [])
+        if (cls) into.classes.push(cls)
+      }
     }
-  } else {
-    errors.push(`${filename}: no recognized "spell"/"monster"/"item"/"race"/"class" array — expected 5etools-2014-src shape`)
+  }
+  if (Array.isArray(obj.subclass)) {
+    recognized = true
+    if (categories.includeClasses) {
+      const subclassFeaturesByShortName = groupFeaturesByKey(obj.subclassFeature, 'subclassShortName')
+      for (const raw of obj.subclass) {
+        const shortName =
+          raw && typeof raw === 'object'
+            ? ((raw as Record<string, unknown>).shortName as string | undefined) ?? ((raw as Record<string, unknown>).name as string | undefined)
+            : undefined
+        const subclass = normalizeSubclass(raw, nextKey('subclass'), shortName ? subclassFeaturesByShortName.get(shortName) ?? [] : [])
+        if (subclass) into.subclasses.push(subclass)
+      }
+    }
+  }
+
+  if (!recognized) {
+    errors.push(`${filename}: no recognized "spell"/"monster"/"item"/"race"/"class"/"subclass" array — expected 5etools-2014-src shape`)
   }
 }
 
@@ -140,7 +189,7 @@ export async function importMirrorFiles(
   files: FileList | File[],
   categories: ContentCategories = defaultContentCategories(),
 ): Promise<MirrorImportResult> {
-  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], importedAt: Date.now(), sourceKey: '' }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], subclasses: [], importedAt: Date.now(), sourceKey: '' }
   const errors: string[] = []
   for (const file of Array.from(files)) {
     try {
@@ -190,7 +239,7 @@ export async function fetchMirrorFromUrl(
   categories: ContentCategories = defaultContentCategories(),
 ): Promise<MirrorImportResult> {
   const base = baseUrl.replace(/\/+$/, '')
-  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], importedAt: Date.now(), sourceKey }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], subclasses: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
 
   if (categories.includeRaces) {
@@ -246,7 +295,7 @@ export async function fetchGithubRepo(
   sourceKey = '',
   categories: ContentCategories = defaultContentCategories(),
 ): Promise<MirrorImportResult> {
-  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], importedAt: Date.now(), sourceKey }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], subclasses: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
   if (token) headers.Authorization = `token ${token}`

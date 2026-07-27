@@ -23,7 +23,7 @@ export function JoinSetupScreen({
   const [standaloneList, setStandaloneList] = useState(() => listStandaloneCharacters())
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [editingCharacter, setEditingCharacter] = useState<CharacterRecord | null>(null)
-  const { races, classes } = useCompendium(null)
+  const { races, classes, subclasses } = useCompendium(null)
 
   const refreshStandaloneList = () => setStandaloneList(listStandaloneCharacters())
 
@@ -130,6 +130,7 @@ export function JoinSetupScreen({
               onQuickRoll={() => {}}
               races={races}
               classes={classes}
+              subclasses={subclasses}
             />
           </div>
         )}

@@ -3,7 +3,7 @@ import type * as Y from 'yjs'
 import { loadSavedMirrorToken } from './constants'
 import { defaultContentCategories, sourceKeyFor, type ContentCategories, type ContentSourceRecord } from './contentSourceTypes'
 import { useContentSource, type UseContentSourceResult } from './useContentSource'
-import { SRD_CLASSES, SRD_ITEMS, SRD_MONSTERS, SRD_RACES, SRD_SPELLS } from './srdData'
+import { SRD_CLASSES, SRD_ITEMS, SRD_MONSTERS, SRD_RACES, SRD_SPELLS, SRD_SUBCLASSES } from './srdData'
 import { useHomebrewContent } from './useHomebrewContent'
 import {
   fetchGithubRepo,
@@ -23,6 +23,7 @@ import type {
   MonsterData,
   RaceData,
   SpellData,
+  SubclassData,
 } from './types'
 
 /** Fetches whatever the campaign's shared content source currently points
@@ -53,6 +54,7 @@ export interface UseCompendiumResult {
    * pass, see character-creation rule-enforcement scope notes. */
   races: RaceData[]
   classes: ClassData[]
+  subclasses: SubclassData[]
   mirrorErrors: string[]
   mirrorImportedAt: number | null
   /** `categories` (default: all) limits which of spells/monsters/items get
@@ -136,7 +138,8 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
           result.content.monsters.length +
           result.content.items.length +
           result.content.races.length +
-          result.content.classes.length >
+          result.content.classes.length +
+          result.content.subclasses.length >
         0
       // Only replace the cache on an actual haul — a transient failure
       // (network blip, missing token) shouldn't wipe out previously-good
@@ -197,6 +200,7 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
   )
   const races = useMemo(() => [...SRD_RACES, ...(mirror?.races ?? [])], [mirror])
   const classes = useMemo(() => [...SRD_CLASSES, ...(mirror?.classes ?? [])], [mirror])
+  const subclasses = useMemo(() => [...SRD_SUBCLASSES, ...(mirror?.subclasses ?? [])], [mirror])
 
   const configuredKey = sourceKeyFor(contentSource.record)
 
@@ -206,6 +210,7 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     items,
     races,
     classes,
+    subclasses,
     mirrorErrors,
     mirrorImportedAt: mirror?.importedAt ?? null,
     importMirrorLocalFiles,
@@ -222,7 +227,7 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
  * kind discriminant — for the token inspector's "rules lookup" and for
  * encounter drag-and-drop initialization. */
 export function findByKey(
-  result: Pick<UseCompendiumResult, 'spells' | 'monsters' | 'items' | 'races' | 'classes'>,
+  result: Pick<UseCompendiumResult, 'spells' | 'monsters' | 'items' | 'races' | 'classes' | 'subclasses'>,
   key: string,
 ): CompendiumEntry | null {
   const spell = result.spells.find((s) => s.key === key)
@@ -235,5 +240,7 @@ export function findByKey(
   if (race) return { kind: 'race', data: race }
   const cls = result.classes.find((c) => c.key === key)
   if (cls) return { kind: 'class', data: cls }
+  const subclass = result.subclasses.find((s) => s.key === key)
+  if (subclass) return { kind: 'subclass', data: subclass }
   return null
 }

@@ -1,17 +1,23 @@
-import type { AbilityKey, AbilityScores, CharacterRecord, SkillId } from './types'
+import type { AbilityKey, AbilityScores, CharacterRecord, ResourceEntry, SkillId } from './types'
 import type { TokenRecord } from '../map/types'
 
-/** Fills in `abilityMethod`/`baseAbilities` for a CharacterRecord persisted
- * (localStorage or an existing campaign Yjs doc) before those fields
- * existed — treats the old `abilities` as if it were already the base (no
- * racial bonus known), which is the only reasonable assumption without
- * re-deriving history. Every character read path should go through this. */
+/** Fills in fields for a CharacterRecord persisted (localStorage or an
+ * existing campaign Yjs doc) before those fields existed — `abilities` is
+ * treated as if it were already the base (no racial bonus known), which is
+ * the only reasonable assumption without re-deriving history; `xp`/
+ * `subclassName`/`resolvedAsiLevels` default to "hasn't leveled up under
+ * this system yet." Every character read path should go through this. */
 export function normalizeCharacterRecord(character: CharacterRecord): CharacterRecord {
-  if (character.abilityMethod && character.baseAbilities) return character
+  if (character.abilityMethod && character.baseAbilities && character.resolvedAsiLevels && character.subclassName !== undefined && character.xp !== undefined) {
+    return character
+  }
   return {
     ...character,
     abilityMethod: character.abilityMethod ?? 'manual',
     baseAbilities: character.baseAbilities ?? character.abilities,
+    subclassName: character.subclassName ?? '',
+    xp: character.xp ?? 0,
+    resolvedAsiLevels: character.resolvedAsiLevels ?? [],
   }
 }
 
@@ -165,4 +171,101 @@ export function pointBuyCost(scores: AbilityScores): number {
 
 export function isValidPointBuy(scores: AbilityScores, budget = POINT_BUY_BUDGET): boolean {
   return pointBuyCost(scores) <= budget
+}
+
+/** Standard 5e XP-to-level thresholds — index 0 is level 1's threshold (0
+ * XP), index 19 is level 20's. */
+export const XP_THRESHOLDS = [
+  0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
+  85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000,
+]
+
+/** The highest level whose XP threshold `xp` meets or exceeds — leveling up
+ * is still a deliberate action (see CharacterRecord.xp's doc comment), this
+ * just tells the UI when that action becomes available. */
+export function xpToLevel(xp: number): number {
+  let level = 1
+  for (let i = 0; i < XP_THRESHOLDS.length; i++) {
+    if (xp >= XP_THRESHOLDS[i]) level = i + 1
+  }
+  return level
+}
+
+/** A 5e Ability Score Improvement is either +2 to one ability or +1 to two
+ * different abilities — never +2 to two abilities, or split any other way. */
+export function isValidAbilityScoreImprovement(changes: Partial<Record<AbilityKey, number>>): boolean {
+  const values = Object.values(changes).filter((v): v is number => typeof v === 'number' && v !== 0)
+  if (values.length === 0) return false
+  const total = values.reduce((sum, v) => sum + v, 0)
+  if (total !== 2 || values.some((v) => v <= 0 || v > 2)) return false
+  if (values.length === 1) return values[0] === 2
+  return values.length === 2 && values.every((v) => v === 1)
+}
+
+export function applyAbilityScoreImprovement(base: AbilityScores, changes: Partial<Record<AbilityKey, number>>): AbilityScores {
+  const next = { ...base }
+  for (const [k, v] of Object.entries(changes)) {
+    if (typeof v === 'number') next[k as AbilityKey] += v
+  }
+  return next
+}
+
+export interface ClassResourceGrant {
+  name: string
+  max: number
+}
+
+/** Best-effort mechanical modeling of the well-known SRD class resource
+ * pools (Rage, Ki, Sorcery Points, etc.) that this app's generic
+ * `ResourceEntry` shape can represent as a simple current/max counter —
+ * returns what a character of this class/level/abilities SHOULD have,
+ * for the level-up flow to merge in via mergeClassResourceGrants.
+ * Deliberately NOT exhaustive: features like Sneak Attack (a damage-die
+ * scale, not a "use" pool), Pact Magic (its own unusual short-rest-recovery
+ * slot rules), and Arcane Recovery (keyed off spent spell slots, not level)
+ * don't fit this current/max shape and aren't modeled here — see the
+ * class's `features` reference text instead. Returns [] for any
+ * class/level this doesn't recognize, so mirror-imported/homebrew classes
+ * degrade safely rather than getting invented resources. */
+export function computeClassResourceGrants(className: string, level: number, abilities: AbilityScores): ClassResourceGrant[] {
+  const name = className.trim().toLowerCase()
+  if (name === 'barbarian' && level >= 1) {
+    const uses = level >= 20 ? 999 : level >= 17 ? 6 : level >= 12 ? 5 : level >= 6 ? 4 : level >= 3 ? 3 : 2
+    return [{ name: 'Rage', max: uses }]
+  }
+  if (name === 'fighter') {
+    const grants: ClassResourceGrant[] = []
+    if (level >= 1) grants.push({ name: 'Second Wind', max: 1 })
+    if (level >= 2) grants.push({ name: 'Action Surge', max: level >= 17 ? 2 : 1 })
+    return grants
+  }
+  if (name === 'monk' && level >= 2) return [{ name: 'Ki Points', max: level }]
+  if (name === 'sorcerer' && level >= 2) return [{ name: 'Sorcery Points', max: level }]
+  if (name === 'bard' && level >= 1) return [{ name: 'Bardic Inspiration', max: Math.max(1, computeModifier(abilities.cha)) }]
+  if (name === 'cleric' && level >= 2) {
+    const uses = level >= 18 ? 3 : level >= 6 ? 2 : 1
+    return [{ name: 'Channel Divinity', max: uses }]
+  }
+  if (name === 'paladin' && level >= 1) return [{ name: 'Lay on Hands Pool', max: level * 5 }]
+  if (name === 'druid' && level >= 2) return [{ name: 'Wild Shape', max: 2 }]
+  return []
+}
+
+/** Merges class resource grants into an existing resource list — an
+ * existing resource (matched by name) has its `max` updated and `current`
+ * clamped down if needed (preserving how much is already spent); a new one
+ * starts full. Resources not granted by the class (DM/player-added
+ * homebrew ones) are left untouched. */
+export function mergeClassResourceGrants(existing: ResourceEntry[], grants: ClassResourceGrant[]): ResourceEntry[] {
+  const result = existing.map((r) => ({ ...r }))
+  for (const grant of grants) {
+    const found = result.find((r) => r.name === grant.name)
+    if (found) {
+      found.max = grant.max
+      found.current = Math.min(found.current, grant.max)
+    } else {
+      result.push({ id: crypto.randomUUID(), name: grant.name, current: grant.max, max: grant.max })
+    }
+  }
+  return result
 }

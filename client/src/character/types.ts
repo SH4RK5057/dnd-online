@@ -93,7 +93,21 @@ export interface CharacterRecord {
   name: string
   race: string
   className: string
+  /** Chosen subclass name (e.g. "Champion"), matching a SubclassData's
+   * `name` for this class — empty until chosen. Required once `level`
+   * reaches the class's `subclassLevel` (character/rules.ts's level-up
+   * flow blocks advancing further without one). */
+  subclassName: string
   level: number
+  /** Total experience points earned — character/rules.ts's xpToLevel()
+   * compares this against the standard 5e XP table to determine whether a
+   * "Level Up" is available; leveling up itself is a deliberate action, not
+   * automatic just because xp crossed a threshold. */
+  xp: number
+  /** Levels at which this character has already resolved its Ability Score
+   * Improvement choice (either an ability bump or a feat, added to `feats`)
+   * — prevents re-prompting at the same level after leveling past it. */
+  resolvedAsiLevels: number[]
   background: string
   alignment: string
   /** Final, derived scores — base (pre-racial) + the selected race's

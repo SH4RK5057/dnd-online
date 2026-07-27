@@ -1,18 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyAbilityScoreImprovement,
   applyRacialBonus,
+  computeClassResourceGrants,
   computeInitiativeBonus,
   computeMaxHp,
   computeModifier,
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
+  isValidAbilityScoreImprovement,
   isValidPointBuy,
   isValidStandardArray,
+  mergeClassResourceGrants,
   normalizeCharacterRecord,
   parseHitDiceCount,
   pointBuyCost,
   resolveTokenHp,
+  xpToLevel,
 } from './rules'
 import type { CharacterRecord } from './types'
 import type { TokenRecord } from '../map/types'
@@ -57,7 +62,10 @@ function baseCharacter(): CharacterRecord {
     name: 'Test',
     race: 'Human',
     className: 'Fighter',
+    subclassName: '',
     level: 5,
+    xp: 0,
+    resolvedAsiLevels: [],
     background: '',
     alignment: '',
     abilities: { str: 16, dex: 14, con: 12, int: 10, wis: 8, cha: 13 },
@@ -291,5 +299,109 @@ describe('normalizeCharacterRecord', () => {
   it('leaves an already-current record untouched', () => {
     const current = { ...baseCharacter(), abilityMethod: 'pointBuy' as const, baseAbilities: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } }
     expect(normalizeCharacterRecord(current)).toBe(current)
+  })
+
+  it('backfills subclassName/xp/resolvedAsiLevels for a record persisted before those fields existed', () => {
+    const legacy = baseCharacter()
+    // @ts-expect-error -- simulating a pre-migration record read from storage
+    delete legacy.subclassName
+    // @ts-expect-error -- simulating a pre-migration record read from storage
+    delete legacy.xp
+    // @ts-expect-error -- simulating a pre-migration record read from storage
+    delete legacy.resolvedAsiLevels
+    const normalized = normalizeCharacterRecord(legacy)
+    expect(normalized.subclassName).toBe('')
+    expect(normalized.xp).toBe(0)
+    expect(normalized.resolvedAsiLevels).toEqual([])
+  })
+})
+
+describe('xpToLevel', () => {
+  it('matches the standard 5e XP table breakpoints', () => {
+    expect(xpToLevel(0)).toBe(1)
+    expect(xpToLevel(299)).toBe(1)
+    expect(xpToLevel(300)).toBe(2)
+    expect(xpToLevel(899)).toBe(2)
+    expect(xpToLevel(2699)).toBe(3)
+    expect(xpToLevel(2700)).toBe(4)
+    expect(xpToLevel(355000)).toBe(20)
+    expect(xpToLevel(999999)).toBe(20)
+  })
+})
+
+describe('isValidAbilityScoreImprovement / applyAbilityScoreImprovement', () => {
+  it('accepts +2 to one ability', () => {
+    expect(isValidAbilityScoreImprovement({ str: 2 })).toBe(true)
+  })
+
+  it('accepts +1 to two different abilities', () => {
+    expect(isValidAbilityScoreImprovement({ str: 1, dex: 1 })).toBe(true)
+  })
+
+  it('rejects +2 to two abilities, an uneven split, or no change', () => {
+    expect(isValidAbilityScoreImprovement({ str: 2, dex: 2 })).toBe(false)
+    expect(isValidAbilityScoreImprovement({ str: 1, dex: 2 })).toBe(false)
+    expect(isValidAbilityScoreImprovement({})).toBe(false)
+    expect(isValidAbilityScoreImprovement({ str: 3 })).toBe(false)
+  })
+
+  it('applies the changes onto base scores', () => {
+    const base = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }
+    expect(applyAbilityScoreImprovement(base, { str: 1, dex: 1 })).toEqual({
+      str: 11, dex: 11, con: 10, int: 10, wis: 10, cha: 10,
+    })
+  })
+})
+
+describe('computeClassResourceGrants / mergeClassResourceGrants', () => {
+  const abilities = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 16 }
+
+  it('grants Barbarian Rage uses scaling with level', () => {
+    expect(computeClassResourceGrants('Barbarian', 1, abilities)).toEqual([{ name: 'Rage', max: 2 }])
+    expect(computeClassResourceGrants('Barbarian', 6, abilities)).toEqual([{ name: 'Rage', max: 4 }])
+    expect(computeClassResourceGrants('Barbarian', 20, abilities)).toEqual([{ name: 'Rage', max: 999 }])
+  })
+
+  it('grants Fighter Second Wind at 1 and Action Surge at 2, improving at 17', () => {
+    expect(computeClassResourceGrants('Fighter', 1, abilities)).toEqual([{ name: 'Second Wind', max: 1 }])
+    expect(computeClassResourceGrants('Fighter', 2, abilities)).toEqual([
+      { name: 'Second Wind', max: 1 },
+      { name: 'Action Surge', max: 1 },
+    ])
+    expect(computeClassResourceGrants('Fighter', 17, abilities)).toEqual([
+      { name: 'Second Wind', max: 1 },
+      { name: 'Action Surge', max: 2 },
+    ])
+  })
+
+  it('grants Bardic Inspiration equal to Cha modifier (min 1)', () => {
+    expect(computeClassResourceGrants('Bard', 1, abilities)).toEqual([{ name: 'Bardic Inspiration', max: 3 }])
+    expect(computeClassResourceGrants('Bard', 1, { ...abilities, cha: 8 })).toEqual([{ name: 'Bardic Inspiration', max: 1 }])
+  })
+
+  it('returns nothing for a class/level with no modeled resource', () => {
+    expect(computeClassResourceGrants('Rogue', 5, abilities)).toEqual([])
+    expect(computeClassResourceGrants('Monk', 1, abilities)).toEqual([])
+    expect(computeClassResourceGrants('UnknownHomebrewClass', 5, abilities)).toEqual([])
+  })
+
+  it('merges grants into an existing resource list, preserving current usage and clamping it to a lower max', () => {
+    const existing = [{ id: 'r1', name: 'Rage', current: 1, max: 2 }, { id: 'r2', name: 'Custom Homebrew', current: 3, max: 5 }]
+    const merged = mergeClassResourceGrants(existing, [{ name: 'Rage', max: 3 }])
+    expect(merged.find((r) => r.name === 'Rage')).toEqual({ id: 'r1', name: 'Rage', current: 1, max: 3 })
+    expect(merged.find((r) => r.name === 'Custom Homebrew')).toEqual({ id: 'r2', name: 'Custom Homebrew', current: 3, max: 5 })
+  })
+
+  it('adds a new full resource when none existed yet', () => {
+    const merged = mergeClassResourceGrants([], [{ name: 'Ki Points', max: 2 }])
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toMatchObject({ name: 'Ki Points', current: 2, max: 2 })
+    expect(typeof merged[0].id).toBe('string')
+  })
+
+  it('clamps current usage down when max shrinks below it', () => {
+    const existing = [{ id: 'r1', name: 'Ki Points', current: 5, max: 5 }]
+    const merged = mergeClassResourceGrants(existing, [{ name: 'Ki Points', max: 3 }])
+    expect(merged[0].current).toBe(3)
   })
 })

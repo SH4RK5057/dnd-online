@@ -19,7 +19,7 @@ import { useCompendium } from '../content/useCompendium'
 export function CharacterManagerScreen({ onBack }: { onBack: () => void }) {
   const [characters, setCharacters] = useState(() => listStandaloneCharacters())
   const [selectedId, setSelectedId] = useState<string | null>(characters[0]?.id ?? null)
-  const { races, classes } = useCompendium(null)
+  const { races, classes, subclasses } = useCompendium(null)
 
   const refresh = () => setCharacters(listStandaloneCharacters())
   const selected = characters.find((c) => c.id === selectedId) ?? null
@@ -114,6 +114,7 @@ export function CharacterManagerScreen({ onBack }: { onBack: () => void }) {
                 onQuickRoll={() => {}}
                 races={races}
                 classes={classes}
+                subclasses={subclasses}
               />
             </>
           ) : (

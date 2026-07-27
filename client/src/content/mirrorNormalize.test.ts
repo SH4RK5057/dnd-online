@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeClass, normalizeRace } from './mirrorNormalize'
+import { groupFeaturesByKey, normalizeClass, normalizeRace, normalizeSubclass } from './mirrorNormalize'
 
 describe('normalizeRace', () => {
   it('extracts size, speed, ability bonuses, and traits from a 5etools-shaped race', () => {
@@ -60,6 +60,9 @@ describe('normalizeClass', () => {
       savingThrows: ['str', 'con'],
       skillChoices: ['acrobatics', 'athletics', 'history', 'insight'],
       skillChoiceCount: 2,
+      asiLevels: [4, 8, 12, 16, 19],
+      subclassLevel: 3,
+      features: [],
     })
   })
 
@@ -74,5 +77,72 @@ describe('normalizeClass', () => {
   it('returns null for a raw value with no name', () => {
     expect(normalizeClass({ hd: { faces: 8 } }, 'k')).toBeNull()
     expect(normalizeClass(undefined, 'k')).toBeNull()
+  })
+
+  it('detects ASI levels and subclass level from feature names, sorted by level', () => {
+    const raw = { name: 'Fighter', hd: { faces: 10 }, proficiency: ['str', 'con'] }
+    const features = [
+      { level: 6, name: 'Ability Score Improvement', entries: [] },
+      { level: 1, name: 'Fighting Style', entries: [] },
+      { level: 3, name: 'Martial Archetype', entries: [] },
+      { level: 4, name: 'Ability Score Improvement', entries: [] },
+    ]
+    const cls = normalizeClass(raw, 'k', features)
+    expect(cls?.asiLevels).toEqual([4, 6])
+    expect(cls?.subclassLevel).toBe(3)
+    expect(cls?.features.map((f) => f.level)).toEqual([1, 3, 4, 6])
+  })
+
+  it('falls back to standard ASI levels and subclassLevel 3 when nothing matches', () => {
+    const raw = { name: 'Homebrew Class' }
+    const cls = normalizeClass(raw, 'k', [{ level: 1, name: 'Something Else', entries: [] }])
+    expect(cls?.asiLevels).toEqual([4, 8, 12, 16, 19])
+    expect(cls?.subclassLevel).toBe(3)
+  })
+})
+
+describe('groupFeaturesByKey', () => {
+  it('groups feature entries by the given key field', () => {
+    const raw = [
+      { name: 'Fighting Style', level: 1, className: 'Fighter', entries: ['pick a style'] },
+      { name: 'Action Surge', level: 2, className: 'Fighter', entries: [] },
+      { name: 'Spellcasting', level: 1, className: 'Wizard', entries: [] },
+    ]
+    const groups = groupFeaturesByKey(raw, 'className')
+    expect(groups.get('Fighter')?.map((f) => f.name)).toEqual(['Fighting Style', 'Action Surge'])
+    expect(groups.get('Wizard')?.map((f) => f.name)).toEqual(['Spellcasting'])
+    expect(groups.get('Sorcerer')).toBeUndefined()
+  })
+
+  it('returns an empty map for non-array input', () => {
+    expect(groupFeaturesByKey(undefined, 'className').size).toBe(0)
+    expect(groupFeaturesByKey(null, 'className').size).toBe(0)
+  })
+})
+
+describe('normalizeSubclass', () => {
+  it('extracts name, className, and sorted features', () => {
+    const raw = { name: 'Champion', className: 'Fighter', shortName: 'Champion' }
+    const features = [
+      { level: 7, name: 'Remarkable Athlete', entries: [] },
+      { level: 3, name: 'Improved Critical', entries: [] },
+    ]
+    const subclass = normalizeSubclass(raw, 'mirror:subclass-1', features)
+    expect(subclass).toEqual({
+      key: 'mirror:subclass-1',
+      source: 'mirror',
+      name: 'Champion',
+      className: 'Fighter',
+      features: [
+        { level: 3, name: 'Improved Critical', entries: [] },
+        { level: 7, name: 'Remarkable Athlete', entries: [] },
+      ],
+    })
+  })
+
+  it('returns null when name or className is missing', () => {
+    expect(normalizeSubclass({ name: 'Champion' }, 'k')).toBeNull()
+    expect(normalizeSubclass({ className: 'Fighter' }, 'k')).toBeNull()
+    expect(normalizeSubclass(null, 'k')).toBeNull()
   })
 })
