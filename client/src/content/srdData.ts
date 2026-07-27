@@ -1,4 +1,4 @@
-import type { ClassData, ItemData, MonsterData, RaceData, SpellData, SubclassData } from './types'
+import type { ClassData, FeatureChoiceOption, ItemData, MonsterData, RaceData, SpellData, SubclassData } from './types'
 import type { SkillId } from '../character/types'
 
 /**
@@ -1154,22 +1154,53 @@ export const SRD_ITEMS: ItemData[] = [
   },
 ]
 
+/** Dragonborn's Draconic Ancestry — determines breath weapon damage type/
+ * shape/save and matching damage resistance (SRD 5.1, publicly known 5e
+ * rules facts, written in my own words). */
+const DRACONIC_ANCESTRY_OPTIONS: FeatureChoiceOption[] = [
+  { key: 'black', name: 'Black', description: 'Acid damage, 5×30 ft. line (Dex save); resistance to acid.' },
+  { key: 'blue', name: 'Blue', description: 'Lightning damage, 5×30 ft. line (Dex save); resistance to lightning.' },
+  { key: 'brass', name: 'Brass', description: 'Fire damage, 5×30 ft. line (Dex save); resistance to fire.' },
+  { key: 'bronze', name: 'Bronze', description: 'Lightning damage, 5×30 ft. line (Dex save); resistance to lightning.' },
+  { key: 'copper', name: 'Copper', description: 'Acid damage, 5×30 ft. line (Dex save); resistance to acid.' },
+  { key: 'gold', name: 'Gold', description: 'Fire damage, 15 ft. cone (Dex save); resistance to fire.' },
+  { key: 'green', name: 'Green', description: 'Poison damage, 15 ft. cone (Con save); resistance to poison.' },
+  { key: 'red', name: 'Red', description: 'Fire damage, 15 ft. cone (Dex save); resistance to fire.' },
+  { key: 'silver', name: 'Silver', description: 'Cold damage, 15 ft. cone (Con save); resistance to cold.' },
+  { key: 'white', name: 'White', description: 'Cold damage, 15 ft. cone (Con save); resistance to cold.' },
+]
+
+/** Half-Elf's real rule is +1 to two OTHER ability scores of the player's
+ * choice, on top of the fixed +2 Cha — modeled as a proper choice now
+ * rather than the flat approximation this used to ship with. */
+const HALF_ELF_ABILITY_OPTIONS: FeatureChoiceOption[] = [
+  { key: 'str', name: 'Strength' },
+  { key: 'dex', name: 'Dexterity' },
+  { key: 'con', name: 'Constitution' },
+  { key: 'int', name: 'Intelligence' },
+  { key: 'wis', name: 'Wisdom' },
+]
+
 /** The 9 core PHB/SRD races, base version only — no subraces (e.g. "Elf"
- * rather than separately modeling High Elf/Wood Elf). Half-Elf's real rule
- * ("+1 to two ability scores of your choice") isn't a flat bonus and would
- * need its own UI to model properly; simplified here to a fixed +1 Str/+1
- * Dex alongside the un-simplifiable +2 Cha, documented rather than silently
- * wrong. */
+ * rather than separately modeling High Elf/Wood Elf). */
 export const SRD_RACES: RaceData[] = [
-  { key: 'srd:human', source: 'srd', name: 'Human', size: 'Medium', speed: 30, abilityBonuses: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, traits: ['Extra language of your choice'] },
-  { key: 'srd:elf', source: 'srd', name: 'Elf', size: 'Medium', speed: 30, abilityBonuses: { dex: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on saves vs. being charmed', "Doesn't need to sleep (trance 4 hrs)"] },
-  { key: 'srd:dwarf', source: 'srd', name: 'Dwarf', size: 'Medium', speed: 25, abilityBonuses: { con: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on saves vs. poison', 'Resistance to poison damage'] },
-  { key: 'srd:halfling', source: 'srd', name: 'Halfling', size: 'Small', speed: 25, abilityBonuses: { dex: 2 }, traits: ['Lucky: reroll a 1 on attack/ability/save d20 rolls', 'Advantage on saves vs. being frightened'] },
-  { key: 'srd:dragonborn', source: 'srd', name: 'Dragonborn', size: 'Medium', speed: 30, abilityBonuses: { str: 2, cha: 1 }, traits: ['Breath weapon (elemental damage by ancestry)', 'Damage resistance by ancestry'] },
-  { key: 'srd:gnome', source: 'srd', name: 'Gnome', size: 'Small', speed: 25, abilityBonuses: { int: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on Int/Wis/Cha saves vs. magic'] },
-  { key: 'srd:half-elf', source: 'srd', name: 'Half-Elf', size: 'Medium', speed: 30, abilityBonuses: { cha: 2, str: 1, dex: 1 }, traits: ['Darkvision 60 ft.', 'Advantage on saves vs. being charmed', 'Simplified: real rule is +1 to two abilities of your choice'] },
-  { key: 'srd:half-orc', source: 'srd', name: 'Half-Orc', size: 'Medium', speed: 30, abilityBonuses: { str: 2, con: 1 }, traits: ['Darkvision 60 ft.', 'Relentless Endurance (drop to 1 HP instead of 0, 1/long rest)'] },
-  { key: 'srd:tiefling', source: 'srd', name: 'Tiefling', size: 'Medium', speed: 30, abilityBonuses: { cha: 2, int: 1 }, traits: ['Darkvision 60 ft.', 'Resistance to fire damage', 'Thaumaturgy cantrip'] },
+  { key: 'srd:human', source: 'srd', name: 'Human', size: 'Medium', speed: 30, abilityBonuses: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, traits: ['Extra language of your choice'], choices: [] },
+  { key: 'srd:elf', source: 'srd', name: 'Elf', size: 'Medium', speed: 30, abilityBonuses: { dex: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on saves vs. being charmed', "Doesn't need to sleep (trance 4 hrs)"], choices: [] },
+  { key: 'srd:dwarf', source: 'srd', name: 'Dwarf', size: 'Medium', speed: 25, abilityBonuses: { con: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on saves vs. poison', 'Resistance to poison damage'], choices: [] },
+  { key: 'srd:halfling', source: 'srd', name: 'Halfling', size: 'Small', speed: 25, abilityBonuses: { dex: 2 }, traits: ['Lucky: reroll a 1 on attack/ability/save d20 rolls', 'Advantage on saves vs. being frightened'], choices: [] },
+  {
+    key: 'srd:dragonborn', source: 'srd', name: 'Dragonborn', size: 'Medium', speed: 30, abilityBonuses: { str: 2, cha: 1 },
+    traits: ['Breath weapon and damage resistance depend on your Draconic Ancestry choice below'],
+    choices: [{ id: 'draconic-ancestry', label: 'Draconic Ancestry', count: 1, options: DRACONIC_ANCESTRY_OPTIONS }],
+  },
+  { key: 'srd:gnome', source: 'srd', name: 'Gnome', size: 'Small', speed: 25, abilityBonuses: { int: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on Int/Wis/Cha saves vs. magic'], choices: [] },
+  {
+    key: 'srd:half-elf', source: 'srd', name: 'Half-Elf', size: 'Medium', speed: 30, abilityBonuses: { cha: 2 },
+    traits: ['Darkvision 60 ft.', 'Advantage on saves vs. being charmed'],
+    choices: [{ id: 'half-elf-ability-choice', label: 'Choose two other ability scores for +1 each', count: 2, grantsAbilityBonus: 1, options: HALF_ELF_ABILITY_OPTIONS }],
+  },
+  { key: 'srd:half-orc', source: 'srd', name: 'Half-Orc', size: 'Medium', speed: 30, abilityBonuses: { str: 2, con: 1 }, traits: ['Darkvision 60 ft.', 'Relentless Endurance (drop to 1 HP instead of 0, 1/long rest)'], choices: [] },
+  { key: 'srd:tiefling', source: 'srd', name: 'Tiefling', size: 'Medium', speed: 30, abilityBonuses: { cha: 2, int: 1 }, traits: ['Darkvision 60 ft.', 'Resistance to fire damage', 'Thaumaturgy cantrip'], choices: [] },
 ]
 
 /** The 12 core PHB/SRD classes — single-class only (see CharacterRecord's
@@ -1185,6 +1216,42 @@ const ALL_SKILLS_FOR_BARD: SkillId[] = [
 /** Standard 5e Ability Score Improvement levels — Fighter and Rogue get
  * extras beyond the common [4,8,12,16,19]. */
 const STANDARD_ASI_LEVELS = [4, 8, 12, 16, 19]
+
+/** Fighting Style options — each PHB class that grants this feature offers a
+ * different subset (mechanics-fact descriptions, written in my own words). */
+const FIGHTING_STYLE_OPTIONS: Record<string, FeatureChoiceOption> = {
+  archery: { key: 'archery', name: 'Archery', description: '+2 bonus to attack rolls with ranged weapons.' },
+  defense: { key: 'defense', name: 'Defense', description: '+1 bonus to AC while wearing armor.' },
+  dueling: { key: 'dueling', name: 'Dueling', description: '+2 damage with a one-handed melee weapon when wielding no other weapon.' },
+  greatWeaponFighting: {
+    key: 'great-weapon-fighting',
+    name: 'Great Weapon Fighting',
+    description: 'Reroll 1s and 2s on damage dice for two-handed/versatile melee weapons.',
+  },
+  protection: {
+    key: 'protection',
+    name: 'Protection',
+    description: 'Use your reaction and a shield to impose disadvantage on an attack against a nearby ally.',
+  },
+  twoWeaponFighting: {
+    key: 'two-weapon-fighting',
+    name: 'Two-Weapon Fighting',
+    description: "Add your ability modifier to your off-hand attack's damage.",
+  },
+}
+const FIGHTER_FIGHTING_STYLES = Object.values(FIGHTING_STYLE_OPTIONS)
+const PALADIN_FIGHTING_STYLES = [
+  FIGHTING_STYLE_OPTIONS.defense,
+  FIGHTING_STYLE_OPTIONS.dueling,
+  FIGHTING_STYLE_OPTIONS.greatWeaponFighting,
+  FIGHTING_STYLE_OPTIONS.protection,
+]
+const RANGER_FIGHTING_STYLES = [
+  FIGHTING_STYLE_OPTIONS.archery,
+  FIGHTING_STYLE_OPTIONS.defense,
+  FIGHTING_STYLE_OPTIONS.dueling,
+  FIGHTING_STYLE_OPTIONS.twoWeaponFighting,
+]
 
 export const SRD_CLASSES: ClassData[] = [
   {
@@ -1256,7 +1323,10 @@ export const SRD_CLASSES: ClassData[] = [
     key: 'srd:fighter', source: 'srd', name: 'Fighter', hitDie: 10, savingThrows: ['str', 'con'], skillChoiceCount: 2, skillChoices: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'perception', 'survival'],
     asiLevels: [4, 6, 8, 12, 14, 16, 19], subclassLevel: 3,
     features: [
-      { level: 1, name: 'Fighting Style', entries: ['Choose a combat specialization (e.g. Archery, Defense, Dueling, Great Weapon Fighting).'] },
+      {
+        level: 1, name: 'Fighting Style', entries: ['Choose a combat specialization.'],
+        choice: { id: 'fighting-style', label: 'Fighting Style', count: 1, options: FIGHTER_FIGHTING_STYLES },
+      },
       { level: 1, name: 'Second Wind', entries: ['Bonus action to regain 1d10 + fighter level HP, once per short/long rest.'] },
       { level: 2, name: 'Action Surge', entries: ['Take one additional action on your turn, once per short/long rest.'] },
       { level: 3, name: 'Martial Archetype', entries: ['Choose a subclass.'] },
@@ -1295,7 +1365,10 @@ export const SRD_CLASSES: ClassData[] = [
     features: [
       { level: 1, name: 'Divine Sense', entries: ['Detect celestials, fiends, and undead nearby, limited uses per long rest.'] },
       { level: 1, name: 'Lay on Hands', entries: ['A pool of HP (5 x paladin level) usable to heal, refreshing on a long rest.'] },
-      { level: 2, name: 'Fighting Style', entries: ['Choose a combat specialization.'] },
+      {
+        level: 2, name: 'Fighting Style', entries: ['Choose a combat specialization.'],
+        choice: { id: 'fighting-style', label: 'Fighting Style', count: 1, options: PALADIN_FIGHTING_STYLES },
+      },
       { level: 2, name: 'Spellcasting', entries: ['Cast paladin spells using Charisma.'] },
       { level: 2, name: 'Divine Smite', entries: ['Expend a spell slot on a melee hit for extra radiant damage.'] },
       { level: 3, name: 'Divine Health', entries: ['Immune to disease.'] },
@@ -1312,7 +1385,10 @@ export const SRD_CLASSES: ClassData[] = [
     features: [
       { level: 1, name: 'Favored Enemy', entries: ['Bonuses tracking/recalling info about a chosen creature type.'] },
       { level: 1, name: 'Natural Explorer', entries: ['Bonuses to travel and exploration within a chosen favored terrain.'] },
-      { level: 2, name: 'Fighting Style', entries: ['Choose a combat specialization.'] },
+      {
+        level: 2, name: 'Fighting Style', entries: ['Choose a combat specialization.'],
+        choice: { id: 'fighting-style', label: 'Fighting Style', count: 1, options: RANGER_FIGHTING_STYLES },
+      },
       { level: 2, name: 'Spellcasting', entries: ['Cast ranger spells using Wisdom.'] },
       { level: 3, name: 'Ranger Archetype', entries: ['Choose a subclass.'] },
       { level: 3, name: 'Primeval Awareness', entries: ['Expend a spell slot to sense certain creature types nearby.'] },

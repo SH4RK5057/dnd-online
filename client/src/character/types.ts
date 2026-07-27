@@ -108,6 +108,12 @@ export interface CharacterRecord {
    * Improvement choice (either an ability bump or a feat, added to `feats`)
    * — prevents re-prompting at the same level after leveling past it. */
   resolvedAsiLevels: number[]
+  /** Selected option key(s) for each FeatureChoice this character has
+   * resolved (content/types.ts) — e.g. `{'draconic-ancestry': ['red']}` or
+   * `{'half-elf-ability-choice': ['dex', 'wis']}`, keyed by the choice's
+   * `id`. A choice's `id` is globally unique across this app's hand-authored
+   * SRD data, so no race/class namespacing is needed. */
+  featureChoices: Record<string, string[]>
   background: string
   alignment: string
   /** Final, derived scores — base (pre-racial) + the selected race's

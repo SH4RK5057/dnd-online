@@ -288,6 +288,11 @@ export function normalizeRace(raw: unknown, key: string): RaceData | null {
     speed: normalizeRaceSpeed(r.speed),
     abilityBonuses: normalizeAbilityBonuses(r.ability),
     traits: flattenNamedTraits(r.entries).slice(0, 10),
+    // Reliably detecting arbitrary racial choice patterns (breath weapons,
+    // "choose two abilities", etc.) in raw 5etools JSON isn't feasible
+    // generically — mirror-imported races just don't get choice UI, same
+    // as the ability "choose" variant above degrading to no bonus.
+    choices: [],
   }
 }
 

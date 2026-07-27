@@ -69,10 +69,36 @@ export interface ItemData {
   entries: string[]
 }
 
+/** One option within a FeatureChoice — e.g. a single Draconic Ancestry
+ * ("Red — Fire") or a single Fighting Style ("Archery"). `key` is what
+ * actually gets stored in CharacterRecord.featureChoices; `name`/
+ * `description` are display-only. */
+export interface FeatureChoiceOption {
+  key: string
+  name: string
+  description?: string
+}
+
+/** A choice a player must make to fully resolve a race or class feature —
+ * e.g. Dragonborn's Draconic Ancestry (pick 1 of 10, determines breath
+ * weapon damage type) or a Fighting Style (pick 1 of several). `count` is
+ * how many distinct options must be picked (1 for most choices; 2 for
+ * something like Half-Elf's "choose two abilities" case). `grantsAbilityBonus`
+ * is set only when this choice's options ARE ability keys and picking one
+ * grants a flat bonus to it (Half-Elf) — see
+ * character/rules.ts's computeChosenAbilityBonuses. */
+export interface FeatureChoice {
+  id: string
+  label: string
+  count: number
+  options: FeatureChoiceOption[]
+  grantsAbilityBonus?: number
+}
+
 /** Character-creation reference data — deliberately much thinner than a full
- * 5etools race entry (no subraces, no trait mechanics beyond a flat ability
- * bonus): just enough to drive rule-enforced character creation (racial
- * ability bonus, speed) plus a flavor-text summary. */
+ * 5etools race entry (no subraces): just enough to drive rule-enforced
+ * character creation (racial ability bonus, speed, choice-bearing traits
+ * like a Dragonborn's breath weapon) plus a flavor-text summary. */
 export interface RaceData {
   key: ContentKey
   source: ContentSource
@@ -81,20 +107,26 @@ export interface RaceData {
   speed: number
   abilityBonuses: Partial<Record<AbilityKey, number>>
   traits: string[]
+  /** SRD-authored only for now — mirror-imported races always get [] since
+   * reliably detecting arbitrary choice patterns in raw 5etools race JSON
+   * isn't feasible generically (see mirrorNormalize.ts's doc comments). */
+  choices: FeatureChoice[]
 }
 
-/** One class or subclass feature gained at a specific level — deliberately
- * just a name + reference text, not a structured mechanical effect: most 5e
- * features (Fighting Style options, Metamagic, Maneuvers, spell-known
- * changes, etc.) can't be reduced to a generic numeric formula. The handful
- * of features this app DOES model mechanically (class resource pools like
- * Rage/Ki/Sorcery Points) are computed separately by
- * character/rules.ts's computeClassResourceGrants, keyed off className+level
- * rather than off this text. */
+/** One class or subclass feature gained at a specific level — mostly just a
+ * name + reference text (most 5e features — Metamagic, Invocations,
+ * Maneuvers, spell-known changes, etc. — can't be reduced to a generic
+ * numeric formula), but a feature that requires picking one thing from a
+ * list (Fighting Style, a subclass's signature choice) can carry a
+ * `choice`. The handful of features this app models mechanically as
+ * numeric pools (Rage/Ki/Sorcery Points) are computed separately by
+ * character/rules.ts's computeClassResourceGrants, keyed off
+ * className+level rather than off this text. */
 export interface ClassFeatureData {
   level: number
   name: string
   entries: string[]
+  choice?: FeatureChoice
 }
 
 /** Character-creation reference data for classes — single-class only (see

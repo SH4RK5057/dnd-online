@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSession } from '../session/useSession'
 import { useConnectionStatus } from '../session/useConnectionStatus'
 import { getOrCreatePlayerId } from '../session/lastSession'
@@ -99,6 +99,29 @@ export function SessionScreen() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isMapFullscreen])
+
+  // A campaign without its DM isn't usable — once a player's peer list has
+  // shown a DM at least once, losing them again (past useConnectionStatus's
+  // own reconnect grace period, so a brief drop doesn't trigger this) means
+  // the DM closed the app/tab. Rather than leaving players stuck staring at
+  // a session with no host, send them back to the main menu.
+  const dmEverSeenRef = useRef(false)
+  useEffect(() => {
+    if (!session || session.role !== 'player') {
+      dmEverSeenRef.current = false
+      return
+    }
+    const dmPresent = peers.some((peer) => peer.role === 'dm')
+    if (dmPresent) {
+      dmEverSeenRef.current = true
+      return
+    }
+    if (dmEverSeenRef.current) {
+      dmEverSeenRef.current = false
+      window.alert('The DM has disconnected. Returning to the main menu.')
+      leaveSession()
+    }
+  }, [session, peers, leaveSession])
 
   if (!session) return null
 

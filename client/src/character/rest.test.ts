@@ -16,6 +16,7 @@ function baseCharacter(overrides: Partial<CharacterRecord> = {}): CharacterRecor
     level: 5,
     xp: 0,
     resolvedAsiLevels: [],
+    featureChoices: {},
     background: '',
     alignment: '',
     abilities: emptyAbilityScores(),

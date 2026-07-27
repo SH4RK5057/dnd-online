@@ -104,6 +104,7 @@ export function newBlankCharacter(ownerId: string, name: string): CharacterRecor
     level: 1,
     xp: 0,
     resolvedAsiLevels: [],
+    featureChoices: {},
     background: '',
     alignment: '',
     abilities: emptyAbilityScores(),

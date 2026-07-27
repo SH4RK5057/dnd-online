@@ -1,14 +1,25 @@
 import type { AbilityKey, AbilityScores, CharacterRecord, ResourceEntry, SkillId } from './types'
 import type { TokenRecord } from '../map/types'
+import type { RaceData } from '../content/types'
+
+const ABILITY_KEYS_SET = new Set<string>(['str', 'dex', 'con', 'int', 'wis', 'cha'])
 
 /** Fills in fields for a CharacterRecord persisted (localStorage or an
  * existing campaign Yjs doc) before those fields existed — `abilities` is
  * treated as if it were already the base (no racial bonus known), which is
  * the only reasonable assumption without re-deriving history; `xp`/
- * `subclassName`/`resolvedAsiLevels` default to "hasn't leveled up under
- * this system yet." Every character read path should go through this. */
+ * `subclassName`/`resolvedAsiLevels`/`featureChoices` default to "hasn't
+ * leveled up / made any choices under this system yet." Every character
+ * read path should go through this. */
 export function normalizeCharacterRecord(character: CharacterRecord): CharacterRecord {
-  if (character.abilityMethod && character.baseAbilities && character.resolvedAsiLevels && character.subclassName !== undefined && character.xp !== undefined) {
+  if (
+    character.abilityMethod &&
+    character.baseAbilities &&
+    character.resolvedAsiLevels &&
+    character.subclassName !== undefined &&
+    character.xp !== undefined &&
+    character.featureChoices
+  ) {
     return character
   }
   return {
@@ -18,6 +29,7 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     subclassName: character.subclassName ?? '',
     xp: character.xp ?? 0,
     resolvedAsiLevels: character.resolvedAsiLevels ?? [],
+    featureChoices: character.featureChoices ?? {},
   }
 }
 
@@ -132,6 +144,45 @@ export function applyRacialBonus(base: AbilityScores, bonuses: Partial<Record<Ab
     wis: base.wis + (bonuses.wis ?? 0),
     cha: base.cha + (bonuses.cha ?? 0),
   }
+}
+
+/** Sums two partial ability-bonus maps together (rather than one
+ * overwriting the other) — used to combine a race's flat `abilityBonuses`
+ * with any additional bonuses granted by a resolved FeatureChoice (see
+ * computeChosenAbilityBonuses). */
+export function combineAbilityBonuses(
+  a: Partial<Record<AbilityKey, number>>,
+  b: Partial<Record<AbilityKey, number>>,
+): Partial<Record<AbilityKey, number>> {
+  const out: Partial<Record<AbilityKey, number>> = { ...a }
+  for (const [key, value] of Object.entries(b)) {
+    if (typeof value !== 'number') continue
+    const k = key as AbilityKey
+    out[k] = (out[k] ?? 0) + value
+  }
+  return out
+}
+
+/** Derives extra ability bonuses from a race's resolved FeatureChoices whose
+ * options ARE ability keys (e.g. Half-Elf's "choose two abilities for +1
+ * each") — `grantsAbilityBonus` marks which of a race's choices this
+ * applies to; a choice without it (Dragonborn's Draconic Ancestry) is
+ * skipped since its options aren't ability keys. Unresolved choices (not
+ * yet in `featureChoices`) simply contribute nothing yet. */
+export function computeChosenAbilityBonuses(
+  race: Pick<RaceData, 'choices'>,
+  featureChoices: Record<string, string[]>,
+): Partial<Record<AbilityKey, number>> {
+  let bonuses: Partial<Record<AbilityKey, number>> = {}
+  for (const choice of race.choices) {
+    if (!choice.grantsAbilityBonus) continue
+    const selected = featureChoices[choice.id] ?? []
+    for (const optionKey of selected) {
+      if (!ABILITY_KEYS_SET.has(optionKey)) continue
+      bonuses = combineAbilityBonuses(bonuses, { [optionKey]: choice.grantsAbilityBonus })
+    }
+  }
+  return bonuses
 }
 
 /** The 5e Standard Array — each value must be assigned to exactly one

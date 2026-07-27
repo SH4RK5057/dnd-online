@@ -19,6 +19,7 @@ describe('normalizeRace', () => {
       speed: 30,
       abilityBonuses: { str: 2, con: 1 },
       traits: ['Darkvision', 'Relentless Endurance', 'Savage Attacks'],
+      choices: [],
     })
   })
 

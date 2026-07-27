@@ -4,6 +4,8 @@ import { ABILITY_LABELS, SKILL_LABELS } from '../character/types'
 import {
   applyAbilityScoreImprovement,
   applyRacialBonus,
+  combineAbilityBonuses,
+  computeChosenAbilityBonuses,
   computeClassResourceGrants,
   computeInitiativeBonus,
   computeMaxHp,
@@ -24,7 +26,7 @@ import {
 } from '../character/rules'
 import type { RollCategory } from '../dice/conditions'
 import type { UseInventoryActionsResult } from '../character/useInventoryActions'
-import type { ClassData, RaceData, SubclassData } from '../content/types'
+import type { ClassData, FeatureChoice, RaceData, SubclassData } from '../content/types'
 import { CharacterInventory } from './CharacterInventory'
 import { CharacterSpells } from './CharacterSpells'
 import { InventoryHistoryList } from './InventoryHistoryPanel'
@@ -46,6 +48,16 @@ function fmtMod(mod: number): string {
 function standardArrayOptionsFor(key: AbilityKey, base: AbilityScores): number[] {
   const usedElsewhere = new Set(ABILITY_KEYS.filter((k) => k !== key).map((k) => base[k]))
   return STANDARD_ARRAY.filter((v) => v === base[key] || !usedElsewhere.has(v))
+}
+
+/** A race's flat abilityBonuses plus whatever extra bonuses its resolved
+ * FeatureChoices grant (e.g. Half-Elf's "choose two abilities") — every
+ * applyRacialBonus call site should go through this rather than reading
+ * `race.abilityBonuses` directly, so a chosen ability bonus actually takes
+ * effect. */
+function effectiveAbilityBonusesFor(race: RaceData | null, featureChoices: Record<string, string[]>): Partial<Record<AbilityKey, number>> {
+  if (!race) return {}
+  return combineAbilityBonuses(race.abilityBonuses, computeChosenAbilityBonuses(race, featureChoices))
 }
 
 export function CharacterSheet({
@@ -142,7 +154,7 @@ export function CharacterSheet({
       }
       nextResolvedAsi = [...character.resolvedAsiLevels, nextLevel]
     }
-    const nextAbilities = applyRacialBonus(nextBaseAbilities, selectedRace?.abilityBonuses ?? {})
+    const nextAbilities = applyRacialBonus(nextBaseAbilities, effectiveAbilityBonusesFor(selectedRace, character.featureChoices))
     const patch: Partial<CharacterRecord> = {
       level: nextLevel,
       baseAbilities: nextBaseAbilities,
@@ -191,7 +203,7 @@ export function CharacterSheet({
         : method === 'pointBuy'
           ? { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 }
           : character.baseAbilities
-    const abilities = applyRacialBonus(nextBase, selectedRace?.abilityBonuses ?? {})
+    const abilities = applyRacialBonus(nextBase, effectiveAbilityBonusesFor(selectedRace, character.featureChoices))
     onUpdate({
       abilityMethod: method,
       baseAbilities: nextBase,
@@ -200,9 +212,23 @@ export function CharacterSheet({
     })
   }
 
+  /** Manual mode is clamped to [3,18] — no legitimate 5e ability-generation
+   * method (Standard Array, Point Buy, or rolling) produces a base score
+   * outside that range without magic, so free typing can't be used to set
+   * every ability to 20. Point Buy changes that would exceed the 27-point
+   * budget (or leave the buyable 8-15 range) are rejected outright rather
+   * than merely flagged, since the existing "over budget" hint alone didn't
+   * stop anything from actually being saved. */
   function handleBaseAbilityChange(key: AbilityKey, value: number) {
-    const nextBase = { ...character.baseAbilities, [key]: value }
-    const abilities = applyRacialBonus(nextBase, selectedRace?.abilityBonuses ?? {})
+    let nextValue = value
+    if (character.abilityMethod === 'manual') {
+      nextValue = Math.min(18, Math.max(3, value))
+    } else if (character.abilityMethod === 'pointBuy') {
+      nextValue = Math.min(15, Math.max(8, value))
+    }
+    const nextBase = { ...character.baseAbilities, [key]: nextValue }
+    if (character.abilityMethod === 'pointBuy' && pointBuyCost(nextBase) > POINT_BUY_BUDGET) return
+    const abilities = applyRacialBonus(nextBase, effectiveAbilityBonusesFor(selectedRace, character.featureChoices))
     onUpdate({
       baseAbilities: nextBase,
       abilities,
@@ -212,11 +238,27 @@ export function CharacterSheet({
 
   function handleRaceChange(name: string) {
     const race = races.find((r) => r.name === name) ?? null
-    const abilities = applyRacialBonus(character.baseAbilities, race?.abilityBonuses ?? {})
+    const abilities = applyRacialBonus(character.baseAbilities, effectiveAbilityBonusesFor(race, character.featureChoices))
     onUpdate({
       race: name,
       abilities,
       ...(race ? { speed: race.speed } : {}),
+      ...(selectedClass ? recomputedHp(selectedClass.hitDie, character.level, abilities) : {}),
+    })
+  }
+
+  /** Shared handler for every FeatureChoice this sheet renders — race
+   * choices (Draconic Ancestry, Half-Elf's ability picks) and class/subclass
+   * feature choices (Fighting Style) alike. Recomputing `abilities`/`hp`
+   * unconditionally is harmless even for choices that don't affect them
+   * (e.g. Fighting Style): computeChosenAbilityBonuses only reacts to race
+   * choices with `grantsAbilityBonus` set, so anything else is a no-op. */
+  function handleFeatureChoiceChange(choiceId: string, selectedKeys: string[]) {
+    const nextFeatureChoices = { ...character.featureChoices, [choiceId]: selectedKeys }
+    const abilities = applyRacialBonus(character.baseAbilities, effectiveAbilityBonusesFor(selectedRace, nextFeatureChoices))
+    onUpdate({
+      featureChoices: nextFeatureChoices,
+      abilities,
       ...(selectedClass ? recomputedHp(selectedClass.hitDie, character.level, abilities) : {}),
     })
   }
@@ -257,6 +299,67 @@ export function CharacterSheet({
         ? { hitDice: `${level}d${selectedClass.hitDie}`, ...recomputedHp(selectedClass.hitDie, level, character.abilities) }
         : {}),
     })
+  }
+
+  /** Renders one FeatureChoice's control — a single <select> when only one
+   * option may be picked (Draconic Ancestry, Fighting Style), or a
+   * checkbox list capped at `count` when more than one may be (Half-Elf's
+   * "choose two abilities"), matching the same capped-checkbox pattern
+   * already used for skill-proficiency picks. */
+  function renderFeatureChoice(choice: FeatureChoice) {
+    const selected = character.featureChoices[choice.id] ?? []
+    const resolved = selected.length >= choice.count
+    if (choice.count === 1) {
+      return (
+        <label key={choice.id}>
+          {choice.label}
+          {!resolved && ' (required)'}
+          <select
+            value={selected[0] ?? ''}
+            disabled={!blueprintEditable}
+            onChange={(e) => handleFeatureChoiceChange(choice.id, e.target.value ? [e.target.value] : [])}
+          >
+            <option value="">Select…</option>
+            {choice.options.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.name}
+                {opt.description ? ` — ${opt.description}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      )
+    }
+    return (
+      <div key={choice.id}>
+        <strong>
+          {choice.label} ({selected.length}/{choice.count} chosen)
+        </strong>
+        <ul className="character-sheet__row-list">
+          {choice.options.map((opt) => {
+            const checked = selected.includes(opt.key)
+            const atCap = !checked && selected.length >= choice.count
+            return (
+              <li key={opt.key}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!blueprintEditable || atCap}
+                    onChange={(e) => {
+                      const next = e.target.checked ? [...selected, opt.key] : selected.filter((k) => k !== opt.key)
+                      handleFeatureChoiceChange(choice.id, next)
+                    }}
+                  />
+                  {opt.name}
+                  {opt.description ? ` — ${opt.description}` : ''}
+                </label>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    )
   }
 
   return (
@@ -366,7 +469,7 @@ export function CharacterSheet({
           {(selectedRace || selectedClass) && (
             <>
               <h3>Features & traits</h3>
-              {selectedRace && selectedRace.traits.length > 0 && (
+              {selectedRace && (selectedRace.traits.length > 0 || selectedRace.choices.length > 0) && (
                 <div className="character-sheet__features-group">
                   <strong>{selectedRace.name}</strong>
                   <ul className="character-sheet__row-list">
@@ -374,6 +477,7 @@ export function CharacterSheet({
                       <li key={i}>{trait}</li>
                     ))}
                   </ul>
+                  {selectedRace.choices.map((choice) => renderFeatureChoice(choice))}
                 </div>
               )}
               {selectedClass && (
@@ -388,6 +492,7 @@ export function CharacterSheet({
                             Lvl {f.level} — {f.name}:
                           </strong>{' '}
                           {f.entries.join(' ')}
+                          {f.choice && <div>{renderFeatureChoice(f.choice)}</div>}
                         </li>
                       ))}
                   </ul>
@@ -405,6 +510,7 @@ export function CharacterSheet({
                             Lvl {f.level} — {f.name}:
                           </strong>{' '}
                           {f.entries.join(' ')}
+                          {f.choice && <div>{renderFeatureChoice(f.choice)}</div>}
                         </li>
                       ))}
                   </ul>

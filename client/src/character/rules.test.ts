@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   applyAbilityScoreImprovement,
   applyRacialBonus,
+  combineAbilityBonuses,
+  computeChosenAbilityBonuses,
   computeClassResourceGrants,
   computeInitiativeBonus,
   computeMaxHp,
@@ -66,6 +68,7 @@ function baseCharacter(): CharacterRecord {
     level: 5,
     xp: 0,
     resolvedAsiLevels: [],
+    featureChoices: {},
     background: '',
     alignment: '',
     abilities: { str: 16, dex: 14, con: 12, int: 10, wis: 8, cha: 13 },
@@ -403,5 +406,41 @@ describe('computeClassResourceGrants / mergeClassResourceGrants', () => {
     const existing = [{ id: 'r1', name: 'Ki Points', current: 5, max: 5 }]
     const merged = mergeClassResourceGrants(existing, [{ name: 'Ki Points', max: 3 }])
     expect(merged[0].current).toBe(3)
+  })
+})
+
+describe('combineAbilityBonuses', () => {
+  it('sums overlapping keys instead of overwriting', () => {
+    expect(combineAbilityBonuses({ str: 1, con: 2 }, { str: 1, dex: 1 })).toEqual({ str: 2, con: 2, dex: 1 })
+  })
+
+  it('handles empty inputs', () => {
+    expect(combineAbilityBonuses({}, {})).toEqual({})
+    expect(combineAbilityBonuses({ cha: 2 }, {})).toEqual({ cha: 2 })
+  })
+})
+
+describe('computeChosenAbilityBonuses', () => {
+  it('grants a bonus for each selected option on a grantsAbilityBonus choice', () => {
+    const race = {
+      choices: [
+        { id: 'half-elf-ability-choice', label: 'Choose two', count: 2, grantsAbilityBonus: 1, options: [] },
+      ],
+    }
+    expect(computeChosenAbilityBonuses(race, { 'half-elf-ability-choice': ['dex', 'wis'] })).toEqual({ dex: 1, wis: 1 })
+  })
+
+  it('ignores choices without grantsAbilityBonus (e.g. Draconic Ancestry)', () => {
+    const race = {
+      choices: [{ id: 'draconic-ancestry', label: 'Draconic Ancestry', count: 1, options: [] }],
+    }
+    expect(computeChosenAbilityBonuses(race, { 'draconic-ancestry': ['red'] })).toEqual({})
+  })
+
+  it('contributes nothing for an unresolved choice', () => {
+    const race = {
+      choices: [{ id: 'half-elf-ability-choice', label: 'Choose two', count: 2, grantsAbilityBonus: 1, options: [] }],
+    }
+    expect(computeChosenAbilityBonuses(race, {})).toEqual({})
   })
 })
