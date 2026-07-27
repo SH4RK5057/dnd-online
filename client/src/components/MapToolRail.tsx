@@ -3,9 +3,8 @@ import { useSession } from '../session/useSession'
 import { useWalls } from '../map/useWalls'
 import { useLights } from '../map/useLights'
 import { useTokens } from '../map/useTokens'
-import { useAnnotations } from '../map/useAnnotations'
 import { TokenUploadButton } from './TokenUploadButton'
-import { MoveIcon, WallIcon, TorchIcon, TokenPawnIcon, QuillIcon } from './icons'
+import { MoveIcon, WallIcon, TorchIcon, TokenPawnIcon } from './icons'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingTokenPlacement } from '../screens/pendingTokenPlacement'
 
@@ -16,17 +15,19 @@ function hexToColor(hex: string): number {
   return parseInt(hex.slice(1), 16)
 }
 
-type OpenPanel = 'walls' | 'lights' | 'tokens' | 'annotations' | null
+type OpenPanel = 'walls' | 'lights' | 'tokens' | null
 
 /** DM-only floating tool rail over the left edge of the map: a strip of icon
  * buttons for each map-editing tool, with that tool's options appearing in a
  * popout panel to the right. Replaces the old always-expanded DrawingToolbar
  * (and TokenUploadButton's sidebar slot) — the rail's `toolMode` icons (Move/
  * Walls/Lights) drive the same exclusive `toolMode` state SessionScreen
- * already owned; Tokens and Annotations are independent, non-exclusive
- * popouts since neither corresponds 1:1 with the interaction mode (token
+ * already owned; Tokens is an independent, non-exclusive popout since token
  * placement is staged via a form and only becomes its own mode once
- * submitted, and shift-drag annotations work regardless of the active tool). */
+ * submitted. Annotations/pinging live in Run Campaign instead — they're
+ * live-session communication aids, not scene-editing tools, and Scene
+ * Builder's canvas disables both outright (see MapCanvas's enablePing/
+ * enableAnnotations props). */
 export function MapToolRail({
   sceneId,
   toolMode,
@@ -56,7 +57,6 @@ export function MapToolRail({
   const { lights, setLightRadius, setLightColor, setLightEnabled, attachLightToToken, detachLight, deleteLight } =
     useLights(doc, sceneId)
   const { tokens } = useTokens(doc, sceneId)
-  const { annotations, clearAll: clearAllAnnotations } = useAnnotations(doc, sceneId, true)
 
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null)
 
@@ -73,7 +73,7 @@ export function MapToolRail({
     setOpenPanel(panel)
   }
 
-  const toggleNonExclusive = (panel: 'tokens' | 'annotations') => {
+  const toggleNonExclusive = (panel: 'tokens') => {
     setOpenPanel((prev) => (prev === panel ? null : panel))
   }
 
@@ -93,7 +93,6 @@ export function MapToolRail({
     walls: 'Draw Walls',
     lights: 'Place Lights',
     tokens: 'Place Tokens',
-    annotations: 'Annotations',
   }
 
   return (
@@ -120,15 +119,6 @@ export function MapToolRail({
         </button>
         <button type="button" aria-pressed={openPanel === 'tokens'} title="Place tokens" onClick={() => toggleNonExclusive('tokens')}>
           <TokenPawnIcon />
-        </button>
-        <div className="map-tool-rail__divider" />
-        <button
-          type="button"
-          aria-pressed={openPanel === 'annotations'}
-          title="Annotations"
-          onClick={() => toggleNonExclusive('annotations')}
-        >
-          <QuillIcon />
         </button>
       </div>
 
@@ -231,18 +221,6 @@ export function MapToolRail({
                 onRequestPlacement={onRequestPlacement}
                 onCancelPlacement={onCancelPlacement}
               />
-            </div>
-          )}
-
-          {openPanel === 'annotations' && (
-            <div className="map-tool-rail__popout-body">
-              <p className="map-tool-rail__hint">
-                Shift-drag anywhere on empty map to sketch a temporary annotation — works for everyone in any tool
-                mode, and fades away on its own after about a minute.
-              </p>
-              <button type="button" onClick={clearAllAnnotations} disabled={annotations.length === 0}>
-                Clear all annotations ({annotations.length})
-              </button>
             </div>
           )}
         </div>

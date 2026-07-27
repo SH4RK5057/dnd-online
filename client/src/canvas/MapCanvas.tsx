@@ -43,6 +43,14 @@ interface MapCanvasProps {
   wallThickness: number
   onPlaceToken?: (x: number, y: number) => void
   onPlacePoi?: (x: number, y: number) => void
+  /** Double-click-to-ping and shift-drag annotations are live-session
+   * communication aids, not scene-editing tools — Scene Builder's canvas
+   * disables both (default true) so they can't fire mid-gesture while
+   * drawing walls/lights, whose own click-handling already takes priority
+   * via Pixi hit-testing but whose native dblclick detection isn't gated by
+   * that at all, since it listens on the raw DOM canvas element. */
+  enablePing?: boolean
+  enableAnnotations?: boolean
   /** DM-only: when set, the DM's own canvas renders exactly what this
    * player currently sees (their fog mask, their exploration memory)
    * instead of the DM's always-unmasked view. Always null for players. */
@@ -60,6 +68,8 @@ export function MapCanvas({
   wallThickness,
   onPlaceToken,
   onPlacePoi,
+  enablePing = true,
+  enableAnnotations = true,
   previewPlayerId = null,
   selectedTokenId = null,
   onSelectToken,
@@ -399,7 +409,10 @@ export function MapCanvas({
     // a communication aid, not an editing tool. A native DOM listener rather
     // than a Pixi one, same reasoning as the wheel handler above: it's not
     // tied to any particular interactive object, just "wherever the cursor
-    // is on the canvas."
+    // is on the canvas" — which also means it's NOT gated by Pixi's own
+    // hit-testing the way wall/light tool clicks are, so it has to be
+    // disabled outright (enablePing=false, Scene Builder) rather than relying
+    // on toolMode to keep it from firing mid-gesture while drawing.
     const onDblClick = (event: MouseEvent) => {
       const world = worldRef.current
       if (!world || !activeScene) return
@@ -407,7 +420,7 @@ export function MapCanvas({
       const local = world.toLocal({ x: event.clientX - rect.left, y: event.clientY - rect.top })
       createPing(getOrCreatePlayerId(), session?.displayName ?? 'Player', local.x / activeScene.gridSizePx, local.y / activeScene.gridSizePx)
     }
-    app.canvas.addEventListener('dblclick', onDblClick)
+    if (enablePing) app.canvas.addEventListener('dblclick', onDblClick)
 
     let panning = false
     let panStart = { x: 0, y: 0 }
@@ -426,7 +439,7 @@ export function MapCanvas({
     const onPointerDown = (event: FederatedPointerEvent) => {
       if (event.target !== app.stage || event.button !== 0) return
 
-      if (event.shiftKey) {
+      if (event.shiftKey && enableAnnotations) {
         const world = worldRef.current
         if (!world || !activeScene) return
         annotating = true
@@ -495,7 +508,18 @@ export function MapCanvas({
       app.stage.off('pointerup', onPointerUp)
       app.stage.off('pointerupoutside', onPointerUp)
     }
-  }, [app, toolMode, activeScene, onPlaceToken, onPlacePoi, createPing, createAnnotation, session?.displayName])
+  }, [
+    app,
+    toolMode,
+    activeScene,
+    onPlaceToken,
+    onPlacePoi,
+    enablePing,
+    enableAnnotations,
+    createPing,
+    createAnnotation,
+    session?.displayName,
+  ])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />
 }

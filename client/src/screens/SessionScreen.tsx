@@ -13,6 +13,7 @@ import { CharacterPanel } from '../components/CharacterPanel'
 import { FogLightingPanel } from '../components/FogLightingPanel'
 import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
 import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
+import { AnnotationsPanel } from '../components/AnnotationsPanel'
 import { DiceRollerPanel } from '../components/DiceRollerPanel'
 import { RollLog } from '../components/RollLog'
 import { InitiativeTracker } from '../components/InitiativeTracker'
@@ -205,6 +206,8 @@ export function SessionScreen() {
             onRequestPoiPlacement={setPendingPoiPlacement}
             onCancelPoiPlacement={() => setPendingPoiPlacement(null)}
           />
+
+          <AnnotationsPanel />
 
           {/* Character sheet, dice, initiative, chat, handouts, and the
               compendium lookup are shared between DM and players — everyone

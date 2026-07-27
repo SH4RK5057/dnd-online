@@ -124,7 +124,14 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className={`session-screen__main${isMapFullscreen ? ' session-screen__main--fullscreen' : ''}`}>
-          <MapCanvas toolMode={effectiveToolMode} snapWalls={snapWalls} wallThickness={wallThickness} onPlaceToken={handlePlaceToken} />
+          <MapCanvas
+            toolMode={effectiveToolMode}
+            snapWalls={snapWalls}
+            wallThickness={wallThickness}
+            onPlaceToken={handlePlaceToken}
+            enablePing={false}
+            enableAnnotations={false}
+          />
           {activeSceneId && (
             <MapToolRail
               sceneId={activeSceneId}
