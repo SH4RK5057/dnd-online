@@ -42,8 +42,12 @@ interface EndpointHit {
  * click-chain drawing. Click once to start a chain, click again to commit a
  * segment from the last point to the new one and continue the chain from
  * there, right-click to end the chain without starting a new segment.
- * Shift-click an existing wall to delete it. Dragging an existing endpoint
- * (rather than empty space) moves that point instead of starting a chain.
+ * Shift-click an existing wall to delete it. A press near an existing
+ * endpoint is ambiguous until release, same as the first point of a new
+ * chain: an actual drag moves that point, but a stationary click there
+ * starts a new chain from it instead (magnet-snapped exactly onto it) —
+ * connecting a new wall to an existing corner is normal DM behavior and
+ * must not be swallowed as a no-op "drag" that silently does nothing.
  */
 export class WallLayer {
   readonly container = new Container()
@@ -69,6 +73,11 @@ export class WallLayer {
    * handlePointerUp's doc comment. */
   private downPoint: { x: number; y: number } | null = null
   private draggingEndpoint: EndpointHit | null = null
+  /** True once a press near an endpoint has actually moved past the drag
+   * threshold — see handlePointerMove/handlePointerUp. While false,
+   * `draggingEndpoint` is only a candidate: the gesture might still resolve
+   * as "start a new chain here" instead of "drag this point." */
+  private endpointDragConfirmed = false
   private lastWriteAt = 0
 
   constructor() {
@@ -113,6 +122,7 @@ export class WallLayer {
       this.pendingStart = null
       this.downPoint = null
       this.draggingEndpoint = null
+      this.endpointDragConfirmed = false
       this.previewGraphics.clear()
     }
     this.active = active
@@ -238,19 +248,16 @@ export class WallLayer {
       return
     }
 
-    if (!this.pendingStart) {
-      const endpointHit = this.findEndpointNear(point)
-      if (endpointHit) {
-        this.draggingEndpoint = endpointHit
-        this.lastWriteAt = 0
-        return
-      }
-    }
-
-    // Every commit decision is made in handlePointerUp instead of here — see
-    // its comment for why. This just remembers where the current press
-    // started.
+    // Every commit decision (including "was this a click or a drag") is
+    // made in handlePointerUp/handlePointerMove instead of here — this just
+    // remembers where the current press started, and — if it landed near an
+    // existing endpoint — which one, in case the gesture turns into a drag.
     this.downPoint = point
+    if (!this.pendingStart) {
+      this.draggingEndpoint = this.findEndpointNear(point)
+      this.endpointDragConfirmed = false
+      this.lastWriteAt = 0
+    }
   }
 
   private handleRightDown = (event: FederatedPointerEvent) => {
@@ -263,7 +270,16 @@ export class WallLayer {
   private handlePointerMove = (event: FederatedPointerEvent) => {
     if (!this.active) return
 
-    if (this.draggingEndpoint && this.callbacks) {
+    if (this.draggingEndpoint) {
+      if (!this.endpointDragConfirmed) {
+        if (!this.downPoint) return
+        const probe = this.toGridPoint(event, this.draggingEndpoint)
+        const dragDistancePx = Math.hypot(probe.x - this.downPoint.x, probe.y - this.downPoint.y) * this.gridSizePx * this.viewScale
+        if (dragDistancePx < DRAG_COMMIT_THRESHOLD_PX) return
+        this.endpointDragConfirmed = true
+        this.lastWriteAt = 0
+      }
+      if (!this.callbacks) return
       const now = performance.now()
       if (now - this.lastWriteAt < DRAG_WRITE_INTERVAL_MS) return
       this.lastWriteAt = now
@@ -286,14 +302,29 @@ export class WallLayer {
   }
 
   private handlePointerUp = (event: FederatedPointerEvent) => {
-    if (this.draggingEndpoint && this.callbacks) {
-      // Always land on the exact release position, even if the last move tick was throttled away.
-      const point = this.toGridPoint(event, this.draggingEndpoint)
-      this.callbacks.onUpdateWallEndpoint(this.draggingEndpoint.wall.id, this.draggingEndpoint.which, point.x, point.y)
+    if (this.draggingEndpoint) {
+      const endpointHit = this.draggingEndpoint
+      const wasConfirmedDrag = this.endpointDragConfirmed
       this.draggingEndpoint = null
+      this.endpointDragConfirmed = false
+      this.downPoint = null
+      if (!this.callbacks) return
+      if (wasConfirmedDrag) {
+        // Always land on the exact release position, even if the last move tick was throttled away.
+        const point = this.toGridPoint(event, endpointHit)
+        this.callbacks.onUpdateWallEndpoint(endpointHit.wall.id, endpointHit.which, point.x, point.y)
+        return
+      }
+      // The press landed near this endpoint but never actually dragged it —
+      // a stationary click here almost always means "start a new wall from
+      // this corner," not "re-write this endpoint to virtually the same
+      // spot and do nothing." Start a fresh chain from it instead; magnet-
+      // snap (built into toGridPoint) lands pendingStart exactly on it so
+      // the new wall connects with no gap.
+      if (!this.active) return
+      this.pendingStart = this.toGridPoint(event)
       return
     }
-    this.draggingEndpoint = null
 
     if (!this.active || !this.callbacks || !this.downPoint) return
     const point = this.toGridPoint(event)

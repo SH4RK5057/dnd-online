@@ -36,11 +36,7 @@ export function SceneToolbar() {
     setSceneMap,
     updateGrid,
     toggleFog,
-    publishScene,
     setAmbientBrightness,
-    togglePersistentFog,
-    resetExploration,
-    toggleSharedVision,
   } = useScenes(doc)
 
   const [newSceneName, setNewSceneName] = useState('')
@@ -113,13 +109,6 @@ export function SceneToolbar() {
       setSceneImportError(err instanceof Error ? err.message : 'Could not import that file.')
     } finally {
       if (sceneFileInputRef.current) sceneFileInputRef.current.value = ''
-    }
-  }
-
-  const handleResetExploration = () => {
-    if (!activeScene) return
-    if (window.confirm(`Reset players' memory of "${activeScene.name}"? They'll see it fogged again until they re-explore.`)) {
-      resetExploration(activeScene.id)
     }
   }
 
@@ -270,77 +259,6 @@ export function SceneToolbar() {
                 />
               </div>
             )}
-          </section>
-
-          <section className="scene-toolbar__section">
-            <h3 className="scene-toolbar__heading">Fog &amp; lighting</h3>
-            <div className="scene-toolbar__row">
-              <label htmlFor="fog-enabled">
-                <input
-                  id="fog-enabled"
-                  type="checkbox"
-                  checked={activeScene.fogEnabled}
-                  onChange={(event) => toggleFog(activeScene.id, event.target.checked)}
-                />
-                Fog of war
-              </label>
-              <label htmlFor="ambient-brightness">
-                Ambient light ({Math.round((activeScene.ambientBrightness ?? 1) * 100)}%)
-              </label>
-              <input
-                id="ambient-brightness"
-                type="range"
-                min={0}
-                max={100}
-                value={Math.round((activeScene.ambientBrightness ?? 1) * 100)}
-                onChange={(event) => setAmbientBrightness(activeScene.id, Number(event.target.value) / 100)}
-              />
-            </div>
-
-            {activeScene.fogEnabled && (
-              <>
-                <div className="scene-toolbar__row">
-                  <label htmlFor="persistent-fog-enabled">
-                    <input
-                      id="persistent-fog-enabled"
-                      type="checkbox"
-                      checked={activeScene.persistentFogEnabled ?? true}
-                      onChange={(event) => togglePersistentFog(activeScene.id, event.target.checked)}
-                    />
-                    Remember explored areas
-                  </label>
-                  <button type="button" onClick={handleResetExploration}>
-                    Reset players' memory of this scene
-                  </button>
-                </div>
-                <div className="scene-toolbar__row">
-                  <label htmlFor="shared-vision-enabled">
-                    <input
-                      id="shared-vision-enabled"
-                      type="checkbox"
-                      checked={activeScene.sharedVisionEnabled ?? false}
-                      onChange={(event) => toggleSharedVision(activeScene.id, event.target.checked)}
-                    />
-                    Share vision between players
-                  </label>
-                </div>
-              </>
-            )}
-
-            <div className="scene-toolbar__row">
-              <label htmlFor="scene-published">
-                <input
-                  id="scene-published"
-                  type="checkbox"
-                  checked={activeScene.published !== false}
-                  onChange={(event) => publishScene(activeScene.id, event.target.checked)}
-                />
-                Visible to players
-              </label>
-              {activeScene.published === false && (
-                <span className="scene-toolbar__hint">Players see a "not ready yet" message until you turn this on.</span>
-              )}
-            </div>
           </section>
         </>
       )}

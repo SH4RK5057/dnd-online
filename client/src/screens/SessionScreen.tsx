@@ -10,6 +10,9 @@ import { PeerList } from '../components/PeerList'
 import { CopyJoinCode } from '../components/CopyJoinCode'
 import { ConnectionErrorPanel } from '../components/ConnectionErrorPanel'
 import { CharacterPanel } from '../components/CharacterPanel'
+import { FogLightingPanel } from '../components/FogLightingPanel'
+import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
+import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
 import { DiceRollerPanel } from '../components/DiceRollerPanel'
 import { RollLog } from '../components/RollLog'
 import { InitiativeTracker } from '../components/InitiativeTracker'
@@ -45,6 +48,7 @@ export function SessionScreen() {
   const [isMapFullscreen, setIsMapFullscreen] = useState(false)
   const [showJoinCode, setShowJoinCode] = useState(true)
   const [pendingPoiPlacement, setPendingPoiPlacement] = useState<PendingPoiPlacement | null>(null)
+  const [previewPlayerId, setPreviewPlayerId] = useState<string | null>(null)
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null)
   const [showCharacterSheet, setShowCharacterSheet] = useState(true)
   const [showDiceRoller, setShowDiceRoller] = useState(true)
@@ -99,7 +103,8 @@ export function SessionScreen() {
     session.role === 'player' && !!activeScene?.fogEnabled && !tokens.some((t) => t.ownerId === getOrCreatePlayerId())
   const isUnpublishedForPlayer = session.role === 'player' && !!activeScene && activeScene.published === false
 
-  const effectiveToolMode: ToolMode = pendingPoiPlacement ? 'place-pois' : 'move'
+  const isPreviewingPlayer = session.role === 'dm' && previewPlayerId !== null
+  const effectiveToolMode: ToolMode = isPreviewingPlayer ? 'move' : pendingPoiPlacement ? 'place-pois' : 'move'
 
   const handlePlacePoi = (x: number, y: number) => {
     if (!pendingPoiPlacement || !activeSceneId) return
@@ -159,6 +164,12 @@ export function SessionScreen() {
                   Character Builder
                 </button>
               </div>
+
+              <FogLightingPanel />
+
+              {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
+
+              <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />
 
               <button type="button" onClick={() => setShowDmNotes((v) => !v)}>
                 {showDmNotes ? 'Hide DM notes' : 'Show DM notes'}
@@ -263,6 +274,7 @@ export function SessionScreen() {
                 snapWalls={false}
                 wallThickness={DEFAULT_WALL_THICKNESS_PX}
                 onPlacePoi={handlePlacePoi}
+                previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
                 selectedTokenId={selectedTokenId}
                 onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
               />

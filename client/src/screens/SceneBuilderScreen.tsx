@@ -4,8 +4,6 @@ import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { SceneToolbar } from '../components/SceneToolbar'
 import { MapToolRail } from '../components/MapToolRail'
-import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
-import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
 import { CompendiumDrawer } from '../components/CompendiumDrawer'
 import { HomebrewEditor } from '../components/HomebrewEditor'
 import { RuleOverridesPanel } from '../components/RuleOverridesPanel'
@@ -24,7 +22,9 @@ import type { PendingTokenPlacement } from './pendingTokenPlacement'
  * CharacterManagerScreen does — the session/WebRTC connection underneath
  * stays alive, this is just a different view over the same campaign doc.
  * Splitting this out from "Run Campaign" keeps the live-play screen free of
- * editing tools it doesn't need turn-to-turn. */
+ * editing tools it doesn't need turn-to-turn. Live vision/fog controls and
+ * token-ownership assignment live in Run Campaign instead — this screen's
+ * DM view is always the plain unmasked one, no preview-as-player here. */
 export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
   const { session } = useSession()
   const doc = session?.doc ?? null
@@ -36,7 +36,6 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
   const [wallThickness, setWallThickness] = useState(DEFAULT_WALL_THICKNESS_PX)
   const [isMapFullscreen, setIsMapFullscreen] = useState(false)
   const [pendingPlacement, setPendingPlacement] = useState<PendingTokenPlacement | null>(null)
-  const [previewPlayerId, setPreviewPlayerId] = useState<string | null>(null)
   const [showCompendium, setShowCompendium] = useState(false)
   const [showHomebrewEditor, setShowHomebrewEditor] = useState(false)
   const [showRuleOverrides, setShowRuleOverrides] = useState(false)
@@ -59,8 +58,7 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isMapFullscreen])
 
-  const isPreviewingPlayer = previewPlayerId !== null
-  const effectiveToolMode: ToolMode = isPreviewingPlayer ? 'move' : pendingPlacement ? 'place-tokens' : toolMode
+  const effectiveToolMode: ToolMode = pendingPlacement ? 'place-tokens' : toolMode
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingPlacement || !activeSceneId) return
@@ -107,19 +105,11 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
         <div className="session-screen__panel">
           <SceneToolbar />
 
-          {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
-
-          <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />
-
           <button type="button" onClick={() => setShowCompendium((v) => !v)}>
             {showCompendium ? 'Hide compendium' : 'Show compendium'}
           </button>
           {showCompendium && (
-            <CompendiumDrawer
-              doc={doc}
-              isDm
-              onAddMonsterToScene={activeSceneId && !isPreviewingPlayer ? handleAddMonsterToScene : undefined}
-            />
+            <CompendiumDrawer doc={doc} isDm onAddMonsterToScene={activeSceneId ? handleAddMonsterToScene : undefined} />
           )}
 
           <button type="button" onClick={() => setShowHomebrewEditor((v) => !v)}>
@@ -134,14 +124,8 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className={`session-screen__main${isMapFullscreen ? ' session-screen__main--fullscreen' : ''}`}>
-          <MapCanvas
-            toolMode={effectiveToolMode}
-            snapWalls={snapWalls}
-            wallThickness={wallThickness}
-            onPlaceToken={handlePlaceToken}
-            previewPlayerId={previewPlayerId}
-          />
-          {activeSceneId && !isPreviewingPlayer && (
+          <MapCanvas toolMode={effectiveToolMode} snapWalls={snapWalls} wallThickness={wallThickness} onPlaceToken={handlePlaceToken} />
+          {activeSceneId && (
             <MapToolRail
               sceneId={activeSceneId}
               toolMode={toolMode}
