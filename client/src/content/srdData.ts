@@ -1,5 +1,5 @@
-import type { ClassData, FeatureChoiceOption, ItemData, MonsterData, RaceData, SpellData, SubclassData } from './types'
-import type { SkillId } from '../character/types'
+import type { BackgroundData, ClassData, FeatureChoiceOption, ItemData, MonsterData, RaceData, SpellData, SubclassData } from './types'
+import { SKILL_LABELS, type SkillId } from '../character/types'
 
 /**
  * A small, hand-authored slice of the SRD 5.1 (Creative Commons CC-BY-4.0),
@@ -1181,6 +1181,13 @@ const HALF_ELF_ABILITY_OPTIONS: FeatureChoiceOption[] = [
   { key: 'wis', name: 'Wisdom' },
 ]
 
+/** Half-Elf's Skill Versatility — proficiency in two skills of your choice,
+ * from the full skill list (not limited to a class's skill list). */
+const HALF_ELF_SKILL_OPTIONS: FeatureChoiceOption[] = (Object.keys(SKILL_LABELS) as SkillId[]).map((id) => ({
+  key: id,
+  name: SKILL_LABELS[id],
+}))
+
 /** The 9 core PHB/SRD races, base version only — no subraces (e.g. "Elf"
  * rather than separately modeling High Elf/Wood Elf). */
 export const SRD_RACES: RaceData[] = [
@@ -1197,7 +1204,10 @@ export const SRD_RACES: RaceData[] = [
   {
     key: 'srd:half-elf', source: 'srd', name: 'Half-Elf', size: 'Medium', speed: 30, abilityBonuses: { cha: 2 },
     traits: ['Darkvision 60 ft.', 'Advantage on saves vs. being charmed'],
-    choices: [{ id: 'half-elf-ability-choice', label: 'Choose two other ability scores for +1 each', count: 2, grantsAbilityBonus: 1, options: HALF_ELF_ABILITY_OPTIONS }],
+    choices: [
+      { id: 'half-elf-ability-choice', label: 'Choose two other ability scores for +1 each', count: 2, grantsAbilityBonus: 1, options: HALF_ELF_ABILITY_OPTIONS },
+      { id: 'half-elf-skill-choice', label: 'Skill Versatility — choose two skills', count: 2, grantsSkillProficiency: true, options: HALF_ELF_SKILL_OPTIONS },
+    ],
   },
   { key: 'srd:half-orc', source: 'srd', name: 'Half-Orc', size: 'Medium', speed: 30, abilityBonuses: { str: 2, con: 1 }, traits: ['Darkvision 60 ft.', 'Relentless Endurance (drop to 1 HP instead of 0, 1/long rest)'], choices: [] },
   { key: 'srd:tiefling', source: 'srd', name: 'Tiefling', size: 'Medium', speed: 30, abilityBonuses: { cha: 2, int: 1 }, traits: ['Darkvision 60 ft.', 'Resistance to fire damage', 'Thaumaturgy cantrip'], choices: [] },
@@ -1568,5 +1578,43 @@ export const SRD_SUBCLASSES: SubclassData[] = [
       { level: 10, name: 'Empowered Evocation', entries: ['Add Intelligence modifier to one damage roll of an evocation spell.'] },
       { level: 14, name: 'Overchannel', entries: ['Deal maximum damage with a spell, at the cost of taking damage yourself on repeat use.'] },
     ],
+  },
+]
+
+/** 6 core SRD 5.1 backgrounds — each grants exactly 2 fixed skill
+ * proficiencies (a genuine 5e SRD rules fact, not a player choice) plus one
+ * roleplay feature. Tool/language proficiencies and starting equipment
+ * aren't modeled — this app's inventory is a plain unmechanical list, so
+ * "equipment" wouldn't do anything mechanically anyway. */
+export const SRD_BACKGROUNDS: BackgroundData[] = [
+  {
+    key: 'srd:acolyte', source: 'srd', name: 'Acolyte',
+    skillProficiencies: ['insight', 'religion'],
+    feature: { name: 'Shelter of the Faithful', entries: ['You and your companions can receive free healing and care at temples of your faith, and you have ties to a religious order.'] },
+  },
+  {
+    key: 'srd:criminal', source: 'srd', name: 'Criminal',
+    skillProficiencies: ['deception', 'stealth'],
+    feature: { name: 'Criminal Contact', entries: ['You have a reliable contact in the criminal underworld who can relay messages and provide local information.'] },
+  },
+  {
+    key: 'srd:folk-hero', source: 'srd', name: 'Folk Hero',
+    skillProficiencies: ['animalHandling', 'survival'],
+    feature: { name: 'Rustic Hospitality', entries: ['Common folk will shelter and provide minor aid to you, hiding you from obvious danger if needed.'] },
+  },
+  {
+    key: 'srd:noble', source: 'srd', name: 'Noble',
+    skillProficiencies: ['history', 'persuasion'],
+    feature: { name: 'Position of Privilege', entries: ['You are welcomed in high society; commoners and nobles alike assume you have the right to be wherever you are.'] },
+  },
+  {
+    key: 'srd:sage', source: 'srd', name: 'Sage',
+    skillProficiencies: ['arcana', 'history'],
+    feature: { name: 'Researcher', entries: ['When you don\'t know a piece of lore, you often know where to find it — a library, sage, or other knowledgeable source.'] },
+  },
+  {
+    key: 'srd:soldier', source: 'srd', name: 'Soldier',
+    skillProficiencies: ['athletics', 'intimidation'],
+    feature: { name: 'Military Rank', entries: ['Soldiers loyal to your former organization recognize your authority and may offer aid or deference.'] },
   },
 ]

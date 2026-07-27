@@ -320,3 +320,119 @@ export function mergeClassResourceGrants(existing: ResourceEntry[], grants: Clas
   }
   return result
 }
+
+/** Which standard 5e spell slot progression a class uses — 'full' (Bard,
+ * Cleric, Druid, Sorcerer, Wizard), 'half' (Paladin, Ranger, starting at
+ * level 2, capped at 5th-level spells), 'pact' (Warlock's unusual Pact
+ * Magic: a small number of same-level slots that all upgrade together),
+ * or 'none' for anything else (including mirror-imported/homebrew classes
+ * this app doesn't recognize — those keep manually-editable slots rather
+ * than being silently zeroed out). */
+export type CasterType = 'full' | 'half' | 'pact' | 'none'
+
+const FULL_CASTER_CLASSES = new Set(['bard', 'cleric', 'druid', 'sorcerer', 'wizard'])
+const HALF_CASTER_CLASSES = new Set(['paladin', 'ranger'])
+
+export function casterTypeForClass(className: string): CasterType {
+  const name = className.trim().toLowerCase()
+  if (FULL_CASTER_CLASSES.has(name)) return 'full'
+  if (HALF_CASTER_CLASSES.has(name)) return 'half'
+  if (name === 'warlock') return 'pact'
+  return 'none'
+}
+
+/** Standard 5e full-caster slot table — index 0 = level 1, each row is
+ * slots for spell levels 1-9. */
+const FULL_CASTER_SLOTS: number[][] = [
+  [2, 0, 0, 0, 0, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0, 0, 0, 0, 0],
+  [4, 3, 0, 0, 0, 0, 0, 0, 0],
+  [4, 3, 2, 0, 0, 0, 0, 0, 0],
+  [4, 3, 3, 0, 0, 0, 0, 0, 0],
+  [4, 3, 3, 1, 0, 0, 0, 0, 0],
+  [4, 3, 3, 2, 0, 0, 0, 0, 0],
+  [4, 3, 3, 3, 1, 0, 0, 0, 0],
+  [4, 3, 3, 3, 2, 0, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 2, 1, 1],
+]
+
+/** Standard 5e half-caster slot table (Paladin/Ranger) — only reaches
+ * 5th-level spells, so only 5 columns are ever nonzero. */
+const HALF_CASTER_SLOTS: number[][] = [
+  [0, 0, 0, 0, 0],
+  [2, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0],
+  [4, 2, 0, 0, 0],
+  [4, 3, 0, 0, 0],
+  [4, 3, 0, 0, 0],
+  [4, 3, 2, 0, 0],
+  [4, 3, 2, 0, 0],
+  [4, 3, 3, 0, 0],
+  [4, 3, 3, 0, 0],
+  [4, 3, 3, 1, 0],
+  [4, 3, 3, 1, 0],
+  [4, 3, 3, 2, 0],
+  [4, 3, 3, 2, 0],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 2],
+  [4, 3, 3, 3, 2],
+]
+
+/** Warlock's Pact Magic — {count, level} of identical slots, all at the
+ * same spell level (unlike every other caster's spread-across-levels
+ * table). Recharges on a short rest elsewhere in this app's rest system,
+ * unlike normal slots — this table only covers how many/what level. */
+const WARLOCK_PACT_SLOTS: { count: number; level: number }[] = [
+  { count: 1, level: 1 },
+  { count: 2, level: 1 },
+  { count: 2, level: 2 },
+  { count: 2, level: 2 },
+  { count: 2, level: 3 },
+  { count: 2, level: 3 },
+  { count: 2, level: 4 },
+  { count: 2, level: 4 },
+  { count: 2, level: 5 },
+  { count: 2, level: 5 },
+  { count: 3, level: 5 },
+  { count: 3, level: 5 },
+  { count: 3, level: 5 },
+  { count: 3, level: 5 },
+  { count: 3, level: 5 },
+  { count: 3, level: 5 },
+  { count: 4, level: 5 },
+  { count: 4, level: 5 },
+  { count: 4, level: 5 },
+  { count: 4, level: 5 },
+]
+
+/** The standard 5e spell-slot-by-level array (index 0 = level-1 slots ...
+ * index 8 = level-9 slots) for a single-class character of this class and
+ * level — [0,0,...] for a class this app doesn't recognize as a caster, so
+ * mirror-imported/homebrew classes keep whatever's already there instead of
+ * being silently zeroed. */
+export function computeSpellSlotsByLevel(className: string, level: number): number[] {
+  const type = casterTypeForClass(className)
+  const clamped = Math.min(20, Math.max(1, level))
+  if (type === 'full') return [...FULL_CASTER_SLOTS[clamped - 1]]
+  if (type === 'half') return [...HALF_CASTER_SLOTS[clamped - 1], 0, 0, 0, 0]
+  if (type === 'pact') {
+    const { count, level: slotLevel } = WARLOCK_PACT_SLOTS[clamped - 1]
+    const arr = new Array(9).fill(0)
+    arr[slotLevel - 1] = count
+    return arr
+  }
+  return new Array(9).fill(0)
+}

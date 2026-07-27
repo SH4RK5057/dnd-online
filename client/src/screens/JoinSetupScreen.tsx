@@ -23,7 +23,7 @@ export function JoinSetupScreen({
   const [standaloneList, setStandaloneList] = useState(() => listStandaloneCharacters())
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [editingCharacter, setEditingCharacter] = useState<CharacterRecord | null>(null)
-  const { races, classes, subclasses } = useCompendium(null)
+  const { races, classes, subclasses, backgrounds } = useCompendium(null)
 
   const refreshStandaloneList = () => setStandaloneList(listStandaloneCharacters())
 
@@ -131,6 +131,7 @@ export function JoinSetupScreen({
               races={races}
               classes={classes}
               subclasses={subclasses}
+              backgrounds={backgrounds}
             />
           </div>
         )}

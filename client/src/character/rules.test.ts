@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyAbilityScoreImprovement,
   applyRacialBonus,
+  casterTypeForClass,
   combineAbilityBonuses,
   computeChosenAbilityBonuses,
   computeClassResourceGrants,
@@ -11,6 +12,7 @@ import {
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
+  computeSpellSlotsByLevel,
   isValidAbilityScoreImprovement,
   isValidPointBuy,
   isValidStandardArray,
@@ -442,5 +444,54 @@ describe('computeChosenAbilityBonuses', () => {
       choices: [{ id: 'half-elf-ability-choice', label: 'Choose two', count: 2, grantsAbilityBonus: 1, options: [] }],
     }
     expect(computeChosenAbilityBonuses(race, {})).toEqual({})
+  })
+})
+
+describe('casterTypeForClass', () => {
+  it('classifies full casters, half casters, Warlock, and everything else', () => {
+    expect(casterTypeForClass('Wizard')).toBe('full')
+    expect(casterTypeForClass('bard')).toBe('full')
+    expect(casterTypeForClass('Cleric')).toBe('full')
+    expect(casterTypeForClass('Druid')).toBe('full')
+    expect(casterTypeForClass('Sorcerer')).toBe('full')
+    expect(casterTypeForClass('Paladin')).toBe('half')
+    expect(casterTypeForClass('Ranger')).toBe('half')
+    expect(casterTypeForClass('Warlock')).toBe('pact')
+    expect(casterTypeForClass('Fighter')).toBe('none')
+    expect(casterTypeForClass('Rogue')).toBe('none')
+    expect(casterTypeForClass('SomeHomebrewClass')).toBe('none')
+  })
+})
+
+describe('computeSpellSlotsByLevel', () => {
+  it('matches the standard full-caster progression at key levels', () => {
+    expect(computeSpellSlotsByLevel('Wizard', 1)).toEqual([2, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Wizard', 3)).toEqual([4, 2, 0, 0, 0, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Wizard', 5)).toEqual([4, 3, 2, 0, 0, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Wizard', 20)).toEqual([4, 3, 3, 3, 3, 2, 2, 1, 1])
+  })
+
+  it('matches the standard half-caster progression, capped at 5th-level spells', () => {
+    expect(computeSpellSlotsByLevel('Paladin', 1)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Paladin', 2)).toEqual([2, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Ranger', 5)).toEqual([4, 2, 0, 0, 0, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Ranger', 20)).toEqual([4, 3, 3, 3, 2, 0, 0, 0, 0])
+  })
+
+  it('matches Warlock Pact Magic (same-level slots, not spread across levels)', () => {
+    expect(computeSpellSlotsByLevel('Warlock', 1)).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Warlock', 5)).toEqual([0, 0, 2, 0, 0, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Warlock', 11)).toEqual([0, 0, 0, 0, 3, 0, 0, 0, 0])
+    expect(computeSpellSlotsByLevel('Warlock', 20)).toEqual([0, 0, 0, 0, 4, 0, 0, 0, 0])
+  })
+
+  it('returns all zeros for a non-caster or unrecognized class', () => {
+    expect(computeSpellSlotsByLevel('Fighter', 20)).toEqual(new Array(9).fill(0))
+    expect(computeSpellSlotsByLevel('HomebrewMartialClass', 10)).toEqual(new Array(9).fill(0))
+  })
+
+  it('clamps out-of-range levels', () => {
+    expect(computeSpellSlotsByLevel('Wizard', 0)).toEqual(computeSpellSlotsByLevel('Wizard', 1))
+    expect(computeSpellSlotsByLevel('Wizard', 99)).toEqual(computeSpellSlotsByLevel('Wizard', 20))
   })
 })

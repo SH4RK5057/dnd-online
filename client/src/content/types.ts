@@ -81,18 +81,38 @@ export interface FeatureChoiceOption {
 
 /** A choice a player must make to fully resolve a race or class feature —
  * e.g. Dragonborn's Draconic Ancestry (pick 1 of 10, determines breath
- * weapon damage type) or a Fighting Style (pick 1 of several). `count` is
- * how many distinct options must be picked (1 for most choices; 2 for
- * something like Half-Elf's "choose two abilities" case). `grantsAbilityBonus`
- * is set only when this choice's options ARE ability keys and picking one
- * grants a flat bonus to it (Half-Elf) — see
- * character/rules.ts's computeChosenAbilityBonuses. */
+ * weapon damage type), a Fighting Style (pick 1 of several), or Half-Elf's
+ * Skill Versatility (pick 2 of any skill). `count` is how many distinct
+ * options must be picked (1 for most choices; 2 for "choose two" cases).
+ * `grantsAbilityBonus` is set only when this choice's options ARE ability
+ * keys and picking one grants a flat bonus to it (Half-Elf's ability
+ * choice) — see character/rules.ts's computeChosenAbilityBonuses.
+ * `grantsSkillProficiency` is set only when this choice's options ARE
+ * SkillIds and picking one grants proficiency in it (Half-Elf's Skill
+ * Versatility) — handled directly in CharacterSheet.tsx since it patches
+ * `skillProficiencies`, not `abilities`. */
 export interface FeatureChoice {
   id: string
   label: string
   count: number
   options: FeatureChoiceOption[]
   grantsAbilityBonus?: number
+  grantsSkillProficiency?: boolean
+}
+
+/** Character-creation reference data for backgrounds — SRD-authored only
+ * (no mirror import, no homebrew editor in this pass — see
+ * character-creation scope notes). Deliberately thin: just the 2 fixed
+ * skill proficiencies every SRD background grants plus a short feature
+ * summary; tool/language proficiencies and starting equipment aren't
+ * modeled, consistent with this app's inventory being a plain unmechanical
+ * list. */
+export interface BackgroundData {
+  key: ContentKey
+  source: ContentSource
+  name: string
+  skillProficiencies: SkillId[]
+  feature: { name: string; entries: string[] }
 }
 
 /** Character-creation reference data — deliberately much thinner than a full
@@ -172,6 +192,7 @@ export type CompendiumEntry =
   | { kind: 'race'; data: RaceData }
   | { kind: 'class'; data: ClassData }
   | { kind: 'subclass'; data: SubclassData }
+  | { kind: 'background'; data: BackgroundData }
 
 /** Flat Yjs record shapes for DM-authored homebrew content — identical field
  * shape to the normalized content types above (source is always 'homebrew'),

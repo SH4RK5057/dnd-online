@@ -3,7 +3,7 @@ import type * as Y from 'yjs'
 import { loadSavedMirrorToken } from './constants'
 import { defaultContentCategories, sourceKeyFor, type ContentCategories, type ContentSourceRecord } from './contentSourceTypes'
 import { useContentSource, type UseContentSourceResult } from './useContentSource'
-import { SRD_CLASSES, SRD_ITEMS, SRD_MONSTERS, SRD_RACES, SRD_SPELLS, SRD_SUBCLASSES } from './srdData'
+import { SRD_BACKGROUNDS, SRD_CLASSES, SRD_ITEMS, SRD_MONSTERS, SRD_RACES, SRD_SPELLS, SRD_SUBCLASSES } from './srdData'
 import { useHomebrewContent } from './useHomebrewContent'
 import {
   fetchGithubRepo,
@@ -14,6 +14,7 @@ import {
   type MirrorImportResult,
 } from './mirrorStorage'
 import type {
+  BackgroundData,
   ClassData,
   CompendiumEntry,
   HomebrewItemRecord,
@@ -55,6 +56,8 @@ export interface UseCompendiumResult {
   races: RaceData[]
   classes: ClassData[]
   subclasses: SubclassData[]
+  /** SRD-only, no mirror/homebrew — see BackgroundData's doc comment. */
+  backgrounds: BackgroundData[]
   mirrorErrors: string[]
   mirrorImportedAt: number | null
   /** `categories` (default: all) limits which of spells/monsters/items get
@@ -211,6 +214,7 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     races,
     classes,
     subclasses,
+    backgrounds: SRD_BACKGROUNDS,
     mirrorErrors,
     mirrorImportedAt: mirror?.importedAt ?? null,
     importMirrorLocalFiles,
@@ -227,7 +231,7 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
  * kind discriminant — for the token inspector's "rules lookup" and for
  * encounter drag-and-drop initialization. */
 export function findByKey(
-  result: Pick<UseCompendiumResult, 'spells' | 'monsters' | 'items' | 'races' | 'classes' | 'subclasses'>,
+  result: Pick<UseCompendiumResult, 'spells' | 'monsters' | 'items' | 'races' | 'classes' | 'subclasses' | 'backgrounds'>,
   key: string,
 ): CompendiumEntry | null {
   const spell = result.spells.find((s) => s.key === key)
@@ -242,5 +246,7 @@ export function findByKey(
   if (cls) return { kind: 'class', data: cls }
   const subclass = result.subclasses.find((s) => s.key === key)
   if (subclass) return { kind: 'subclass', data: subclass }
+  const background = result.backgrounds.find((b) => b.key === key)
+  if (background) return { kind: 'background', data: background }
   return null
 }

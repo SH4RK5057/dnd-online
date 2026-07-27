@@ -33,7 +33,8 @@ export function CharacterInventory({
     // Quantity edits aren't logged as add/remove — only whole-row
     // add/remove/transfer are, to keep the history log meaningful rather
     // than noisy with every +/-1 tweak.
-    onUpdate({ inventory: character.inventory.map((i) => (i.id === item.id ? { ...i, quantity } : i)) })
+    const clamped = Math.max(0, quantity)
+    onUpdate({ inventory: character.inventory.map((i) => (i.id === item.id ? { ...i, quantity: clamped } : i)) })
   }
   const addItem = () => {
     if (inventoryActions) {

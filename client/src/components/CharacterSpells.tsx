@@ -11,11 +11,20 @@ export function CharacterSpells({
   canEdit,
   blueprintEditable,
   onUpdate,
+  slotsLocked,
+  casterClassName,
 }: {
   character: CharacterRecord
   canEdit: boolean
   blueprintEditable: boolean
   onUpdate: (patch: Partial<Pick<CharacterRecord, 'spellSlotsByLevel' | 'spellSlotsUsedByLevel' | 'spells'>>) => void
+  /** True when the character's class is a recognized 5e caster (full/half/
+   * pact) — slot totals are then computed automatically from class+level
+   * (character/rules.ts's computeSpellSlotsByLevel) and this locks the
+   * total inputs, the same "computed field" pattern already used for Max
+   * HP. Unrecognized/non-caster classes leave slots freely editable. */
+  slotsLocked?: boolean
+  casterClassName?: string
 }) {
   const setSlot = (levelIndex: number, value: number) => {
     const next = [...character.spellSlotsByLevel]
@@ -47,6 +56,9 @@ export function CharacterSpells({
   return (
     <div className="character-sheet__section">
       <h3>Spell slots</h3>
+      {slotsLocked && blueprintEditable && (
+        <p className="character-sheet__hint">Computed from {casterClassName}'s spellcasting progression.</p>
+      )}
       <div className="character-sheet__spell-slots">
         {SPELL_LEVELS.map((level, index) => {
           const total = character.spellSlotsByLevel[index] ?? 0
@@ -59,7 +71,7 @@ export function CharacterSpells({
                 min={0}
                 max={9}
                 value={total}
-                disabled={!canEdit || !blueprintEditable}
+                disabled={!canEdit || !blueprintEditable || slotsLocked}
                 onChange={(e) => setSlot(index, Number(e.target.value))}
               />
               {total > 0 && canEdit && (

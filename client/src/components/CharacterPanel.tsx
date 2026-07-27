@@ -40,7 +40,7 @@ export function CharacterPanel() {
   const { tokens } = useTokens(doc, activeSceneId)
   const { combat } = useCombat(doc, activeSceneId)
   const { characters, myCharacter, bindCharacter, updateCharacter } = useCharacters(doc)
-  const { races, classes, subclasses } = useCompendium(doc)
+  const { races, classes, subclasses, backgrounds } = useCompendium(doc)
   const { pushRoll } = useRollLog(doc, isDm)
   const inventoryActions = useInventoryActions(doc, isDm)
   const { settings: campaignSettings, setRestsEnabled } = useCampaignSettings(doc)
@@ -245,6 +245,7 @@ export function CharacterPanel() {
         races={races}
         classes={classes}
         subclasses={subclasses}
+        backgrounds={backgrounds}
       />
     </div>
   )

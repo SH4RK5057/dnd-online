@@ -4,6 +4,7 @@ import { ABILITY_LABELS, SKILL_LABELS } from '../character/types'
 import {
   applyAbilityScoreImprovement,
   applyRacialBonus,
+  casterTypeForClass,
   combineAbilityBonuses,
   computeChosenAbilityBonuses,
   computeClassResourceGrants,
@@ -13,6 +14,7 @@ import {
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
+  computeSpellSlotsByLevel,
   isValidAbilityScoreImprovement,
   isValidPointBuy,
   isValidStandardArray,
@@ -26,7 +28,7 @@ import {
 } from '../character/rules'
 import type { RollCategory } from '../dice/conditions'
 import type { UseInventoryActionsResult } from '../character/useInventoryActions'
-import type { ClassData, FeatureChoice, RaceData, SubclassData } from '../content/types'
+import type { BackgroundData, ClassData, FeatureChoice, RaceData, SubclassData } from '../content/types'
 import { CharacterInventory } from './CharacterInventory'
 import { CharacterSpells } from './CharacterSpells'
 import { InventoryHistoryList } from './InventoryHistoryPanel'
@@ -71,6 +73,7 @@ export function CharacterSheet({
   races,
   classes,
   subclasses,
+  backgrounds,
 }: {
   character: CharacterRecord
   /** isDm || isOwner — gates every edit control. */
@@ -92,6 +95,8 @@ export function CharacterSheet({
   races: RaceData[]
   classes: ClassData[]
   subclasses: SubclassData[]
+  /** SRD-only reference data — see BackgroundData's doc comment. */
+  backgrounds: BackgroundData[]
 }) {
   const [tab, setTab] = useState<Tab>('stats')
   const blueprintEditable = canEdit && !character.locked
@@ -102,6 +107,7 @@ export function CharacterSheet({
 
   const selectedRace = races.find((r) => r.name === character.race) ?? null
   const selectedClass = classes.find((c) => c.name === character.className) ?? null
+  const selectedBackground = backgrounds.find((b) => b.name === character.background) ?? null
   const selectedSubclass = subclasses.find((s) => s.name === character.subclassName && s.className === character.className) ?? null
   const allowedSkillIds = selectedClass ? new Set(selectedClass.skillChoices) : null
   const restrictSkillsToClass = blueprintEditable && !!selectedClass
@@ -170,6 +176,7 @@ export function CharacterSheet({
       patch.hitDice = `${nextLevel}d${selectedClass.hitDie}`
       patch.hp = { ...character.hp, max: character.hp.max + hpGain, current: character.hp.current + hpGain }
       patch.resources = mergeClassResourceGrants(character.resources, computeClassResourceGrants(character.className, nextLevel, nextAbilities))
+      Object.assign(patch, recomputedSpellSlots(character.className, nextLevel))
     }
     onUpdate(patch)
     setLevelUpOpen(false)
@@ -194,6 +201,19 @@ export function CharacterSheet({
   function recomputedHp(hitDie: number, level: number, abilities: AbilityScores): Partial<CharacterRecord> {
     const maxHp = computeMaxHp(hitDie, level, computeModifier(abilities.con))
     return { hp: { ...character.hp, max: maxHp, current: Math.min(character.hp.current, maxHp) } }
+  }
+
+  /** Recomputes spell slot totals from the standard 5e progression for this
+   * class/level, clamping already-spent slots down if the total shrank —
+   * shared by every handler that can change class or level. Returns an
+   * empty patch (no-op) for a class this app doesn't recognize as a caster
+   * (including mirror-imported/homebrew ones), so those keep whatever
+   * slots were manually entered instead of being silently zeroed. */
+  function recomputedSpellSlots(className: string, level: number): Partial<CharacterRecord> {
+    if (casterTypeForClass(className) === 'none') return {}
+    const spellSlotsByLevel = computeSpellSlotsByLevel(className, level)
+    const spellSlotsUsedByLevel = character.spellSlotsUsedByLevel.map((used, i) => Math.min(used, spellSlotsByLevel[i] ?? 0))
+    return { spellSlotsByLevel, spellSlotsUsedByLevel }
   }
 
   function handleAbilityMethodChange(method: CharacterRecord['abilityMethod']) {
@@ -247,17 +267,51 @@ export function CharacterSheet({
     })
   }
 
+  /** A background grants exactly 2 fixed skill proficiencies (no player
+   * choice, per SRD) — swapping backgrounds removes the OLD background's
+   * skills (only if still 'proficient', so an independently-upgraded or
+   * otherwise-granted skill isn't clobbered) and grants the NEW one's. */
+  function handleBackgroundChange(name: string) {
+    const newBg = backgrounds.find((b) => b.name === name) ?? null
+    const next = { ...character.skillProficiencies }
+    for (const skill of selectedBackground?.skillProficiencies ?? []) {
+      if (next[skill] === 'proficient') delete next[skill]
+    }
+    for (const skill of newBg?.skillProficiencies ?? []) {
+      if (!next[skill]) next[skill] = 'proficient'
+    }
+    onUpdate({ background: name, skillProficiencies: next })
+  }
+
   /** Shared handler for every FeatureChoice this sheet renders — race
-   * choices (Draconic Ancestry, Half-Elf's ability picks) and class/subclass
-   * feature choices (Fighting Style) alike. Recomputing `abilities`/`hp`
-   * unconditionally is harmless even for choices that don't affect them
-   * (e.g. Fighting Style): computeChosenAbilityBonuses only reacts to race
-   * choices with `grantsAbilityBonus` set, so anything else is a no-op. */
-  function handleFeatureChoiceChange(choiceId: string, selectedKeys: string[]) {
-    const nextFeatureChoices = { ...character.featureChoices, [choiceId]: selectedKeys }
+   * choices (Draconic Ancestry, Half-Elf's ability/skill picks) and class/
+   * subclass feature choices (Fighting Style) alike. Recomputing
+   * `abilities`/`hp` unconditionally is harmless even for choices that
+   * don't affect them (e.g. Fighting Style): computeChosenAbilityBonuses
+   * only reacts to race choices with `grantsAbilityBonus` set, so anything
+   * else is a no-op. For a `grantsSkillProficiency` choice (Half-Elf's
+   * Skill Versatility), also grants/revokes 'proficient' in
+   * skillProficiencies for the skills added/removed by THIS choice —
+   * doesn't touch a skill this choice didn't grant, even if it happens to
+   * already be proficient some other way (class pick, another choice). */
+  function handleFeatureChoiceChange(choice: FeatureChoice, selectedKeys: string[]) {
+    const previousKeys = character.featureChoices[choice.id] ?? []
+    const nextFeatureChoices = { ...character.featureChoices, [choice.id]: selectedKeys }
+    let nextSkillProficiencies = character.skillProficiencies
+    if (choice.grantsSkillProficiency) {
+      const next = { ...character.skillProficiencies }
+      for (const key of previousKeys) {
+        if (!selectedKeys.includes(key) && next[key as SkillId] === 'proficient') delete next[key as SkillId]
+      }
+      for (const key of selectedKeys) {
+        if (!next[key as SkillId]) next[key as SkillId] = 'proficient'
+      }
+      nextSkillProficiencies = next
+    }
     const abilities = applyRacialBonus(character.baseAbilities, effectiveAbilityBonusesFor(selectedRace, nextFeatureChoices))
     onUpdate({
       featureChoices: nextFeatureChoices,
+      skillProficiencies: nextSkillProficiencies,
       abilities,
       ...(selectedClass ? recomputedHp(selectedClass.hitDie, character.level, abilities) : {}),
     })
@@ -289,6 +343,7 @@ export function CharacterSheet({
       skillProficiencies,
       hitDice: `${character.level}d${cls.hitDie}`,
       ...recomputedHp(cls.hitDie, character.level, character.abilities),
+      ...recomputedSpellSlots(name, character.level),
     })
   }
 
@@ -298,6 +353,7 @@ export function CharacterSheet({
       ...(selectedClass
         ? { hitDice: `${level}d${selectedClass.hitDie}`, ...recomputedHp(selectedClass.hitDie, level, character.abilities) }
         : {}),
+      ...recomputedSpellSlots(character.className, level),
     })
   }
 
@@ -317,7 +373,7 @@ export function CharacterSheet({
           <select
             value={selected[0] ?? ''}
             disabled={!blueprintEditable}
-            onChange={(e) => handleFeatureChoiceChange(choice.id, e.target.value ? [e.target.value] : [])}
+            onChange={(e) => handleFeatureChoiceChange(choice, e.target.value ? [e.target.value] : [])}
           >
             <option value="">Select…</option>
             {choice.options.map((opt) => (
@@ -348,7 +404,7 @@ export function CharacterSheet({
                     disabled={!blueprintEditable || atCap}
                     onChange={(e) => {
                       const next = e.target.checked ? [...selected, opt.key] : selected.filter((k) => k !== opt.key)
-                      handleFeatureChoiceChange(choice.id, next)
+                      handleFeatureChoiceChange(choice, next)
                     }}
                   />
                   {opt.name}
@@ -445,11 +501,14 @@ export function CharacterSheet({
             </label>
             <label>
               Background
-              <input
-                value={character.background}
-                disabled={!blueprintEditable}
-                onChange={(e) => onUpdate({ background: e.target.value })}
-              />
+              <select value={character.background} disabled={!blueprintEditable} onChange={(e) => handleBackgroundChange(e.target.value)}>
+                <option value="">Select a background…</option>
+                {backgrounds.map((b) => (
+                  <option key={b.key} value={b.name}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Alignment
@@ -466,9 +525,20 @@ export function CharacterSheet({
 
           <p className="character-sheet__hint">Proficiency bonus: {fmtMod(profBonus)}</p>
 
-          {(selectedRace || selectedClass) && (
+          {(selectedRace || selectedClass || selectedBackground) && (
             <>
               <h3>Features & traits</h3>
+              {selectedBackground && (
+                <div className="character-sheet__features-group">
+                  <strong>{selectedBackground.name}</strong>
+                  <ul className="character-sheet__row-list">
+                    <li>Skill proficiencies: {selectedBackground.skillProficiencies.map((s) => SKILL_LABELS[s]).join(', ')}</li>
+                    <li>
+                      <strong>{selectedBackground.feature.name}:</strong> {selectedBackground.feature.entries.join(' ')}
+                    </li>
+                  </ul>
+                </div>
+              )}
               {selectedRace && (selectedRace.traits.length > 0 || selectedRace.choices.length > 0) && (
                 <div className="character-sheet__features-group">
                   <strong>{selectedRace.name}</strong>
@@ -808,8 +878,15 @@ export function CharacterSheet({
             </label>
             <label>
               Hit dice
-              <input value={character.hitDice} disabled={!blueprintEditable} onChange={(e) => onUpdate({ hitDice: e.target.value })} />
+              <input
+                value={character.hitDice}
+                disabled={!blueprintEditable || !!selectedClass}
+                onChange={(e) => onUpdate({ hitDice: e.target.value })}
+              />
             </label>
+            {selectedClass && blueprintEditable && (
+              <span className="character-sheet__hint">Computed from {selectedClass.name}'s hit die × level.</span>
+            )}
             {hitDiceTotal > 0 && canEdit && (
               <span className="character-sheet__slot-used">
                 <button
@@ -839,7 +916,9 @@ export function CharacterSheet({
                 type="number"
                 value={character.hp.current}
                 disabled={!canEdit}
-                onChange={(e) => onUpdate({ hp: { ...character.hp, current: Number(e.target.value) } })}
+                onChange={(e) =>
+                  onUpdate({ hp: { ...character.hp, current: Math.max(0, Math.min(character.hp.max + character.hp.temp, Number(e.target.value))) } })
+                }
               />
             </label>
             <label>
@@ -848,7 +927,10 @@ export function CharacterSheet({
                 type="number"
                 value={character.hp.max}
                 disabled={!blueprintEditable || !!selectedClass}
-                onChange={(e) => onUpdate({ hp: { ...character.hp, max: Number(e.target.value) } })}
+                onChange={(e) => {
+                  const max = Math.max(1, Number(e.target.value))
+                  onUpdate({ hp: { ...character.hp, max, current: Math.min(character.hp.current, max + character.hp.temp) } })
+                }}
               />
             </label>
             {selectedClass && blueprintEditable && (
@@ -860,7 +942,7 @@ export function CharacterSheet({
                 type="number"
                 value={character.hp.temp}
                 disabled={!canEdit}
-                onChange={(e) => onUpdate({ hp: { ...character.hp, temp: Number(e.target.value) } })}
+                onChange={(e) => onUpdate({ hp: { ...character.hp, temp: Math.max(0, Number(e.target.value)) } })}
               />
             </label>
           </div>
@@ -962,7 +1044,14 @@ export function CharacterSheet({
       )}
 
       {tab === 'spells' && (
-        <CharacterSpells character={character} canEdit={canEdit} blueprintEditable={blueprintEditable} onUpdate={onUpdate} />
+        <CharacterSpells
+          character={character}
+          canEdit={canEdit}
+          blueprintEditable={blueprintEditable}
+          onUpdate={onUpdate}
+          slotsLocked={casterTypeForClass(character.className) !== 'none'}
+          casterClassName={selectedClass?.name}
+        />
       )}
 
       {tab === 'history' && inventoryActions && (
