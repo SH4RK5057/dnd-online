@@ -3,7 +3,8 @@
  * version-to-version quirks — these are defensive (missing/oddly-shaped
  * fields degrade to empty strings/defaults rather than throwing) rather than
  * a full-fidelity reimplementation of 5etools' own parser. */
-import type { ItemData, MonsterAction, MonsterData, SpellData } from './types'
+import type { AbilityKey, SkillId } from '../character/types'
+import type { ClassData, ItemData, MonsterAction, MonsterData, RaceData, SpellData } from './types'
 
 const SCHOOL_CODES: Record<string, string> = {
   A: 'Abjuration',
@@ -219,5 +220,114 @@ export function normalizeItem(raw: unknown, key: string): ItemData | null {
     weight: typeof r.weight === 'number' ? `${r.weight} lb.` : asString(r.weight),
     value: typeof r.value === 'number' ? `${r.value / 100} gp` : asString(r.value),
     entries: flattenEntries(r.entries),
+  }
+}
+
+const VALID_ABILITY_KEYS = new Set<string>(['str', 'dex', 'con', 'int', 'wis', 'cha'])
+
+function normalizeAbilityBonuses(ability: unknown): Partial<Record<AbilityKey, number>> {
+  // 5etools' `ability` field is an array (usually length 1) of objects
+  // mapping ability -> bonus, e.g. [{dex: 2}] — a `choose` variant (pick N
+  // abilities for +1 each) exists too but isn't modeled here; that entry's
+  // numeric keys are simply skipped, degrading to "no bonus from that
+  // clause" rather than throwing.
+  const out: Partial<Record<AbilityKey, number>> = {}
+  const first = Array.isArray(ability) ? ability[0] : ability
+  if (!first || typeof first !== 'object') return out
+  for (const [k, v] of Object.entries(first as Record<string, unknown>)) {
+    if (VALID_ABILITY_KEYS.has(k) && typeof v === 'number') out[k as AbilityKey] = v
+  }
+  return out
+}
+
+function normalizeRaceSpeed(speed: unknown): number {
+  if (typeof speed === 'number') return speed
+  if (speed && typeof speed === 'object') {
+    const walk = (speed as Record<string, unknown>).walk
+    if (typeof walk === 'number') return walk
+  }
+  return 30
+}
+
+export function normalizeRace(raw: unknown, key: string): RaceData | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (typeof r.name !== 'string') return null
+  const sizeRaw = Array.isArray(r.size) ? asString(r.size[0]) : asString(r.size)
+  return {
+    key,
+    source: 'mirror',
+    name: r.name,
+    size: SIZE_CODES[sizeRaw] ?? sizeRaw ?? 'Medium',
+    speed: normalizeRaceSpeed(r.speed),
+    abilityBonuses: normalizeAbilityBonuses(r.ability),
+    traits: flattenEntries(r.entries).slice(0, 5),
+  }
+}
+
+function normalizeSavingThrows(proficiency: unknown): AbilityKey[] {
+  if (!Array.isArray(proficiency)) return []
+  return proficiency.filter((p): p is AbilityKey => typeof p === 'string' && VALID_ABILITY_KEYS.has(p))
+}
+
+/** Maps a 5etools skill display name ("Sleight of Hand") to this app's
+ * camelCase SkillId ("sleightOfHand") — the startingProficiencies.skills
+ * choice list is written as display names, not ids. */
+const SKILL_NAME_TO_ID: Record<string, SkillId> = {
+  acrobatics: 'acrobatics',
+  'animal handling': 'animalHandling',
+  arcana: 'arcana',
+  athletics: 'athletics',
+  deception: 'deception',
+  history: 'history',
+  insight: 'insight',
+  intimidation: 'intimidation',
+  investigation: 'investigation',
+  medicine: 'medicine',
+  nature: 'nature',
+  perception: 'perception',
+  performance: 'performance',
+  persuasion: 'persuasion',
+  religion: 'religion',
+  'sleight of hand': 'sleightOfHand',
+  stealth: 'stealth',
+  survival: 'survival',
+}
+const ALL_SKILL_IDS = Object.values(SKILL_NAME_TO_ID)
+
+function normalizeSkillChoices(startingProficiencies: unknown): { choices: SkillId[]; count: number } {
+  const sp = startingProficiencies as { skills?: unknown } | undefined
+  const skillsField = sp?.skills
+  const chooseEntry = Array.isArray(skillsField)
+    ? (skillsField.find((e) => e && typeof e === 'object' && 'choose' in (e as object)) as
+        | { choose?: { from?: unknown[]; count?: number } }
+        | undefined)
+    : undefined
+  const from = chooseEntry?.choose?.from
+  const count = typeof chooseEntry?.choose?.count === 'number' ? chooseEntry.choose.count : 2
+  if (!Array.isArray(from) || from.length === 0) return { choices: ALL_SKILL_IDS, count }
+  const choices: SkillId[] = []
+  for (const entry of from) {
+    const name = asString(entry).toLowerCase()
+    const id = SKILL_NAME_TO_ID[name]
+    if (id) choices.push(id)
+  }
+  return { choices: choices.length > 0 ? choices : ALL_SKILL_IDS, count }
+}
+
+export function normalizeClass(raw: unknown, key: string): ClassData | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (typeof r.name !== 'string') return null
+  const hd = r.hd as { faces?: number } | undefined
+  const { choices, count } = normalizeSkillChoices(r.startingProficiencies)
+  return {
+    key,
+    source: 'mirror',
+    name: r.name,
+    hitDie: typeof hd?.faces === 'number' ? hd.faces : 8,
+    savingThrows: normalizeSavingThrows(r.proficiency),
+    skillChoices: choices,
+    skillChoiceCount: count,
   }
 }

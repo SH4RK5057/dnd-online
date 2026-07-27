@@ -1,4 +1,5 @@
-import type { ItemData, MonsterData, SpellData } from './types'
+import type { ClassData, ItemData, MonsterData, RaceData, SpellData } from './types'
+import type { SkillId } from '../character/types'
 
 /**
  * A small, hand-authored slice of the SRD 5.1 (Creative Commons CC-BY-4.0),
@@ -1151,4 +1152,47 @@ export const SRD_ITEMS: ItemData[] = [
       'If the bag is overloaded, or if a sharp object pierces it, the bag ruptures and is destroyed, and its contents are scattered in the Astral Plane.',
     ],
   },
+]
+
+/** The 9 core PHB/SRD races, base version only — no subraces (e.g. "Elf"
+ * rather than separately modeling High Elf/Wood Elf). Half-Elf's real rule
+ * ("+1 to two ability scores of your choice") isn't a flat bonus and would
+ * need its own UI to model properly; simplified here to a fixed +1 Str/+1
+ * Dex alongside the un-simplifiable +2 Cha, documented rather than silently
+ * wrong. */
+export const SRD_RACES: RaceData[] = [
+  { key: 'srd:human', source: 'srd', name: 'Human', size: 'Medium', speed: 30, abilityBonuses: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, traits: ['Extra language of your choice'] },
+  { key: 'srd:elf', source: 'srd', name: 'Elf', size: 'Medium', speed: 30, abilityBonuses: { dex: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on saves vs. being charmed', "Doesn't need to sleep (trance 4 hrs)"] },
+  { key: 'srd:dwarf', source: 'srd', name: 'Dwarf', size: 'Medium', speed: 25, abilityBonuses: { con: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on saves vs. poison', 'Resistance to poison damage'] },
+  { key: 'srd:halfling', source: 'srd', name: 'Halfling', size: 'Small', speed: 25, abilityBonuses: { dex: 2 }, traits: ['Lucky: reroll a 1 on attack/ability/save d20 rolls', 'Advantage on saves vs. being frightened'] },
+  { key: 'srd:dragonborn', source: 'srd', name: 'Dragonborn', size: 'Medium', speed: 30, abilityBonuses: { str: 2, cha: 1 }, traits: ['Breath weapon (elemental damage by ancestry)', 'Damage resistance by ancestry'] },
+  { key: 'srd:gnome', source: 'srd', name: 'Gnome', size: 'Small', speed: 25, abilityBonuses: { int: 2 }, traits: ['Darkvision 60 ft.', 'Advantage on Int/Wis/Cha saves vs. magic'] },
+  { key: 'srd:half-elf', source: 'srd', name: 'Half-Elf', size: 'Medium', speed: 30, abilityBonuses: { cha: 2, str: 1, dex: 1 }, traits: ['Darkvision 60 ft.', 'Advantage on saves vs. being charmed', 'Simplified: real rule is +1 to two abilities of your choice'] },
+  { key: 'srd:half-orc', source: 'srd', name: 'Half-Orc', size: 'Medium', speed: 30, abilityBonuses: { str: 2, con: 1 }, traits: ['Darkvision 60 ft.', 'Relentless Endurance (drop to 1 HP instead of 0, 1/long rest)'] },
+  { key: 'srd:tiefling', source: 'srd', name: 'Tiefling', size: 'Medium', speed: 30, abilityBonuses: { cha: 2, int: 1 }, traits: ['Darkvision 60 ft.', 'Resistance to fire damage', 'Thaumaturgy cantrip'] },
+]
+
+/** The 12 core PHB/SRD classes — single-class only (see CharacterRecord's
+ * v1 limitation doc comment). `skillChoices` is the list a new character can
+ * pick `skillChoiceCount` proficiencies from at creation; Bard's list is
+ * genuinely "any skill" per SRD, so it lists all eighteen. */
+const ALL_SKILLS_FOR_BARD: SkillId[] = [
+  'acrobatics', 'animalHandling', 'arcana', 'athletics', 'deception', 'history', 'insight', 'intimidation',
+  'investigation', 'medicine', 'nature', 'perception', 'performance', 'persuasion', 'religion', 'sleightOfHand',
+  'stealth', 'survival',
+]
+
+export const SRD_CLASSES: ClassData[] = [
+  { key: 'srd:barbarian', source: 'srd', name: 'Barbarian', hitDie: 12, savingThrows: ['str', 'con'], skillChoiceCount: 2, skillChoices: ['animalHandling', 'athletics', 'intimidation', 'nature', 'perception', 'survival'] },
+  { key: 'srd:bard', source: 'srd', name: 'Bard', hitDie: 8, savingThrows: ['dex', 'cha'], skillChoiceCount: 3, skillChoices: ALL_SKILLS_FOR_BARD },
+  { key: 'srd:cleric', source: 'srd', name: 'Cleric', hitDie: 8, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['history', 'insight', 'medicine', 'persuasion', 'religion'] },
+  { key: 'srd:druid', source: 'srd', name: 'Druid', hitDie: 8, savingThrows: ['int', 'wis'], skillChoiceCount: 2, skillChoices: ['arcana', 'animalHandling', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'] },
+  { key: 'srd:fighter', source: 'srd', name: 'Fighter', hitDie: 10, savingThrows: ['str', 'con'], skillChoiceCount: 2, skillChoices: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'perception', 'survival'] },
+  { key: 'srd:monk', source: 'srd', name: 'Monk', hitDie: 8, savingThrows: ['str', 'dex'], skillChoiceCount: 2, skillChoices: ['acrobatics', 'athletics', 'history', 'insight', 'religion', 'stealth'] },
+  { key: 'srd:paladin', source: 'srd', name: 'Paladin', hitDie: 10, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['athletics', 'insight', 'intimidation', 'medicine', 'persuasion', 'religion'] },
+  { key: 'srd:ranger', source: 'srd', name: 'Ranger', hitDie: 10, savingThrows: ['str', 'dex'], skillChoiceCount: 3, skillChoices: ['animalHandling', 'athletics', 'insight', 'investigation', 'nature', 'perception', 'stealth', 'survival'] },
+  { key: 'srd:rogue', source: 'srd', name: 'Rogue', hitDie: 8, savingThrows: ['dex', 'int'], skillChoiceCount: 4, skillChoices: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'performance', 'persuasion', 'sleightOfHand', 'stealth'] },
+  { key: 'srd:sorcerer', source: 'srd', name: 'Sorcerer', hitDie: 6, savingThrows: ['con', 'cha'], skillChoiceCount: 2, skillChoices: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'] },
+  { key: 'srd:warlock', source: 'srd', name: 'Warlock', hitDie: 8, savingThrows: ['wis', 'cha'], skillChoiceCount: 2, skillChoices: ['arcana', 'deception', 'history', 'intimidation', 'investigation', 'nature', 'religion'] },
+  { key: 'srd:wizard', source: 'srd', name: 'Wizard', hitDie: 6, savingThrows: ['int', 'wis'], skillChoiceCount: 2, skillChoices: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'] },
 ]

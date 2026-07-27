@@ -14,6 +14,8 @@ export interface ContentCategories {
   includeSpells: boolean
   includeMonsters: boolean
   includeItems: boolean
+  includeRaces: boolean
+  includeClasses: boolean
 }
 
 export interface ContentSourceRecord extends ContentCategories {
@@ -27,7 +29,7 @@ export interface ContentSourceRecord extends ContentCategories {
 }
 
 export function defaultContentCategories(): ContentCategories {
-  return { includeSpells: true, includeMonsters: true, includeItems: true }
+  return { includeSpells: true, includeMonsters: true, includeItems: true, includeRaces: true, includeClasses: true }
 }
 
 export function defaultContentSource(): ContentSourceRecord {
@@ -40,7 +42,7 @@ export function defaultContentSource(): ContentSourceRecord {
  * currently-configured source or needs re-fetching. */
 export function sourceKeyFor(source: ContentSourceRecord | null | undefined): string {
   if (!source || source.mode === 'none') return ''
-  const categoryFlags = `${source.includeSpells ? 's' : ''}${source.includeMonsters ? 'm' : ''}${source.includeItems ? 'i' : ''}`
+  const categoryFlags = `${source.includeSpells ? 's' : ''}${source.includeMonsters ? 'm' : ''}${source.includeItems ? 'i' : ''}${source.includeRaces ? 'r' : ''}${source.includeClasses ? 'c' : ''}`
   const location =
     source.mode === 'url' ? `url:${source.url}` : `github:${source.owner}/${source.repo}@${source.branch}:${source.path}`
   return `${location}|${categoryFlags}`
@@ -56,6 +58,8 @@ export function describeContentSource(source: ContentSourceRecord | null | undef
     source.includeSpells && 'spells',
     source.includeMonsters && 'monsters',
     source.includeItems && 'items',
+    source.includeRaces && 'races',
+    source.includeClasses && 'classes',
   ].filter(Boolean)
   return `${location} (${categories.length > 0 ? categories.join(', ') : 'nothing selected'})`
 }

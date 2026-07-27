@@ -47,7 +47,10 @@ export function CompendiumDrawer({
   const [includeSpells, setIncludeSpells] = useState(true)
   const [includeMonsters, setIncludeMonsters] = useState(true)
   const [includeItems, setIncludeItems] = useState(true)
-  const importCategories = { includeSpells, includeMonsters, includeItems }
+  const [includeRaces, setIncludeRaces] = useState(true)
+  const [includeClasses, setIncludeClasses] = useState(true)
+  const importCategories = { includeSpells, includeMonsters, includeItems, includeRaces, includeClasses }
+  const anyCategorySelected = includeSpells || includeMonsters || includeItems || includeRaces || includeClasses
 
   const spells = filterSpells(compendium.spells, query, spellLevel, spellSchool)
   const monsters = filterMonsters(compendium.monsters, query, monsterCr, monsterType)
@@ -264,7 +267,8 @@ export function CompendiumDrawer({
           <h4>What to bring in</h4>
           <p className="compendium-drawer__hint">
             Applies to all three import methods below — uncheck a category to skip it entirely, e.g. import just
-            monsters from a repo that also has spells and items.
+            monsters from a repo that also has spells and items. Races and classes feed character creation's
+            race/class dropdowns — they aren't browsable here in the drawer itself.
           </p>
           <div className="compendium-drawer__categories">
             <label>
@@ -278,6 +282,14 @@ export function CompendiumDrawer({
             <label>
               <input type="checkbox" checked={includeItems} onChange={(e) => setIncludeItems(e.target.checked)} />
               Items
+            </label>
+            <label>
+              <input type="checkbox" checked={includeRaces} onChange={(e) => setIncludeRaces(e.target.checked)} />
+              Races
+            </label>
+            <label>
+              <input type="checkbox" checked={includeClasses} onChange={(e) => setIncludeClasses(e.target.checked)} />
+              Classes
             </label>
           </div>
 
@@ -293,7 +305,7 @@ export function CompendiumDrawer({
               accept=".json"
               multiple
               onChange={(e) => void handleImportFiles(e.target.files)}
-              disabled={mirrorBusy || !(includeSpells || includeMonsters || includeItems)}
+              disabled={mirrorBusy || !anyCategorySelected}
             />
             <input
               ref={folderInputRef}
@@ -303,7 +315,7 @@ export function CompendiumDrawer({
               directory=""
               multiple
               onChange={(e) => void handleImportFiles(e.target.files)}
-              disabled={mirrorBusy || !(includeSpells || includeMonsters || includeItems)}
+              disabled={mirrorBusy || !anyCategorySelected}
             />
           </div>
 
@@ -327,7 +339,7 @@ export function CompendiumDrawer({
             <button
               type="button"
               onClick={() => void handleImportUrl()}
-              disabled={mirrorBusy || !mirrorUrl.trim() || !(includeSpells || includeMonsters || includeItems)}
+              disabled={mirrorBusy || !mirrorUrl.trim() || !anyCategorySelected}
             >
               {mirrorBusy ? 'Importing…' : 'Fetch'}
             </button>
@@ -352,9 +364,7 @@ export function CompendiumDrawer({
             <button
               type="button"
               onClick={() => void handleImportGithubRepo()}
-              disabled={
-                mirrorBusy || !ghOwner.trim() || !ghRepo.trim() || !(includeSpells || includeMonsters || includeItems)
-              }
+              disabled={mirrorBusy || !ghOwner.trim() || !ghRepo.trim() || !anyCategorySelected}
             >
               {mirrorBusy ? 'Importing…' : 'Fetch'}
             </button>

@@ -1,3 +1,5 @@
+import type { AbilityKey, SkillId } from '../character/types'
+
 /** Where a piece of compendium content came from. `srd` = the small
  * hand-authored SRD 5.1 (CC-BY-4.0) fallback baked into this app; `mirror` =
  * imported at runtime from a user-configured private 5etools-shaped mirror
@@ -67,10 +69,40 @@ export interface ItemData {
   entries: string[]
 }
 
+/** Character-creation reference data — deliberately much thinner than a full
+ * 5etools race entry (no subraces, no trait mechanics beyond a flat ability
+ * bonus): just enough to drive rule-enforced character creation (racial
+ * ability bonus, speed) plus a flavor-text summary. */
+export interface RaceData {
+  key: ContentKey
+  source: ContentSource
+  name: string
+  size: string
+  speed: number
+  abilityBonuses: Partial<Record<AbilityKey, number>>
+  traits: string[]
+}
+
+/** Character-creation reference data for classes — single-class only (see
+ * CharacterRecord's v1 limitation doc comment), just enough to drive rule
+ * enforcement: hit die for HP, the class's two fixed saving-throw
+ * proficiencies, and its starting-skill choice list/count. */
+export interface ClassData {
+  key: ContentKey
+  source: ContentSource
+  name: string
+  hitDie: number
+  savingThrows: AbilityKey[]
+  skillChoices: SkillId[]
+  skillChoiceCount: number
+}
+
 export type CompendiumEntry =
   | { kind: 'spell'; data: SpellData }
   | { kind: 'monster'; data: MonsterData }
   | { kind: 'item'; data: ItemData }
+  | { kind: 'race'; data: RaceData }
+  | { kind: 'class'; data: ClassData }
 
 /** Flat Yjs record shapes for DM-authored homebrew content — identical field
  * shape to the normalized content types above (source is always 'homebrew'),

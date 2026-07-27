@@ -10,6 +10,7 @@ import {
 } from '../character/standaloneStorage'
 import type { CharacterRecord } from '../character/types'
 import { CharacterSheet } from '../components/CharacterSheet'
+import { useCompendium } from '../content/useCompendium'
 
 /** Standalone character creation/editing, fully decoupled from any active
  * campaign — reachable from the landing screen before hosting or joining a
@@ -18,6 +19,7 @@ import { CharacterSheet } from '../components/CharacterSheet'
 export function CharacterManagerScreen({ onBack }: { onBack: () => void }) {
   const [characters, setCharacters] = useState(() => listStandaloneCharacters())
   const [selectedId, setSelectedId] = useState<string | null>(characters[0]?.id ?? null)
+  const { races, classes } = useCompendium(null)
 
   const refresh = () => setCharacters(listStandaloneCharacters())
   const selected = characters.find((c) => c.id === selectedId) ?? null
@@ -110,6 +112,8 @@ export function CharacterManagerScreen({ onBack }: { onBack: () => void }) {
                 canRoll={false}
                 onUpdate={handleUpdate}
                 onQuickRoll={() => {}}
+                races={races}
+                classes={classes}
               />
             </>
           ) : (

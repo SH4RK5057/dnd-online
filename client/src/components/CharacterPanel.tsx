@@ -5,6 +5,7 @@ import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useCombat } from '../combat/useCombat'
 import { useCharacters, newBlankCharacter } from '../character/useCharacters'
+import { useCompendium } from '../content/useCompendium'
 import { useInventoryActions } from '../character/useInventoryActions'
 import { useCampaignSettings } from '../character/useCampaignSettings'
 import { applyLongRest, applyShortRest, hitDiceAvailable, shortRestHealingNotation } from '../character/rest'
@@ -39,6 +40,7 @@ export function CharacterPanel() {
   const { tokens } = useTokens(doc, activeSceneId)
   const { combat } = useCombat(doc, activeSceneId)
   const { characters, myCharacter, bindCharacter, updateCharacter } = useCharacters(doc)
+  const { races, classes } = useCompendium(doc)
   const { pushRoll } = useRollLog(doc, isDm)
   const inventoryActions = useInventoryActions(doc, isDm)
   const { settings: campaignSettings, setRestsEnabled } = useCampaignSettings(doc)
@@ -240,6 +242,8 @@ export function CharacterPanel() {
         onQuickRoll={handleQuickRoll}
         inventoryActions={inventoryActions}
         otherCharacters={characters.filter((c) => c.id !== character.id).map((c) => ({ id: c.id, name: c.name }))}
+        races={races}
+        classes={classes}
       />
     </div>
   )

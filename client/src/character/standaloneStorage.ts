@@ -1,4 +1,5 @@
 import type { CharacterRecord } from './types'
+import { normalizeCharacterRecord } from './rules'
 
 const STORAGE_KEY = 'dndonline:standaloneCharacters'
 
@@ -14,7 +15,7 @@ function readAll(): CharacterRecord[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw) as CharacterRecord[]
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed) ? parsed.map(normalizeCharacterRecord) : []
   } catch {
     return []
   }
@@ -62,13 +63,13 @@ export async function importCharacterFromFile(file: File): Promise<CharacterReco
   if (!parsed || typeof parsed !== 'object' || !parsed.name) {
     throw new Error('That file doesn’t look like a character export.')
   }
-  const character: CharacterRecord = {
+  const character: CharacterRecord = normalizeCharacterRecord({
     ...parsed,
     id: crypto.randomUUID(),
     campaignId: null,
     locked: false,
     createdAt: Date.now(),
-  }
+  })
   saveStandaloneCharacter(character)
   return character
 }

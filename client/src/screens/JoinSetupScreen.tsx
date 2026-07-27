@@ -4,6 +4,7 @@ import { newBlankCharacter } from '../character/useCharacters'
 import { importCharacterFromFile, listStandaloneCharacters, saveStandaloneCharacter } from '../character/standaloneStorage'
 import { savePendingCharacterBind } from '../character/pendingBind'
 import { CharacterSheet } from '../components/CharacterSheet'
+import { useCompendium } from '../content/useCompendium'
 import type { CharacterRecord } from '../character/types'
 
 export function JoinSetupScreen({
@@ -22,6 +23,7 @@ export function JoinSetupScreen({
   const [standaloneList, setStandaloneList] = useState(() => listStandaloneCharacters())
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [editingCharacter, setEditingCharacter] = useState<CharacterRecord | null>(null)
+  const { races, classes } = useCompendium(null)
 
   const refreshStandaloneList = () => setStandaloneList(listStandaloneCharacters())
 
@@ -120,7 +122,15 @@ export function JoinSetupScreen({
         {editingCharacter && (
           <div className="setup-screen__character-editor">
             <p className="setup-screen__hint">Fill in your character below — you can keep editing after you join too.</p>
-            <CharacterSheet character={editingCharacter} canEdit canRoll={false} onUpdate={handleUpdateEditingCharacter} onQuickRoll={() => {}} />
+            <CharacterSheet
+              character={editingCharacter}
+              canEdit
+              canRoll={false}
+              onUpdate={handleUpdateEditingCharacter}
+              onQuickRoll={() => {}}
+              races={races}
+              classes={classes}
+            />
           </div>
         )}
 

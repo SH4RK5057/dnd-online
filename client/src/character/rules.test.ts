@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyRacialBonus,
   computeInitiativeBonus,
+  computeMaxHp,
   computeModifier,
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
+  isValidPointBuy,
+  isValidStandardArray,
+  normalizeCharacterRecord,
   parseHitDiceCount,
+  pointBuyCost,
   resolveTokenHp,
 } from './rules'
 import type { CharacterRecord } from './types'
@@ -55,6 +61,8 @@ function baseCharacter(): CharacterRecord {
     background: '',
     alignment: '',
     abilities: { str: 16, dex: 14, con: 12, int: 10, wis: 8, cha: 13 },
+    abilityMethod: 'manual',
+    baseAbilities: { str: 16, dex: 14, con: 12, int: 10, wis: 8, cha: 13 },
     saveProficiencies: { str: true, dex: false, con: true, int: false, wis: false, cha: false },
     skillProficiencies: { athletics: 'proficient', perception: 'expertise' },
     ac: 16,
@@ -197,5 +205,91 @@ describe('parseHitDiceCount', () => {
   it('returns 0 for unparseable text', () => {
     expect(parseHitDiceCount('')).toBe(0)
     expect(parseHitDiceCount('lots')).toBe(0)
+  })
+})
+
+describe('computeMaxHp', () => {
+  it('uses the full die at level 1, then average-rounded-up per level after', () => {
+    // d8, level 1, +2 con => 8 + 2 = 10
+    expect(computeMaxHp(8, 1, 2)).toBe(10)
+    // d8, level 3, +2 con => 10 + 2*(4+1+2) = 10 + 14 = 24
+    expect(computeMaxHp(8, 3, 2)).toBe(24)
+    // d6, level 1, -1 con => 6 - 1 = 5
+    expect(computeMaxHp(6, 1, -1)).toBe(5)
+    // d12, level 5, +3 con => 12+3 + 4*(6+1+3) = 15 + 40 = 55
+    expect(computeMaxHp(12, 5, 3)).toBe(55)
+  })
+})
+
+describe('applyRacialBonus', () => {
+  it('adds each specified bonus and leaves unmentioned abilities unchanged', () => {
+    const base = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }
+    expect(applyRacialBonus(base, { dex: 2, int: 1 })).toEqual({
+      str: 10,
+      dex: 12,
+      con: 10,
+      int: 11,
+      wis: 10,
+      cha: 10,
+    })
+  })
+
+  it('is a no-op with an empty bonus set', () => {
+    const base = { str: 8, dex: 9, con: 10, int: 11, wis: 12, cha: 13 }
+    expect(applyRacialBonus(base, {})).toEqual(base)
+  })
+})
+
+describe('isValidStandardArray', () => {
+  it('accepts any permutation of the standard array', () => {
+    expect(isValidStandardArray({ str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 })).toBe(true)
+    expect(isValidStandardArray({ str: 8, dex: 10, con: 12, int: 13, wis: 14, cha: 15 })).toBe(true)
+  })
+
+  it('rejects a set with a repeated or out-of-set value', () => {
+    expect(isValidStandardArray({ str: 15, dex: 15, con: 13, int: 12, wis: 10, cha: 8 })).toBe(false)
+    expect(isValidStandardArray({ str: 16, dex: 14, con: 13, int: 12, wis: 10, cha: 8 })).toBe(false)
+  })
+})
+
+describe('pointBuyCost / isValidPointBuy', () => {
+  it('computes cost from the standard table and validates against the 27-point budget', () => {
+    const allEights = { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 }
+    expect(pointBuyCost(allEights)).toBe(0)
+    expect(isValidPointBuy(allEights)).toBe(true)
+
+    // 15,15,15,8,8,8 => 9+9+9+0+0+0 = 27, exactly at budget
+    const maxSpend = { str: 15, dex: 15, con: 15, int: 8, wis: 8, cha: 8 }
+    expect(pointBuyCost(maxSpend)).toBe(27)
+    expect(isValidPointBuy(maxSpend)).toBe(true)
+
+    // One over budget
+    const overBudget = { str: 15, dex: 15, con: 15, int: 9, wis: 8, cha: 8 }
+    expect(pointBuyCost(overBudget)).toBe(28)
+    expect(isValidPointBuy(overBudget)).toBe(false)
+  })
+
+  it('treats an out-of-range score as infinitely expensive', () => {
+    const outOfRange = { str: 16, dex: 8, con: 8, int: 8, wis: 8, cha: 8 }
+    expect(pointBuyCost(outOfRange)).toBe(Infinity)
+    expect(isValidPointBuy(outOfRange)).toBe(false)
+  })
+})
+
+describe('normalizeCharacterRecord', () => {
+  it('backfills abilityMethod/baseAbilities for a record persisted before those fields existed', () => {
+    const legacy = baseCharacter()
+    // @ts-expect-error -- simulating a pre-migration record read from storage
+    delete legacy.abilityMethod
+    // @ts-expect-error -- simulating a pre-migration record read from storage
+    delete legacy.baseAbilities
+    const normalized = normalizeCharacterRecord(legacy)
+    expect(normalized.abilityMethod).toBe('manual')
+    expect(normalized.baseAbilities).toEqual(legacy.abilities)
+  })
+
+  it('leaves an already-current record untouched', () => {
+    const current = { ...baseCharacter(), abilityMethod: 'pointBuy' as const, baseAbilities: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } }
+    expect(normalizeCharacterRecord(current)).toBe(current)
   })
 })

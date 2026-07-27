@@ -10,7 +10,7 @@ describe('sourceKeyFor', () => {
 
   it('keys a url source by its url', () => {
     const key = sourceKeyFor({ ...defaultContentSource(), mode: 'url', url: 'https://example.com/data' })
-    expect(key).toBe('url:https://example.com/data|smi')
+    expect(key).toBe('url:https://example.com/data|smirc')
   })
 
   it('keys a github source by owner/repo/branch/path', () => {
@@ -22,7 +22,7 @@ describe('sourceKeyFor', () => {
       branch: 'main',
       path: 'data',
     })
-    expect(key).toBe('github:me/my-data@main:data|smi')
+    expect(key).toBe('github:me/my-data@main:data|smirc')
   })
 
   it('produces different keys when any github field changes', () => {
@@ -38,7 +38,7 @@ describe('sourceKeyFor', () => {
     expect(sourceKeyFor({ ...base, includeSpells: false })).not.toBe(key)
     expect(sourceKeyFor({ ...base, includeMonsters: false })).not.toBe(key)
     expect(sourceKeyFor({ ...base, includeItems: false })).not.toBe(key)
-    expect(sourceKeyFor({ ...base, includeMonsters: false })).toBe('url:https://x.test|si')
+    expect(sourceKeyFor({ ...base, includeMonsters: false })).toBe('url:https://x.test|sirc')
   })
 })
 
@@ -77,7 +77,7 @@ describe('describeContentSource', () => {
 
   it('lists which categories are included, or says so when none are', () => {
     const allThree = describeContentSource({ ...defaultContentSource(), mode: 'url', url: 'https://x.test' })
-    expect(allThree).toContain('spells, monsters, items')
+    expect(allThree).toContain('spells, monsters, items, races, classes')
 
     const onlyMonsters = describeContentSource({
       ...defaultContentSource(),
@@ -85,6 +85,8 @@ describe('describeContentSource', () => {
       url: 'https://x.test',
       includeSpells: false,
       includeItems: false,
+      includeRaces: false,
+      includeClasses: false,
     })
     expect(onlyMonsters).toContain('(monsters)')
 
@@ -95,6 +97,8 @@ describe('describeContentSource', () => {
       includeSpells: false,
       includeMonsters: false,
       includeItems: false,
+      includeRaces: false,
+      includeClasses: false,
     })
     expect(none).toContain('nothing selected')
   })

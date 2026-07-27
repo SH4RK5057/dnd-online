@@ -6,8 +6,8 @@
  * Parsed/normalized results are cached in a local IndexedDB store (separate
  * from y-indexeddb, same pattern as map/localAssetCache.ts) so a DM doesn't
  * need to re-import/re-fetch every session. */
-import type { ItemData, MonsterData, SpellData } from './types'
-import { normalizeItem, normalizeMonster, normalizeSpell } from './mirrorNormalize'
+import type { ClassData, ItemData, MonsterData, RaceData, SpellData } from './types'
+import { normalizeClass, normalizeItem, normalizeMonster, normalizeRace, normalizeSpell } from './mirrorNormalize'
 import { defaultContentCategories, type ContentCategories } from './contentSourceTypes'
 
 const DB_NAME = 'dndonline-content-mirror'
@@ -18,6 +18,8 @@ export interface MirrorContent {
   spells: SpellData[]
   monsters: MonsterData[]
   items: ItemData[]
+  races: RaceData[]
+  classes: ClassData[]
   importedAt: number
   /** Empty for a local-file import (nothing shareable to key off of).
    * Otherwise matches contentSourceTypes.ts's sourceKeyFor() for whatever
@@ -73,6 +75,14 @@ export async function clearCachedMirrorContent(): Promise<void> {
   })
 }
 
+/** 5etools-2014-src has no single classes.json / class index — one file per
+ * class, conventionally named class-<lowercase-name>.json. Used by
+ * fetchMirrorFromUrl to probe for the core 12 SRD classes directly. */
+const CORE_CLASS_FILENAMES = [
+  'barbarian', 'bard', 'cleric', 'druid', 'fighter', 'monk',
+  'paladin', 'ranger', 'rogue', 'sorcerer', 'warlock', 'wizard',
+]
+
 let keyCounter = 0
 function nextKey(prefix: string): string {
   keyCounter += 1
@@ -81,8 +91,9 @@ function nextKey(prefix: string): string {
 
 /** Classifies one parsed JSON file by its top-level array key — 5etools
  * spell files are `{spell: [...]}`, bestiary files `{monster: [...]}`, the
- * items file `{item: [...]}`. Anything else is reported as an error rather
- * than silently ignored, so a DM importing the wrong file finds out why.
+ * items file `{item: [...]}`, race files `{race: [...]}`, class files
+ * `{class: [...]}`. Anything else is reported as an error rather than
+ * silently ignored, so a DM importing the wrong file finds out why.
  * A category the DM excluded (per `categories`) is skipped silently — that's
  * a deliberate choice, not an error. */
 export function ingestFile(filename: string, json: unknown, into: MirrorContent, errors: string[], categories: ContentCategories): void {
@@ -109,8 +120,20 @@ export function ingestFile(filename: string, json: unknown, into: MirrorContent,
       const item = normalizeItem(raw, nextKey('item'))
       if (item) into.items.push(item)
     }
+  } else if (Array.isArray(obj.race)) {
+    if (!categories.includeRaces) return
+    for (const raw of obj.race) {
+      const race = normalizeRace(raw, nextKey('race'))
+      if (race) into.races.push(race)
+    }
+  } else if (Array.isArray(obj.class)) {
+    if (!categories.includeClasses) return
+    for (const raw of obj.class) {
+      const cls = normalizeClass(raw, nextKey('class'))
+      if (cls) into.classes.push(cls)
+    }
   } else {
-    errors.push(`${filename}: no recognized "spell"/"monster"/"item" array — expected 5etools-2014-src shape`)
+    errors.push(`${filename}: no recognized "spell"/"monster"/"item"/"race"/"class" array — expected 5etools-2014-src shape`)
   }
 }
 
@@ -125,7 +148,7 @@ export async function importMirrorFiles(
   files: FileList | File[],
   categories: ContentCategories = defaultContentCategories(),
 ): Promise<MirrorImportResult> {
-  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey: '' }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], importedAt: Date.now(), sourceKey: '' }
   const errors: string[] = []
   for (const file of Array.from(files)) {
     try {
@@ -175,8 +198,26 @@ export async function fetchMirrorFromUrl(
   categories: ContentCategories = defaultContentCategories(),
 ): Promise<MirrorImportResult> {
   const base = baseUrl.replace(/\/+$/, '')
-  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
+
+  if (categories.includeRaces) {
+    const racesJson = await tryFetchJson(`${base}/data/races.json`, token)
+    if (racesJson) ingestFile('races.json', racesJson, content, errors, categories)
+    else errors.push('data/races.json: not found or unreachable')
+  }
+
+  if (categories.includeClasses) {
+    // 5etools-2014-src splits classes one-file-per-class rather than a
+    // single classes.json — there's no reliable index, so this tries the
+    // core 12 SRD class filenames directly and silently skips any that
+    // don't exist on this particular mirror (a mirror covering only a
+    // subset of classes is expected, not an error).
+    for (const className of CORE_CLASS_FILENAMES) {
+      const classJson = await tryFetchJson(`${base}/data/class/class-${className}.json`, token)
+      if (classJson) ingestFile(`class/class-${className}.json`, classJson, content, errors, categories)
+    }
+  }
 
   if (categories.includeItems) {
     // 5etools-2014-src splits items across two files: items.json (magic
@@ -223,7 +264,7 @@ export async function fetchGithubRepo(
   sourceKey = '',
   categories: ContentCategories = defaultContentCategories(),
 ): Promise<MirrorImportResult> {
-  const content: MirrorContent = { spells: [], monsters: [], items: [], importedAt: Date.now(), sourceKey }
+  const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
   if (token) headers.Authorization = `token ${token}`

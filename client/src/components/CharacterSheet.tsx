@@ -1,17 +1,25 @@
 import { useState } from 'react'
-import type { AbilityKey, CharacterRecord, SkillId, SkillProficiency } from '../character/types'
+import type { AbilityKey, AbilityScores, CharacterRecord, SkillId, SkillProficiency } from '../character/types'
 import { ABILITY_LABELS, SKILL_LABELS } from '../character/types'
 import {
+  applyRacialBonus,
   computeInitiativeBonus,
+  computeMaxHp,
   computeModifier,
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
+  isValidPointBuy,
+  isValidStandardArray,
   parseHitDiceCount,
+  pointBuyCost,
+  POINT_BUY_BUDGET,
   SKILL_ABILITY_MAP,
+  STANDARD_ARRAY,
 } from '../character/rules'
 import type { RollCategory } from '../dice/conditions'
 import type { UseInventoryActionsResult } from '../character/useInventoryActions'
+import type { ClassData, RaceData } from '../content/types'
 import { CharacterInventory } from './CharacterInventory'
 import { CharacterSpells } from './CharacterSpells'
 import { InventoryHistoryList } from './InventoryHistoryPanel'
@@ -25,6 +33,14 @@ function fmtMod(mod: number): string {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
+/** Which values a Standard Array <select> for `key` may offer: any value not
+ * already assigned to another ability, plus whatever `key` is currently set
+ * to (so its own current selection always remains a valid option). */
+function standardArrayOptionsFor(key: AbilityKey, base: AbilityScores): number[] {
+  const usedElsewhere = new Set(ABILITY_KEYS.filter((k) => k !== key).map((k) => base[k]))
+  return STANDARD_ARRAY.filter((v) => v === base[key] || !usedElsewhere.has(v))
+}
+
 export function CharacterSheet({
   character,
   canEdit,
@@ -33,6 +49,8 @@ export function CharacterSheet({
   onQuickRoll,
   inventoryActions,
   otherCharacters,
+  races,
+  classes,
 }: {
   character: CharacterRecord
   /** isDm || isOwner — gates every edit control. */
@@ -48,6 +66,11 @@ export function CharacterSheet({
    * inventory add/remove falls back to plain onUpdate with no history. */
   inventoryActions?: UseInventoryActionsResult
   otherCharacters?: { id: string; name: string }[]
+  /** SRD + mirror race/class reference data — drives the race/class dropdowns
+   * and rule enforcement (racial ability bonus, save proficiencies, skill
+   * choice cap, computed max HP). */
+  races: RaceData[]
+  classes: ClassData[]
 }) {
   const [tab, setTab] = useState<Tab>('stats')
   const blueprintEditable = canEdit && !character.locked
@@ -55,6 +78,96 @@ export function CharacterSheet({
   const hitDiceTotal = parseHitDiceCount(character.hitDice)
 
   const rollTitle = canRoll ? undefined : "Not your turn"
+
+  const selectedRace = races.find((r) => r.name === character.race) ?? null
+  const selectedClass = classes.find((c) => c.name === character.className) ?? null
+  const allowedSkillIds = selectedClass ? new Set(selectedClass.skillChoices) : null
+  const restrictSkillsToClass = blueprintEditable && !!selectedClass
+  const proficientSkillCount = SKILL_IDS.filter(
+    (id) => allowedSkillIds?.has(id) && character.skillProficiencies[id],
+  ).length
+
+  /** Recomputes `hp.max` (and clamps `hp.current` down if it now exceeds the
+   * new max) from the currently-selected class's hit die — shared by every
+   * handler that can change level, class, or Constitution. No-op (returns an
+   * empty patch) when no class is selected, so callers can always spread
+   * this in unconditionally. */
+  function recomputedHp(hitDie: number, level: number, abilities: AbilityScores): Partial<CharacterRecord> {
+    const maxHp = computeMaxHp(hitDie, level, computeModifier(abilities.con))
+    return { hp: { ...character.hp, max: maxHp, current: Math.min(character.hp.current, maxHp) } }
+  }
+
+  function handleAbilityMethodChange(method: CharacterRecord['abilityMethod']) {
+    const nextBase: AbilityScores =
+      method === 'standard'
+        ? { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 }
+        : method === 'pointBuy'
+          ? { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 }
+          : character.baseAbilities
+    const abilities = applyRacialBonus(nextBase, selectedRace?.abilityBonuses ?? {})
+    onUpdate({
+      abilityMethod: method,
+      baseAbilities: nextBase,
+      abilities,
+      ...(selectedClass ? recomputedHp(selectedClass.hitDie, character.level, abilities) : {}),
+    })
+  }
+
+  function handleBaseAbilityChange(key: AbilityKey, value: number) {
+    const nextBase = { ...character.baseAbilities, [key]: value }
+    const abilities = applyRacialBonus(nextBase, selectedRace?.abilityBonuses ?? {})
+    onUpdate({
+      baseAbilities: nextBase,
+      abilities,
+      ...(selectedClass ? recomputedHp(selectedClass.hitDie, character.level, abilities) : {}),
+    })
+  }
+
+  function handleRaceChange(name: string) {
+    const race = races.find((r) => r.name === name) ?? null
+    const abilities = applyRacialBonus(character.baseAbilities, race?.abilityBonuses ?? {})
+    onUpdate({
+      race: name,
+      abilities,
+      ...(race ? { speed: race.speed } : {}),
+      ...(selectedClass ? recomputedHp(selectedClass.hitDie, character.level, abilities) : {}),
+    })
+  }
+
+  function handleClassChange(name: string) {
+    const cls = classes.find((c) => c.name === name) ?? null
+    if (!cls) {
+      onUpdate({ className: name })
+      return
+    }
+    const saveProficiencies = ABILITY_KEYS.reduce(
+      (acc, k) => {
+        acc[k] = cls.savingThrows.includes(k)
+        return acc
+      },
+      {} as Record<AbilityKey, boolean>,
+    )
+    const allowed = new Set(cls.skillChoices)
+    const skillProficiencies = Object.fromEntries(
+      Object.entries(character.skillProficiencies).filter(([skill]) => allowed.has(skill as SkillId)),
+    ) as Partial<Record<SkillId, SkillProficiency>>
+    onUpdate({
+      className: name,
+      saveProficiencies,
+      skillProficiencies,
+      hitDice: `${character.level}d${cls.hitDie}`,
+      ...recomputedHp(cls.hitDie, character.level, character.abilities),
+    })
+  }
+
+  function handleLevelChange(level: number) {
+    onUpdate({
+      level,
+      ...(selectedClass
+        ? { hitDice: `${level}d${selectedClass.hitDie}`, ...recomputedHp(selectedClass.hitDie, level, character.abilities) }
+        : {}),
+    })
+  }
 
   return (
     <div className="character-sheet">
@@ -90,15 +203,25 @@ export function CharacterSheet({
             </label>
             <label>
               Race
-              <input value={character.race} disabled={!blueprintEditable} onChange={(e) => onUpdate({ race: e.target.value })} />
+              <select value={character.race} disabled={!blueprintEditable} onChange={(e) => handleRaceChange(e.target.value)}>
+                <option value="">Select a race…</option>
+                {races.map((r) => (
+                  <option key={r.key} value={r.name}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Class
-              <input
-                value={character.className}
-                disabled={!blueprintEditable}
-                onChange={(e) => onUpdate({ className: e.target.value })}
-              />
+              <select value={character.className} disabled={!blueprintEditable} onChange={(e) => handleClassChange(e.target.value)}>
+                <option value="">Select a class…</option>
+                {classes.map((c) => (
+                  <option key={c.key} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Level
@@ -108,7 +231,7 @@ export function CharacterSheet({
                 max={20}
                 value={character.level}
                 disabled={!blueprintEditable}
-                onChange={(e) => onUpdate({ level: Number(e.target.value) })}
+                onChange={(e) => handleLevelChange(Number(e.target.value))}
               />
             </label>
             <label>
@@ -132,21 +255,68 @@ export function CharacterSheet({
           <p className="character-sheet__hint">Proficiency bonus: {fmtMod(profBonus)}</p>
 
           <h3>Abilities & saving throws</h3>
+          <label>
+            Ability score method
+            <select
+              value={character.abilityMethod}
+              disabled={!blueprintEditable}
+              onChange={(e) => handleAbilityMethodChange(e.target.value as CharacterRecord['abilityMethod'])}
+            >
+              <option value="standard">Standard Array</option>
+              <option value="pointBuy">Point Buy</option>
+              <option value="manual">Manual / Rolled</option>
+            </select>
+          </label>
+          {character.abilityMethod === 'pointBuy' && (
+            <p className="character-sheet__hint">
+              Points spent: {pointBuyCost(character.baseAbilities)} / {POINT_BUY_BUDGET}
+              {!isValidPointBuy(character.baseAbilities) && ' — over budget'}
+            </p>
+          )}
+          {character.abilityMethod === 'standard' && !isValidStandardArray(character.baseAbilities) && (
+            <p className="character-sheet__hint">Each of {STANDARD_ARRAY.join(', ')} must be used exactly once.</p>
+          )}
+          {selectedClass && (
+            <p className="character-sheet__hint">
+              Saving throw proficiencies are locked to {selectedClass.name}'s: {selectedClass.savingThrows.map((k) => ABILITY_LABELS[k]).join(', ')}.
+            </p>
+          )}
           <ul className="character-sheet__ability-list">
             {ABILITY_KEYS.map((key) => {
-              const score = character.abilities[key]
-              const mod = computeModifier(score)
+              const baseScore = character.baseAbilities[key]
+              const finalScore = character.abilities[key]
+              const mod = computeModifier(finalScore)
               const saveBonus = computeSaveBonus(character, key)
+              const racialBonus = selectedRace?.abilityBonuses[key] ?? 0
               return (
                 <li key={key} className="character-sheet__ability-row">
                   <span className="character-sheet__ability-label">{ABILITY_LABELS[key]}</span>
-                  <input
-                    type="number"
-                    value={score}
-                    disabled={!blueprintEditable}
-                    onChange={(e) => onUpdate({ abilities: { ...character.abilities, [key]: Number(e.target.value) } })}
-                  />
-                  <span>{fmtMod(mod)}</span>
+                  {character.abilityMethod === 'standard' ? (
+                    <select
+                      value={baseScore}
+                      disabled={!blueprintEditable}
+                      onChange={(e) => handleBaseAbilityChange(key, Number(e.target.value))}
+                    >
+                      {standardArrayOptionsFor(key, character.baseAbilities).map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      min={character.abilityMethod === 'pointBuy' ? 8 : undefined}
+                      max={character.abilityMethod === 'pointBuy' ? 15 : undefined}
+                      value={baseScore}
+                      disabled={!blueprintEditable}
+                      onChange={(e) => handleBaseAbilityChange(key, Number(e.target.value))}
+                    />
+                  )}
+                  {racialBonus !== 0 && <span className="character-sheet__hint">{fmtMod(racialBonus)} racial</span>}
+                  <span>
+                    {finalScore} ({fmtMod(mod)})
+                  </span>
                   <button type="button" disabled={!canRoll} title={rollTitle} onClick={() => onQuickRoll(ABILITY_LABELS[key], `1d20${mod >= 0 ? '+' : ''}${mod}`, 'abilityCheck')}>
                     Check
                   </button>
@@ -154,7 +324,7 @@ export function CharacterSheet({
                     <input
                       type="checkbox"
                       checked={character.saveProficiencies[key]}
-                      disabled={!blueprintEditable}
+                      disabled={!blueprintEditable || !!selectedClass}
                       onChange={(e) =>
                         onUpdate({ saveProficiencies: { ...character.saveProficiencies, [key]: e.target.checked } })
                       }
@@ -176,10 +346,19 @@ export function CharacterSheet({
           </ul>
 
           <h3>Skills</h3>
+          {restrictSkillsToClass && (
+            <p className="character-sheet__hint">
+              {selectedClass!.name} may choose {selectedClass!.skillChoiceCount} skill{selectedClass!.skillChoiceCount === 1 ? '' : 's'} from
+              its list ({proficientSkillCount}/{selectedClass!.skillChoiceCount} chosen).
+            </p>
+          )}
           <ul className="character-sheet__skill-list">
             {SKILL_IDS.map((skillId) => {
               const bonus = computeSkillBonus(character, skillId)
               const proficiency = character.skillProficiencies[skillId]
+              const allowedForClass = !restrictSkillsToClass || (allowedSkillIds?.has(skillId) ?? false)
+              const atCap = restrictSkillsToClass && !proficiency && proficientSkillCount >= (selectedClass?.skillChoiceCount ?? 0)
+              const skillDisabled = !blueprintEditable || (restrictSkillsToClass && (!allowedForClass || atCap))
               return (
                 <li key={skillId} className="character-sheet__skill-row">
                   <span className="character-sheet__skill-label">
@@ -187,7 +366,7 @@ export function CharacterSheet({
                   </span>
                   <select
                     value={proficiency ?? ''}
-                    disabled={!blueprintEditable}
+                    disabled={skillDisabled}
                     onChange={(e) => {
                       const value = e.target.value as SkillProficiency | ''
                       const next = { ...character.skillProficiencies }
@@ -198,7 +377,7 @@ export function CharacterSheet({
                   >
                     <option value="">Untrained</option>
                     <option value="proficient">Proficient</option>
-                    <option value="expertise">Expertise</option>
+                    {!restrictSkillsToClass && <option value="expertise">Expertise</option>}
                   </select>
                   <span>{fmtMod(bonus)}</span>
                   <button
@@ -280,10 +459,13 @@ export function CharacterSheet({
               <input
                 type="number"
                 value={character.hp.max}
-                disabled={!blueprintEditable}
+                disabled={!blueprintEditable || !!selectedClass}
                 onChange={(e) => onUpdate({ hp: { ...character.hp, max: Number(e.target.value) } })}
               />
             </label>
+            {selectedClass && blueprintEditable && (
+              <span className="character-sheet__hint">Computed from {selectedClass.name}'s hit die + Constitution.</span>
+            )}
             <label>
               Temp
               <input

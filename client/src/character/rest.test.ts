@@ -16,6 +16,8 @@ function baseCharacter(overrides: Partial<CharacterRecord> = {}): CharacterRecor
     background: '',
     alignment: '',
     abilities: emptyAbilityScores(),
+    abilityMethod: 'manual',
+    baseAbilities: emptyAbilityScores(),
     saveProficiencies: { str: false, dex: false, con: false, int: false, wis: false, cha: false },
     skillProficiencies: {},
     ac: 10,

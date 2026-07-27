@@ -96,7 +96,17 @@ export interface CharacterRecord {
   level: number
   background: string
   alignment: string
+  /** Final, derived scores — base (pre-racial) + the selected race's
+   * abilityBonuses. This is what every other consumer (rules.ts,
+   * TokenSprite, etc.) reads; nothing changes for them. */
   abilities: AbilityScores
+  /** How `abilities` was generated — drives which UI (standard array /
+   * point buy / manual) is shown and how `baseAbilities` should be
+   * validated. 'manual' also covers rolled-stat entry (bounded, not free). */
+  abilityMethod: 'standard' | 'pointBuy' | 'manual'
+  /** Pre-racial-bonus scores — `abilities` is always recomputed as
+   * `baseAbilities` + the selected race's abilityBonuses. */
+  baseAbilities: AbilityScores
   saveProficiencies: Record<AbilityKey, boolean>
   skillProficiencies: Partial<Record<SkillId, SkillProficiency>>
   ac: number

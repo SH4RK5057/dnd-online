@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as Y from 'yjs'
 import type { CharacterRecord } from './types'
-import { emptyAbilityScores } from './rules'
+import { emptyAbilityScores, normalizeCharacterRecord } from './rules'
 
 function charactersMap(doc: Y.Doc) {
   return doc.getMap<CharacterRecord>('characters')
@@ -35,7 +35,7 @@ export function useCharacters(doc: Y.Doc | null): UseCharactersResult {
       return
     }
     const charactersM = charactersMap(doc)
-    const sync = () => setCharacters(Array.from(charactersM.values()))
+    const sync = () => setCharacters(Array.from(charactersM.values()).map(normalizeCharacterRecord))
     sync()
     charactersM.observe(sync)
     return () => charactersM.unobserve(sync)
@@ -50,14 +50,14 @@ export function useCharacters(doc: Y.Doc | null): UseCharactersResult {
     (standalone: CharacterRecord, ownerId: string, campaignId: string): string => {
       if (!doc) throw new Error('No active session.')
       const id = crypto.randomUUID()
-      const record: CharacterRecord = {
+      const record: CharacterRecord = normalizeCharacterRecord({
         ...standalone,
         id,
         ownerId,
         campaignId,
         locked: true,
         createdAt: Date.now(),
-      }
+      })
       charactersMap(doc).set(id, record)
       return id
     },
@@ -104,6 +104,8 @@ export function newBlankCharacter(ownerId: string, name: string): CharacterRecor
     background: '',
     alignment: '',
     abilities: emptyAbilityScores(),
+    abilityMethod: 'manual',
+    baseAbilities: emptyAbilityScores(),
     saveProficiencies: { str: false, dex: false, con: false, int: false, wis: false, cha: false },
     skillProficiencies: {},
     ac: 10,

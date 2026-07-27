@@ -164,9 +164,13 @@ function ItemCard({ data }: { data: Extract<CompendiumEntry, { kind: 'item' }>['
 }
 
 /** Renders a full reference card for any compendium entry (spell, monster,
- * or item), tag-parsing every description line via TaggedText. */
+ * or item), tag-parsing every description line via TaggedText. Races/classes
+ * aren't browsable through this drawer (see character-creation scope notes)
+ * so there's no card for them here — they're only ever surfaced through the
+ * character sheet's race/class dropdowns. */
 export function StatBlockCard({ entry }: { entry: CompendiumEntry }) {
   if (entry.kind === 'spell') return <SpellCard data={entry.data} />
   if (entry.kind === 'monster') return <MonsterCard data={entry.data} />
-  return <ItemCard data={entry.data} />
+  if (entry.kind === 'item') return <ItemCard data={entry.data} />
+  return null
 }

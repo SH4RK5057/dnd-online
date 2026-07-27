@@ -3,7 +3,7 @@ import type * as Y from 'yjs'
 import { loadSavedMirrorToken } from './constants'
 import { defaultContentCategories, sourceKeyFor, type ContentCategories, type ContentSourceRecord } from './contentSourceTypes'
 import { useContentSource, type UseContentSourceResult } from './useContentSource'
-import { SRD_ITEMS, SRD_MONSTERS, SRD_SPELLS } from './srdData'
+import { SRD_CLASSES, SRD_ITEMS, SRD_MONSTERS, SRD_RACES, SRD_SPELLS } from './srdData'
 import { useHomebrewContent } from './useHomebrewContent'
 import {
   fetchGithubRepo,
@@ -14,12 +14,14 @@ import {
   type MirrorImportResult,
 } from './mirrorStorage'
 import type {
+  ClassData,
   CompendiumEntry,
   HomebrewItemRecord,
   HomebrewMonsterRecord,
   HomebrewSpellRecord,
   ItemData,
   MonsterData,
+  RaceData,
   SpellData,
 } from './types'
 
@@ -47,6 +49,10 @@ export interface UseCompendiumResult {
   spells: SpellData[]
   monsters: MonsterData[]
   items: ItemData[]
+  /** SRD + mirror only — no homebrew CRUD/editor for races/classes in this
+   * pass, see character-creation rule-enforcement scope notes. */
+  races: RaceData[]
+  classes: ClassData[]
   mirrorErrors: string[]
   mirrorImportedAt: number | null
   /** `categories` (default: all) limits which of spells/monsters/items get
@@ -125,7 +131,13 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     setAttemptedSourceKey(key)
     void fetchForSource(source, key).then((result) => {
       if (cancelled || !result) return
-      const hasContent = result.content.spells.length + result.content.monsters.length + result.content.items.length > 0
+      const hasContent =
+        result.content.spells.length +
+          result.content.monsters.length +
+          result.content.items.length +
+          result.content.races.length +
+          result.content.classes.length >
+        0
       // Only replace the cache on an actual haul — a transient failure
       // (network blip, missing token) shouldn't wipe out previously-good
       // cached content for an older source-key.
@@ -183,6 +195,8 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     () => [...SRD_ITEMS, ...(mirror?.items ?? []), ...homebrew.homebrewItems.map(homebrewItemToData)],
     [mirror, homebrew.homebrewItems],
   )
+  const races = useMemo(() => [...SRD_RACES, ...(mirror?.races ?? [])], [mirror])
+  const classes = useMemo(() => [...SRD_CLASSES, ...(mirror?.classes ?? [])], [mirror])
 
   const configuredKey = sourceKeyFor(contentSource.record)
 
@@ -190,6 +204,8 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
     spells,
     monsters,
     items,
+    races,
+    classes,
     mirrorErrors,
     mirrorImportedAt: mirror?.importedAt ?? null,
     importMirrorLocalFiles,
@@ -206,7 +222,7 @@ export function useCompendium(doc: Y.Doc | null): UseCompendiumResult {
  * kind discriminant — for the token inspector's "rules lookup" and for
  * encounter drag-and-drop initialization. */
 export function findByKey(
-  result: Pick<UseCompendiumResult, 'spells' | 'monsters' | 'items'>,
+  result: Pick<UseCompendiumResult, 'spells' | 'monsters' | 'items' | 'races' | 'classes'>,
   key: string,
 ): CompendiumEntry | null {
   const spell = result.spells.find((s) => s.key === key)
@@ -215,5 +231,9 @@ export function findByKey(
   if (monster) return { kind: 'monster', data: monster }
   const item = result.items.find((i) => i.key === key)
   if (item) return { kind: 'item', data: item }
+  const race = result.races.find((r) => r.key === key)
+  if (race) return { kind: 'race', data: race }
+  const cls = result.classes.find((c) => c.key === key)
+  if (cls) return { kind: 'class', data: cls }
   return null
 }
