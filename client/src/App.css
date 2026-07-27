@@ -732,24 +732,22 @@
 }
 
 .map-tool-rail {
+  /* Icon column only now — the options panel (.map-tool-rail__details) is a
+   * separate floating element anchored to the map's opposite edge, not a
+   * flex sibling squeezed in right next to these icons. Deliberately kept
+   * far apart: the old layout put a up-to-300px-wide opaque panel directly
+   * beside the icons, meaning any click meant for the map underneath that
+   * region (very easy to hit while drawing walls near the top-left, exactly
+   * where a DM naturally starts a room) silently landed on the panel's own
+   * background instead of reaching the canvas at all. */
   position: absolute;
   top: 12px;
   left: 12px;
-  /* Setting `right` too (rather than relying on 100vw, which some browsers
-   * measure inconsistently against the actual layout viewport once a
-   * scrollbar is involved) ties this element's width directly to its real
-   * containing block (.session-screen__main), so it can never run past that
-   * block's own right edge no matter how narrow the screen is. */
-  right: 12px;
   z-index: 20;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
 }
 
 .map-tool-rail__icons {
   display: flex;
-  flex: 0 0 auto;
   flex-direction: column;
   gap: 4px;
   padding: 6px;
@@ -774,14 +772,20 @@
   background: var(--border);
 }
 
-.map-tool-rail__popout {
-  /* flex (not a fixed width) lets this shrink to fit .map-tool-rail's real
-   * available space (bounded by the `right: 12px` above) instead of ever
-   * overflowing past it on a narrow screen — min-width: 0 is required for a
-   * flex item to be allowed to shrink below its content's natural width. */
-  flex: 1 1 300px;
-  min-width: 0;
-  max-width: 300px;
+.map-tool-rail__details {
+  /* Anchored to the map's right edge — the opposite side from the icon
+   * rail's left edge. Only `right` is anchored (no `left`), with `max-width`
+   * doing the narrow-screen clamping instead of also constraining `left` —
+   * mixing an explicit `width` with both `left` and `right` set puts the box
+   * model into its over-constrained case, which depends on exactly which
+   * property a browser chooses to resolve via auto margins and is easy to
+   * get subtly wrong; anchoring from one side only has no such ambiguity. */
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  width: 300px;
+  max-width: calc(100% - 24px);
   max-height: calc(var(--session-body-height) - 24px);
   overflow-y: auto;
   border: 1px solid var(--border);
@@ -791,18 +795,41 @@
   padding: 10px 12px;
 }
 
-.map-tool-rail__popout-header {
+.map-tool-rail__details--collapsed {
+  /* Collapsed keeps the header (title + expand/close) visible as a small,
+   * low-profile bar so the DM can tell a tool is still active and reopen its
+   * options in one click, without either losing screen space to the full
+   * panel or having to deselect the tool (see the collapse/close doc
+   * comment in MapToolRail.tsx for why those are two different buttons). */
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding-bottom: 0;
+}
+
+.map-tool-rail__details-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.map-tool-rail__popout-header h3 {
+.map-tool-rail__details--collapsed .map-tool-rail__details-header {
+  margin-bottom: 0;
+}
+
+.map-tool-rail__details-header h3 {
   margin: 0;
   font-size: 15px;
 }
 
+.map-tool-rail__details-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.map-tool-rail__collapse,
 .map-tool-rail__close {
   padding: 2px 8px;
   font-size: 16px;
