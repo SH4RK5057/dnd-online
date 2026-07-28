@@ -15,6 +15,7 @@ import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
 import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
 import { AnnotationsPanel } from '../components/AnnotationsPanel'
 import { PartyLootPanel } from '../components/PartyLootPanel'
+import { SessionRecapPanel } from '../components/SessionRecapPanel'
 import { TokenUploadButton } from '../components/TokenUploadButton'
 import { DiceRollerPanel } from '../components/DiceRollerPanel'
 import { RollLog } from '../components/RollLog'
@@ -74,6 +75,7 @@ export function SessionScreen() {
   const [showSoundboard, setShowSoundboard] = useState(false)
   const [showCampaignFiles, setShowCampaignFiles] = useState(false)
   const [showChat, setShowChat] = useState(true)
+  const [showSessionRecap, setShowSessionRecap] = useState(false)
 
   useEffect(() => {
     if (!notification) return
@@ -315,6 +317,11 @@ export function SessionScreen() {
           <AnnotationsPanel />
 
           <PartyLootPanel />
+
+          <button type="button" onClick={() => setShowSessionRecap((v) => !v)}>
+            {showSessionRecap ? 'Hide session recap' : 'Show session recap'}
+          </button>
+          {showSessionRecap && <SessionRecapPanel />}
 
           {/* Dice, initiative, chat, handouts, and the compendium lookup are
               shared between DM and players — everyone rolls dice and sees

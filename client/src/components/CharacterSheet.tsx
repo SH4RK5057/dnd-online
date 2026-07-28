@@ -11,6 +11,7 @@ import {
   computeInitiativeBonus,
   computeMaxHp,
   computeModifier,
+  computePassiveSkill,
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
@@ -900,6 +901,7 @@ export function CharacterSheet({
           </ul>
 
           <h3>Skills</h3>
+          <p className="character-sheet__hint">Passive Perception: {computePassiveSkill(character, 'perception')}</p>
           {restrictSkillsToClass && (
             <p className="character-sheet__hint">
               {selectedClass!.name} may choose {selectedClass!.skillChoiceCount} skill{selectedClass!.skillChoiceCount === 1 ? '' : 's'} from

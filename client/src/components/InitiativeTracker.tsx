@@ -6,6 +6,7 @@ import { useCharacters } from '../character/useCharacters'
 import { useCombat } from '../combat/useCombat'
 import { computeInitiativeOrder } from '../combat/rules'
 import { computeInitiativeBonus } from '../character/rules'
+import { useSessionEvents } from '../sessionLog/useSessionEvents'
 import { EncounterBuilder } from './EncounterBuilder'
 import type { MonsterInitiativeMode } from '../combat/types'
 import type { TokenRecord } from '../map/types'
@@ -19,10 +20,11 @@ export function InitiativeTracker() {
   const doc = session?.doc ?? null
   const isDm = session?.role === 'dm'
   const myPlayerId = getOrCreatePlayerId()
-  const { activeSceneId } = useScenes(doc)
+  const { activeSceneId, activeScene } = useScenes(doc)
   const { tokens, setTokenInitiative, setTokenReactionAvailable } = useTokens(doc, activeSceneId)
   const { characters } = useCharacters(doc)
   const { combat, startCombat, endCombat, advanceTurn, setMonsterInitiativeMode } = useCombat(doc, activeSceneId)
+  const { logEvent } = useSessionEvents(doc, isDm)
 
   if (!doc || !activeSceneId) return null
 
@@ -35,9 +37,14 @@ export function InitiativeTracker() {
   const order = computeInitiativeOrder(tokens)
 
   const handleModeChange = (mode: MonsterInitiativeMode) => setMonsterInitiativeMode(mode)
-  const handleStart = (selectedTokens: TokenRecord[]) =>
+  const handleStart = (selectedTokens: TokenRecord[]) => {
     startCombat(selectedTokens, rollBonusForToken, setTokenInitiative, setTokenReactionAvailable)
-  const handleEnd = () => endCombat(tokens, setTokenInitiative)
+    logEvent(`Combat started in ${activeScene?.name ?? 'a scene'}`)
+  }
+  const handleEnd = () => {
+    endCombat(tokens, setTokenInitiative)
+    logEvent(`Combat ended in ${activeScene?.name ?? 'a scene'}`)
+  }
   const handleAdvance = () => advanceTurn(tokens, setTokenReactionAvailable)
 
   return (

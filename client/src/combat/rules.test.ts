@@ -21,6 +21,7 @@ function token(overrides: Partial<TokenRecord>): TokenRecord {
     speed: null,
     description: '',
     hidden: false,
+    perceptionDc: null,
     z: 0,
     reactionAvailable: true,
     hazardSize: null,

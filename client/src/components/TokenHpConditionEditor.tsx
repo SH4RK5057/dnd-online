@@ -24,7 +24,7 @@ export function TokenHpConditionEditor({
   const isDm = session?.role === 'dm'
   const myPlayerId = getOrCreatePlayerId()
 
-  const { tokens, setTokenHp, setTokenConditions, setTokenInitiative, linkCharacter, setTokenHidden, setTokenZ } =
+  const { tokens, setTokenHp, setTokenConditions, setTokenInitiative, linkCharacter, setTokenHidden, setTokenPerceptionDc, setTokenZ } =
     useTokens(doc, sceneId)
   const { characters, updateCharacter, createNpcCharacter } = useCharacters(doc)
 
@@ -93,6 +93,17 @@ export function TokenHpConditionEditor({
             <input type="checkbox" checked={token.hidden} onChange={(e) => setTokenHidden(token.id, e.target.checked)} />
             Hidden from players (independent of fog)
           </label>
+          {token.hidden && (
+            <label title="A player whose passive Perception meets or beats this DC auto-reveals this token as their sight reaches it — only when the campaign's passive perception toggle is on. Leave blank to never auto-reveal.">
+              Perception DC to notice (optional)
+              <input
+                type="number"
+                value={token.perceptionDc ?? ''}
+                placeholder="Never auto-reveals"
+                onChange={(e) => setTokenPerceptionDc(token.id, e.target.value === '' ? null : Number(e.target.value))}
+              />
+            </label>
+          )}
           <label>
             Altitude (cells)
             <input type="number" value={token.z} onChange={(e) => setTokenZ(token.id, Number(e.target.value))} />

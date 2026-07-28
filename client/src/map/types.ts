@@ -139,6 +139,14 @@ export interface TokenRecord {
    * editing — see canvas/MapCanvas.tsx's token effect for where this is
    * actually filtered out of what gets rendered. */
   hidden: boolean
+  /** DC to passively notice this token while it's hidden — the DM's call
+   * (this app doesn't model a Stealth roll for it), e.g. 10 + the hiding
+   * creature's Dex/Stealth modifier, or a trap's discovery DC. Only
+   * meaningful while `hidden` is true. Null = not set, so passive-
+   * perception auto-reveal (see useCampaignSettings.ts
+   * passivePerceptionEnabled) never triggers for this token even when the
+   * campaign setting is on — the DM has to opt each hidden token in. */
+  perceptionDc: number | null
   /** Altitude in grid cells above (positive) or below (negative) the map
    * plane, e.g. a flying creature or something in a pit. Not rendered as
    * actual 3D — token art still draws flat on the map — but visible on

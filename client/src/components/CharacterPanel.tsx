@@ -48,7 +48,7 @@ export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { 
   const { races, classes, subclasses, backgrounds } = useCompendium(doc)
   const { pushRoll } = useRollLog(doc, isDm)
   const inventoryActions = useInventoryActions(doc, isDm)
-  const { settings: campaignSettings, setRestsEnabled, setAutoResolveAttacksEnabled } = useCampaignSettings(doc)
+  const { settings: campaignSettings, setRestsEnabled, setAutoResolveAttacksEnabled, setPassivePerceptionEnabled } = useCampaignSettings(doc)
 
   const [standaloneList, setStandaloneList] = useState(() => listStandaloneCharacters())
   const [selectedStandaloneId, setSelectedStandaloneId] = useState('')
@@ -243,6 +243,18 @@ export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { 
             onChange={(e) => setAutoResolveAttacksEnabled(e.target.checked)}
           />
           Auto-resolve attacks (compare roll to target AC automatically)
+        </label>
+      )}
+
+      {isDm && (
+        <label className="character-panel__rests-toggle">
+          <input
+            type="checkbox"
+            checked={campaignSettings.passivePerceptionEnabled ?? false}
+            onChange={(e) => setPassivePerceptionEnabled(e.target.checked)}
+          />
+          Passive perception auto-reveal (hidden tokens with a set DC reveal themselves to a player whose passive
+          Perception beats it)
         </label>
       )}
 

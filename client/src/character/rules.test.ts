@@ -11,6 +11,7 @@ import {
   computeInitiativeBonus,
   computeMaxHp,
   computeModifier,
+  computePassiveSkill,
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
@@ -136,6 +137,22 @@ describe('computeInitiativeBonus', () => {
   })
 })
 
+describe('computePassiveSkill', () => {
+  it('is 10 + the skill bonus, expertise included (baseCharacter has Perception expertise)', () => {
+    // Wis 8 -> mod -1, expertise => -1 + 3*2 = +5; passive = 15
+    const c = baseCharacter()
+    expect(computePassiveSkill(c, 'perception')).toBe(15)
+  })
+
+  it('drops to plain proficiency or untrained correctly', () => {
+    const c = baseCharacter()
+    const proficient = { ...c, skillProficiencies: { ...c.skillProficiencies, perception: 'proficient' as const } }
+    expect(computePassiveSkill(proficient, 'perception')).toBe(12) // -1 + 3 = +2 -> 12
+    const untrained = { ...c, skillProficiencies: {} }
+    expect(computePassiveSkill(untrained, 'perception')).toBe(9) // -1 -> 9
+  })
+})
+
 describe('resolveTokenHp', () => {
   const character = baseCharacter()
   const charactersById = new Map([[character.id, character]])
@@ -159,6 +176,7 @@ describe('resolveTokenHp', () => {
       speed: null,
       description: '',
       hidden: false,
+      perceptionDc: null,
       z: 0,
       reactionAvailable: true,
       hazardSize: null,
@@ -186,6 +204,7 @@ describe('resolveTokenHp', () => {
       speed: null,
       description: '',
       hidden: false,
+      perceptionDc: null,
       z: 0,
       reactionAvailable: true,
       hazardSize: null,
@@ -213,6 +232,7 @@ describe('resolveTokenHp', () => {
       speed: null,
       description: '',
       hidden: false,
+      perceptionDc: null,
       z: 0,
       reactionAvailable: true,
       hazardSize: null,
@@ -243,6 +263,7 @@ describe('resolveTokenAc', () => {
     speed: null,
     description: '',
     hidden: false,
+    perceptionDc: null,
     z: 0,
     reactionAvailable: true,
     hazardSize: null,

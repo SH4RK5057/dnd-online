@@ -13,7 +13,8 @@ import { colorForPlayerId } from '../map/annotationColor'
 import { usePois } from '../map/usePois'
 import { useAssetUrl } from '../map/assetSync'
 import { useCharacters } from '../character/useCharacters'
-import { resolveTokenHp } from '../character/rules'
+import { useCampaignSettings } from '../character/useCampaignSettings'
+import { resolveTokenHp, computePassiveSkill } from '../character/rules'
 import { footprintCells, rectanglesOverlap, tokenFootprintRect } from '../map/sizeCategory'
 import {
   PERSONAL_VISION_RADIUS_CELLS,
@@ -106,6 +107,7 @@ export function MapCanvas({
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
   const { exploredCells, revealCells } = useExploration(doc, activeScene?.id ?? null, effectiveViewerId)
   const { characters } = useCharacters(doc)
+  const { settings: campaignSettings } = useCampaignSettings(doc)
   const { pings, createPing } = usePings(doc, activeScene?.id ?? null, isDm)
   const { annotations, createAnnotation } = useAnnotations(doc, activeScene?.id ?? null, isDm)
   const { pois } = usePois(doc, activeScene?.id ?? null)
@@ -392,7 +394,46 @@ export function MapCanvas({
     fogTarget.mask = fogLayer.mask
     tokenTarget.mask = fogLayer.liveMask
     if (newlyExplored.length > 0) revealCells(newlyExplored)
-  }, [app, activeScene, mapSize, isDmUnmasked, effectiveViewerId, walls, lights, tokens, exploredCells, revealCells])
+
+    // Passive-perception auto-reveal: a hidden token with a set DC unhides
+    // itself the moment this viewer's own live sight just reached its cell
+    // and their passive Perception beats that DC — reusing the same
+    // newly-explored-this-frame signal the persistent-fog reveal above
+    // does, rather than a separate visibility recompute.
+    if (campaignSettings.passivePerceptionEnabled && effectiveViewerId && newlyExplored.length > 0) {
+      const myCharacter = characters.find((c) => c.ownerId === effectiveViewerId)
+      if (myCharacter) {
+        const passivePerception = computePassiveSkill(myCharacter, 'perception')
+        const newlyExploredSet = new Set(newlyExplored)
+        for (const token of tokens) {
+          if (!token.hidden || token.perceptionDc === null) continue
+          const width = token.hazardSize?.widthCells ?? footprintCells(token.sizeCategory)
+          const height = token.hazardSize?.heightCells ?? footprintCells(token.sizeCategory)
+          let spotted = false
+          for (let dx = 0; dx < width && !spotted; dx++) {
+            for (let dy = 0; dy < height && !spotted; dy++) {
+              if (newlyExploredSet.has(`${Math.floor(token.x) + dx},${Math.floor(token.y) + dy}`)) spotted = true
+            }
+          }
+          if (spotted && passivePerception >= token.perceptionDc) setTokenHidden(token.id, false)
+        }
+      }
+    }
+  }, [
+    app,
+    activeScene,
+    mapSize,
+    isDmUnmasked,
+    effectiveViewerId,
+    walls,
+    lights,
+    tokens,
+    exploredCells,
+    revealCells,
+    campaignSettings.passivePerceptionEnabled,
+    characters,
+    setTokenHidden,
+  ])
 
   // Update pings.
   useEffect(() => {

@@ -349,57 +349,41 @@ depth plus a few things a physical table can't do at all.
       auto-reveals (the DM resolves the actual trap effect manually with
       existing tools — a save, damage, whatever the trap does — same as
       any other damage/save flow)
+- [x] Passive perception — a per-scene/campaign DM toggle
+      (`passivePerceptionEnabled`); a hidden token can carry an optional
+      `perceptionDc` the DM sets (this app doesn't model a Stealth roll,
+      the DM just decides the number). When the toggle is on, the moment a
+      player's own live sight newly reaches a hidden token with a DC set
+      (reusing the fog layer's existing "cells newly explored this frame"
+      output — no separate visibility recompute needed), their passive
+      Perception (`10 + Perception bonus`, shown on every character sheet
+      regardless of the toggle) is compared against it and the token
+      auto-reveals on success. A token with no DC set never auto-reveals,
+      even with the toggle on — the DM opts in per hidden thing.
+- [x] Session recap — merges the roll log, chat log, and a small new
+      combat-start/combat-end event log (`sessionLog/useSessionEvents.ts`,
+      logged from `InitiativeTracker`'s existing start/end handlers) into
+      one chronological, oldest-first timeline. Deliberately the raw merged
+      history rather than a written-prose summary — see the rejected
+      AI-tools entry below for why this app doesn't reach for text
+      generation to produce one.
 
-## Phase 9 — Roadmapped, not yet built
+## Phase 9 — Explicitly rejected
 
-Explained here so the design intent isn't lost, but deliberately not
-scheduled — either lower priority right now or needs a decision this repo
-hasn't made yet. Pull one of these into an active phase when it's actually
-next.
+Decided against, not just deprioritized — don't re-propose these without a
+real change in constraints.
 
-- **Passive perception** — every character already has a Perception skill
-  bonus computed (`computeSkillBonus`); passive perception is just
-  `10 + that bonus` (no roll). The DM-useful version of this feature isn't
-  the number itself (trivial to show on the sheet) but comparing it against
-  a hidden token's/trap's stealth/DC automatically as it comes into a
-  player's fog-of-war sight — "did anyone notice the hidden goblin that just
-  entered their vision?" — which means hooking into the *same* fog/
-  visibility recompute that already runs every frame per viewer
-  (`map/visibility.ts` → `FogLayer`) and diffing "newly visible hidden
-  tokens" against each viewer's passive Perception. That diff-and-notify
-  hook is the actual work; the arithmetic is a one-liner.
-- **Encounter difficulty calculator** — 5e's DMG method: each monster's CR
-  maps to an XP value (a public table, safe to hand-author like the XP-to-
-  level table already in `character/rules.ts`), multiplied by a scaling
-  factor for how many monsters are in the fight, compared against
-  Easy/Medium/Hard/Deadly thresholds derived from the party's levels. All
-  the inputs already exist in this app (encounter builder's selected
-  tokens, each linked character's level) — this is a pure function plus a
-  readout in `EncounterBuilder`/`InitiativeTracker`, no new data model.
-- **Session recap** — stitch the roll log, chat log, and combat/encounter
-  events (already all timestamped Yjs records) into a chronological "what
-  happened this session" summary the DM can review or share. The
-  mechanical part (merge + sort three logs by `createdAt`) is
-  straightforward; the open design question is whether the recap is just
-  that raw merged timeline (cheap, always accurate) or an actual
-  written-prose summary (needs either a DM-authored pass or a text-
-  generation dependency this app doesn't have — see "AI-assisted DM tools,"
-  explicitly rejected below, for why that's not a given here).
-- **Play-by-post mode** — the party plays out a scene asynchronously
-  through this app's own text chat and dice roller instead of a live
-  session with everyone connected at once: each player posts their action
-  whenever they're free, the DM responds and rolls when they get to it.
-  Most of the plumbing already works today (state lives in the DM's
-  IndexedDB-backed Yjs doc regardless of who's online), so this is really a
-  UI-affordance gap, not an architecture one — "whose turn is it to post"
-  and unread/new-post indicators for a cadence measured in hours/days
-  instead of minutes, without requiring everyone connected simultaneously.
-
-**Explicitly rejected, not just deprioritized:**
-- AI-assisted DM tools (NPC dialogue, encounter suggestions, generated prose
-  recaps) — decided against; not on this roadmap at any priority.
-- Built-in voice/video — out of scope per the original Decisions section;
-  Discord/Google Meet alongside the app remains the answer.
+- **AI-assisted DM tools** (NPC dialogue, encounter suggestions, generated
+  prose recaps, etc.) — not on this roadmap at any priority.
+- **Built-in voice/video** — out of scope per the original Decisions
+  section; Discord/Google Meet alongside the app remains the answer.
+- **Encounter difficulty calculator** — 5e's DMG CR/XP-budget method was a
+  clean, cheap addition (no new data model, just a pure function over
+  numbers this app already has), but rejected on its own terms, not for
+  feasibility reasons.
+- **Play-by-post mode** — most of the plumbing already works today (state
+  lives in the DM's IndexedDB-backed Yjs doc regardless of who's online),
+  but rejected as a supported mode; this app targets live sessions.
 
 ## Phase 10 — Stretch goals
 - [ ] 3D dice roll animations

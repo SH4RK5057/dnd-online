@@ -41,6 +41,7 @@ export interface UseTokensResult {
   setTokenSpeed: (tokenId: string, speed: number | null) => void
   setTokenDescription: (tokenId: string, description: string) => void
   setTokenHidden: (tokenId: string, hidden: boolean) => void
+  setTokenPerceptionDc: (tokenId: string, dc: number | null) => void
   setTokenZ: (tokenId: string, z: number) => void
   setTokenReactionAvailable: (tokenId: string, available: boolean) => void
   setTokenHazardSize: (tokenId: string, size: { widthCells: number; heightCells: number } | null) => void
@@ -104,6 +105,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         speed: null,
         description: '',
         hidden: input.hidden ?? false,
+        perceptionDc: null,
         z: 0,
         reactionAvailable: true,
         hazardSize: input.hazardSize ?? null,
@@ -169,6 +171,10 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     [patchToken],
   )
   const setTokenHidden = useCallback((tokenId: string, hidden: boolean) => patchToken(tokenId, { hidden }), [patchToken])
+  const setTokenPerceptionDc = useCallback(
+    (tokenId: string, dc: number | null) => patchToken(tokenId, { perceptionDc: dc }),
+    [patchToken],
+  )
   const setTokenZ = useCallback((tokenId: string, z: number) => patchToken(tokenId, { z }), [patchToken])
   const setTokenReactionAvailable = useCallback(
     (tokenId: string, available: boolean) => patchToken(tokenId, { reactionAvailable: available }),
@@ -216,6 +222,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     setTokenSpeed,
     setTokenDescription,
     setTokenHidden,
+    setTokenPerceptionDc,
     setTokenZ,
     setTokenReactionAvailable,
     setTokenHazardSize,

@@ -14,6 +14,13 @@ export interface CampaignSettingsRecord {
    * miss manually from the roll log. Read as `?? true` so a campaign that
    * predates this field defaults to auto-resolving. */
   autoResolveAttacksEnabled: boolean
+  /** When true, a hidden token with a set perceptionDc auto-reveals itself
+   * to a player the moment their passive Perception would beat that DC as
+   * their live sight reaches it (see canvas/MapCanvas.tsx's fog effect).
+   * Read as `?? false` so a campaign that predates this field defaults to
+   * off — auto-revealing hidden things is a bigger behavior change than the
+   * other defaults-on toggles, so this one opts in instead. */
+  passivePerceptionEnabled: boolean
 }
 
 function settingsMap(doc: Y.Doc) {
@@ -21,13 +28,14 @@ function settingsMap(doc: Y.Doc) {
 }
 
 function defaultSettings(): CampaignSettingsRecord {
-  return { restsEnabled: true, autoResolveAttacksEnabled: true }
+  return { restsEnabled: true, autoResolveAttacksEnabled: true, passivePerceptionEnabled: false }
 }
 
 export interface UseCampaignSettingsResult {
   settings: CampaignSettingsRecord
   setRestsEnabled: (enabled: boolean) => void
   setAutoResolveAttacksEnabled: (enabled: boolean) => void
+  setPassivePerceptionEnabled: (enabled: boolean) => void
 }
 
 /** Campaign-wide DM preferences that don't belong to any single scene or
@@ -66,5 +74,14 @@ export function useCampaignSettings(doc: Y.Doc | null): UseCampaignSettingsResul
     [doc],
   )
 
-  return { settings, setRestsEnabled, setAutoResolveAttacksEnabled }
+  const setPassivePerceptionEnabled = useCallback(
+    (enabled: boolean) => {
+      if (!doc) return
+      const m = settingsMap(doc)
+      m.set(SETTINGS_KEY, { ...defaultSettings(), ...m.get(SETTINGS_KEY), passivePerceptionEnabled: enabled })
+    },
+    [doc],
+  )
+
+  return { settings, setRestsEnabled, setAutoResolveAttacksEnabled, setPassivePerceptionEnabled }
 }

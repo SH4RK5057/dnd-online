@@ -93,6 +93,14 @@ export function computeSkillBonus(character: Pick<CharacterRecord, 'abilities' |
   return mod
 }
 
+/** Standard 5e passive check formula (10 + the skill's bonus) — currently
+ * only used for passive Perception (see useCampaignSettings.ts
+ * passivePerceptionEnabled), but written generically since the formula
+ * itself isn't Perception-specific. */
+export function computePassiveSkill(character: Pick<CharacterRecord, 'abilities' | 'level' | 'skillProficiencies'>, skill: SkillId): number {
+  return 10 + computeSkillBonus(character, skill)
+}
+
 export function computeInitiativeBonus(character: Pick<CharacterRecord, 'abilities' | 'initiativeBonus'>): number {
   return computeModifier(character.abilities.dex) + character.initiativeBonus
 }
