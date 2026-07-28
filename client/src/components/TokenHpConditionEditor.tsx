@@ -24,8 +24,17 @@ export function TokenHpConditionEditor({
   const isDm = session?.role === 'dm'
   const myPlayerId = getOrCreatePlayerId()
 
-  const { tokens, setTokenHp, setTokenConditions, setTokenInitiative, linkCharacter, setTokenHidden, setTokenPerceptionDc, setTokenZ } =
-    useTokens(doc, sceneId)
+  const {
+    tokens,
+    setTokenHp,
+    setTokenConditions,
+    setTokenInitiative,
+    linkCharacter,
+    setTokenHidden,
+    setTokenPerceptionDc,
+    setTokenZ,
+    setTokenModel,
+  } = useTokens(doc, sceneId)
   const { characters, updateCharacter, createNpcCharacter } = useCharacters(doc)
 
   const token = tokens.find((t) => t.id === selectedTokenId)
@@ -117,6 +126,23 @@ export function TokenHpConditionEditor({
             Altitude (cells)
             <input type="number" value={token.z} onChange={(e) => setTokenZ(token.id, Number(e.target.value))} />
           </label>
+          <label title="Optional STL 3D model standing in for this token in the 3D flat-plane view. Leave unset to use a plain placeholder mini.">
+            3D model (STL)
+            <input
+              type="file"
+              accept=".stl,model/stl,model/x.stl-binary,model/x.stl-ascii"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                if (file) void setTokenModel(token.id, file)
+                e.target.value = ''
+              }}
+            />
+          </label>
+          {token.modelAssetId && (
+            <button type="button" onClick={() => void setTokenModel(token.id, null)}>
+              Clear 3D model
+            </button>
+          )}
         </div>
       )}
 

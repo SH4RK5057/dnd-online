@@ -1,6 +1,6 @@
 export type SizeCategory = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan'
 
-export type AssetKind = 'map' | 'token' | 'handout' | 'audio'
+export type AssetKind = 'map' | 'token' | 'handout' | 'audio' | 'model'
 
 export type GridType = 'square' | 'hex'
 
@@ -166,6 +166,13 @@ export interface TokenRecord {
    * area rather than a creature size category. Null for every normal
    * token, which keeps using sizeCategory as before. */
   hazardSize: { widthCells: number; heightCells: number } | null
+  /** An uploaded STL 3D model (AssetKind 'model') standing in for this
+   * token in the 3D flat-plane view (canvas3d/Scene3D.tsx) — synced through
+   * the same chunked asset pipeline as map/token images (map/assetSync.ts),
+   * just an unprocessed binary blob instead of a compressed image. Null
+   * falls back to a plain placeholder mini in 3D. Irrelevant to the normal
+   * 2D map view, which keeps using `assetId` exactly as before. */
+  modelAssetId: string | null
   createdAt: number
 }
 

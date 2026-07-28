@@ -29,7 +29,7 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
   const { session } = useSession()
   const doc = session?.doc ?? null
   const { activeSceneId, activeScene } = useScenes(doc)
-  const { createToken, setTokenArt, initTokenFromMonster } = useTokens(doc, activeSceneId)
+  const { createToken, setTokenArt, setTokenModel, initTokenFromMonster } = useTokens(doc, activeSceneId)
 
   const [toolMode, setToolMode] = useState<ToolMode>('move')
   const [snapWalls, setSnapWalls] = useState(false)
@@ -62,7 +62,7 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingPlacement || !activeSceneId) return
-    const { name, sizeCategory, file, monsterInit, hazardSize } = pendingPlacement
+    const { name, sizeCategory, file, modelFile, monsterInit, hazardSize } = pendingPlacement
     setPendingPlacement(null)
     try {
       const footprint = hazardSize ? Math.max(hazardSize.widthCells, hazardSize.heightCells) : footprintCells(sizeCategory)
@@ -78,6 +78,7 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
         hidden: !!hazardSize,
       })
       if (file) void setTokenArt(tokenId, file)
+      if (modelFile) void setTokenModel(tokenId, modelFile)
       if (monsterInit) initTokenFromMonster(tokenId, monsterInit)
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not add that token.')
@@ -89,6 +90,7 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
       name: monster.name,
       sizeCategory: monsterSizeToCategory(monster.size),
       file: null,
+      modelFile: null,
       monsterInit: {
         monsterKey: monster.key,
         hp: { current: monster.hp, max: monster.hp, temp: 0 },

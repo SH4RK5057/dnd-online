@@ -9,6 +9,10 @@ export interface PendingTokenPlacement {
   name: string
   sizeCategory: SizeCategory
   file: File | null
+  /** Optional STL 3D model for the 3D flat-plane view (canvas3d/Scene3D.tsx)
+   * — see TokenRecord.modelAssetId. Independent of `file` (the 2D image);
+   * a token can have either, both, or neither. */
+  modelFile: File | null
   /** Set when this placement came from the compendium's "Add to scene"
    * button (encounter drag-and-drop) instead of TokenUploadButton — carries
    * the stat block fields to initialize on the token once it's placed. */

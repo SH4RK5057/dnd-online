@@ -32,6 +32,9 @@ export interface UseTokensResult {
   setTokenSize: (tokenId: string, sizeCategory: SizeCategory) => void
   moveToken: (tokenId: string, x: number, y: number) => void
   setTokenArt: (tokenId: string, file: File) => Promise<void>
+  /** Uploads (or clears, when `file` is null) the STL 3D model standing in
+   * for this token in the 3D flat-plane view — see TokenRecord.modelAssetId. */
+  setTokenModel: (tokenId: string, file: File | null) => Promise<void>
   assignOwner: (tokenId: string, ownerId: string | null) => void
   linkCharacter: (tokenId: string, characterId: string | null) => void
   setTokenHp: (tokenId: string, hp: { current: number; max: number; temp: number } | null) => void
@@ -109,6 +112,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         z: 0,
         reactionAvailable: true,
         hazardSize: input.hazardSize ?? null,
+        modelAssetId: null,
         createdAt: Date.now(),
       }
       tokensMap(doc).set(id, record)
@@ -202,6 +206,24 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     [doc, patchToken],
   )
 
+  const setTokenModel = useCallback(
+    async (tokenId: string, file: File | null) => {
+      if (!doc) return
+      if (!file) {
+        patchToken(tokenId, { modelAssetId: null })
+        return
+      }
+      // STL is a raw mesh format, not an image — published as-is (no
+      // compression step) via the same generic chunked asset pipeline
+      // image/audio/handout uploads already use. width/height are
+      // meaningless for a 3D model; publishAsset only threads them through
+      // to AssetMeta, which no model consumer reads.
+      const { assetId } = await publishAsset(doc, 'model', file, { width: 0, height: 0 })
+      patchToken(tokenId, { modelAssetId: assetId })
+    },
+    [doc, patchToken],
+  )
+
   const tokens = sceneId ? allTokens.filter((t) => t.sceneId === sceneId) : []
 
   return {
@@ -213,6 +235,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     setTokenSize,
     moveToken,
     setTokenArt,
+    setTokenModel,
     assignOwner,
     linkCharacter,
     setTokenHp,

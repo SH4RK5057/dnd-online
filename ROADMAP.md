@@ -446,6 +446,28 @@ real change in constraints.
       via the Yjs doc — sidesteps P2P timing/ordering questions for what's
       a purely cosmetic flourish; every other viewer still sees the result
       land in the shared log exactly as before, just without the animation.
+- [x] 3D flat-plane view with STL miniatures — a personal, per-viewer toggle
+      (each player/DM switches their own screen, not synced) swaps the 2D
+      map (`canvas/MapCanvas.tsx`) for a three.js scene
+      (`canvas3d/Scene3D.tsx`): the scene's map image becomes a textured
+      flat tabletop plane, and any token with an uploaded STL
+      (`TokenRecord.modelAssetId`, uploaded via the same chunked asset
+      pipeline as map/token images — no size cap) stands on it as a real 3D
+      mini instead of a flat sprite; tokens without one get a plain
+      placeholder cone (or a flat box for hazard/trap tokens). Dragging a
+      mini is fully interactive but DM-only, matching the 2D view's existing
+      drag convention. STL files are assumed Z-up (the near-universal
+      convention for 3D-printable miniature files) and auto-normalized to
+      stand upright at the correct scale regardless of the original file's
+      real-world dimensions (`canvas3d/modelCache.ts`).
+      **v1 limitations, deliberately scoped out:** no fog-of-war/line-of-
+      sight masking (every non-hidden token is visible to everyone
+      regardless of vision — hidden tokens still stay DM-only); a drag only
+      writes the final position on release, not a continuously-broadcast
+      live position like 2D's throttled dragging; no visual selection
+      highlight on the mini itself (clicking still opens the same HP/
+      condition/inspector side panels as 2D); walls, lights, annotations,
+      and measuring have no 3D equivalent — this view is map + tokens only.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---

@@ -38,6 +38,7 @@ import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { useUndoManager } from '../undo/useUndoManager'
 import { DiceOverlay } from '../components/DiceOverlay'
 import { MapCanvas } from '../canvas/MapCanvas'
+import { Scene3D } from '../canvas3d/Scene3D'
 import type { MeasureShape } from '../canvas/MeasureLayer'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
@@ -52,7 +53,7 @@ export function SessionScreen() {
   const { scenes, activeSceneId, activeScene, switchToScene } = useScenes(session?.doc ?? null)
   const { notification, dismiss: dismissNotification } = useEncounterNotifications(session?.doc ?? null, scenes)
   const { undo, redo, canUndo, canRedo } = useUndoManager(session?.role === 'dm' ? (session?.doc ?? null) : null)
-  const { tokens, createToken, setTokenArt } = useTokens(session?.doc ?? null, activeSceneId)
+  const { tokens, createToken, setTokenArt, setTokenModel } = useTokens(session?.doc ?? null, activeSceneId)
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
   const [showCharacterManager, setShowCharacterManager] = useState(false)
   const [showSceneBuilder, setShowSceneBuilder] = useState(false)
@@ -79,6 +80,10 @@ export function SessionScreen() {
   const [showCampaignFiles, setShowCampaignFiles] = useState(false)
   const [showChat, setShowChat] = useState(true)
   const [showSessionRecap, setShowSessionRecap] = useState(false)
+  /** Personal display preference, not synced — each viewer picks 2D or 3D
+   * for their own screen independently (see canvas3d/Scene3D.tsx's doc
+   * comment for what 3D mode does and doesn't support in v1). */
+  const [view3d, setView3d] = useState(false)
 
   useEffect(() => {
     if (!notification) return
@@ -204,7 +209,7 @@ export function SessionScreen() {
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingTokenPlacement || !activeSceneId) return
-    const { name, sizeCategory, file, hazardSize } = pendingTokenPlacement
+    const { name, sizeCategory, file, modelFile, hazardSize } = pendingTokenPlacement
     setPendingTokenPlacement(null)
     try {
       const footprint = hazardSize ? Math.max(hazardSize.widthCells, hazardSize.heightCells) : footprintCells(sizeCategory)
@@ -220,6 +225,7 @@ export function SessionScreen() {
         hidden: !!hazardSize,
       })
       if (file) void setTokenArt(tokenId, file)
+      if (modelFile) void setTokenModel(tokenId, modelFile)
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not add that token.')
     }
@@ -422,18 +428,33 @@ export function SessionScreen() {
               {isUnassignedPlayer && (
                 <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
               )}
-              <MapCanvas
-                toolMode={effectiveToolMode}
-                snapWalls={false}
-                wallThickness={DEFAULT_WALL_THICKNESS_PX}
-                onPlaceToken={handlePlaceToken}
-                onPlacePoi={handlePlacePoi}
-                previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
-                selectedTokenId={selectedTokenId}
-                onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
-                armedTemplate={armedTemplate}
-                onArmedTemplatePlaced={() => setArmedTemplate(null)}
-              />
+              {view3d ? (
+                <Scene3D
+                  selectedTokenId={selectedTokenId}
+                  onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
+                />
+              ) : (
+                <MapCanvas
+                  toolMode={effectiveToolMode}
+                  snapWalls={false}
+                  wallThickness={DEFAULT_WALL_THICKNESS_PX}
+                  onPlaceToken={handlePlaceToken}
+                  onPlacePoi={handlePlacePoi}
+                  previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
+                  selectedTokenId={selectedTokenId}
+                  onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
+                  armedTemplate={armedTemplate}
+                  onArmedTemplatePlaced={() => setArmedTemplate(null)}
+                />
+              )}
+              <button
+                type="button"
+                className="session-screen__3d-toggle"
+                onClick={() => setView3d((v) => !v)}
+                title={view3d ? 'Switch back to the 2D map' : 'Switch to the 3D flat-plane view (STL minis)'}
+              >
+                {view3d ? '2D map' : '3D view'}
+              </button>
               <button
                 type="button"
                 className="session-screen__fullscreen-toggle"

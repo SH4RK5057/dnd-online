@@ -27,6 +27,7 @@ export function TokenUploadButton({
   const [name, setName] = useState('')
   const [sizeCategory, setSizeCategory] = useState<SizeCategory>('medium')
   const [file, setFile] = useState<File | null>(null)
+  const [modelFile, setModelFile] = useState<File | null>(null)
   const [isHazard, setIsHazard] = useState(false)
   const [hazardWidth, setHazardWidth] = useState(2)
   const [hazardHeight, setHazardHeight] = useState(2)
@@ -39,11 +40,13 @@ export function TokenUploadButton({
       name: trimmed,
       sizeCategory,
       file,
+      modelFile,
       monsterInit: null,
       hazardSize: isHazard ? { widthCells: Math.max(1, hazardWidth), heightCells: Math.max(1, hazardHeight) } : null,
     })
     setName('')
     setFile(null)
+    setModelFile(null)
   }
 
   const handleEraseAll = () => {
@@ -102,6 +105,12 @@ export function TokenUploadButton({
         </select>
       )}
       <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+      <input
+        type="file"
+        accept=".stl,model/stl,model/x.stl-binary,model/x.stl-ascii"
+        title="Optional STL 3D model for the 3D flat-plane view"
+        onChange={(event) => setModelFile(event.target.files?.[0] ?? null)}
+      />
       <button type="submit" disabled={!name.trim()}>
         Add token
       </button>

@@ -25,6 +25,7 @@ function token(overrides: Partial<TokenRecord>): TokenRecord {
     z: 0,
     reactionAvailable: true,
     hazardSize: null,
+    modelAssetId: null,
     createdAt: 0,
     ...overrides,
   }
