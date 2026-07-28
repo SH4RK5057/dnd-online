@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as Y from 'yjs'
 import type { RollRecord } from './types'
+import { triggerDiceAnimation } from './diceAnimationBus'
 
 const MAX_ROLL_LOG_ENTRIES = 200
 
@@ -59,6 +60,15 @@ export function useRollLog(doc: Y.Doc | null, isDm: boolean): UseRollLogResult {
       if (!doc) return
       const id = crypto.randomUUID()
       rollsMap(doc).set(id, { ...roll, id, createdAt: Date.now() })
+      // Every roll funnels through here regardless of caller (freeform,
+      // quick-roll, attack, spell, rest healing, etc.) — a single choke
+      // point to trigger the dice animation from, rather than wiring it
+      // into every call site individually. Uses the first die term (the
+      // d20 for most checks/attacks/saves) and its real kept value.
+      const firstTerm = roll.terms[0]
+      if (firstTerm) {
+        triggerDiceAnimation({ sides: firstTerm.sides, value: firstTerm.kept.reduce((a, b) => a + b, 0) })
+      }
     },
     [doc],
   )

@@ -427,46 +427,26 @@ real change in constraints.
 - **Turn timer** — an on-deck indicator (who's up next) shipped in Phase 8's
   second combat-smoothness batch, but a countdown clock on the current turn
   was rejected alongside it; this app doesn't pressure table pacing.
+- **Multiclassing** — `CharacterRecord` stays single-class
+  (`className` + `level`, see its own v1-limitation doc comment in
+  `character/types.ts`). Rejected, not deferred: the rework it would take
+  (a `classes[]` array, per-class HP dice, the multiclass spell-slot
+  formula, first-class-only save proficiencies, per-class ASI
+  breakpoints, and a level-up/character-sheet UI overhaul to manage a list
+  of classes instead of one) isn't worth taking on for this app.
 
 ## Phase 10 — Stretch goals
-- [ ] 3D dice roll animations
+- [x] 3D dice roll animations — a lightweight CSS 3D die (no WebGL/three.js
+      dependency) tumbles for ~900ms then reveals the real rolled value —
+      never a separate fake number, always the same die-term result that
+      just got written to the shared roll log (`dice/diceAnimationBus.ts`,
+      triggered from the single choke point every roll already passes
+      through, `dice/useRollLog.ts`'s `pushRoll`). Deliberately local-only:
+      it plays for whichever client just rolled, not broadcast to everyone
+      via the Yjs doc — sidesteps P2P timing/ordering questions for what's
+      a purely cosmetic flourish; every other viewer still sees the result
+      land in the shared log exactly as before, just without the animation.
 - [ ] Support for non-5e systems (generalize the rules engine)
-- [ ] **Multiclassing.** Deferred, not rejected — a real chunk of work, not a
-      quick add, because "single class" is baked fairly deep into the
-      character model. `CharacterRecord` currently has one `className` +
-      one `level` (see its own v1-limitation doc comment in
-      `character/types.ts`); real multiclass support would need:
-      - `classes: { className, subclassName, level }[]` replacing the
-        singular fields, with a UI that goes from three dropdowns to a
-        repeatable "add a class" list.
-      - **Proficiency bonus is actually already fine** — 5e keys it off
-        *total* character level, which this app already computes correctly
-        regardless of how many classes contribute to that total. No change
-        needed there.
-      - **Hit points** would need to change from one HP-die formula to
-        summing each class's own hit die average (or roll) for the levels
-        taken in that class — currently `computeMaxHp` assumes a single die
-        type for the whole character.
-      - **Spell slots** are the hardest part: 5e's multiclass table isn't
-        "add the slot tables together," it's a unified caster-level formula
-        (full casters count their level 1:1, half-casters count half
-        rounded down, third-casters count a third rounded down, and Pact
-        Magic slots from Warlock levels never combine with the rest at
-        all). This needs its own lookup table distinct from the existing
-        single-class one.
-      - **Save proficiencies** only come from the *first* class taken in
-        5e — every subsequent class grants a different, smaller set of
-        proficiencies instead (per its multiclassing prerequisites table).
-        This needs to track which class was taken first, something a flat
-        `classes[]` array doesn't imply on its own.
-      - **ASI/feat levels** are keyed to each class's *own* level in that
-        class (e.g. a Fighter 3/Rogue 2 only gets Fighter's level-4 ASI
-        once Fighter reaches level 4, not when total level hits 4) —
-        `resolvedAsiLevels` would need to become per-class instead of a
-        flat list of total-level numbers.
-      In short: proficiency bonus is free, but HP/spell-slots/saves/ASI all
-      need real rework, plus the level-up wizard and character sheet UI
-      both need to go from "pick one class" to "manage a list of classes."
 
 ---
 

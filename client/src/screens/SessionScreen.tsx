@@ -36,6 +36,7 @@ import { EncounterNotificationBanner } from '../components/EncounterNotification
 import { PendingOverridesBanner } from '../components/PendingOverridesBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { useUndoManager } from '../undo/useUndoManager'
+import { DiceOverlay } from '../components/DiceOverlay'
 import { MapCanvas } from '../canvas/MapCanvas'
 import type { MeasureShape } from '../canvas/MeasureLayer'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
@@ -226,6 +227,7 @@ export function SessionScreen() {
 
   return (
     <section className="session-screen">
+      <DiceOverlay />
       <header className="session-screen__header">
         <h1>{sessionMeta?.sessionName ?? 'Session'}</h1>
         <ConnectionStatusBadge status={status} />
