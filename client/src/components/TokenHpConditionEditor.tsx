@@ -47,9 +47,18 @@ export function TokenHpConditionEditor({
     }
   }
 
-  const toggleCondition = (condition: string, active: boolean) => {
-    const next = active ? [...token.conditions, condition] : token.conditions.filter((c) => c !== condition)
+  const toggleCondition = (name: string, active: boolean) => {
+    const next = active
+      ? [...token.conditions, { name, roundsRemaining: null }]
+      : token.conditions.filter((c) => c.name !== name)
     setTokenConditions(token.id, next)
+  }
+
+  const setConditionDuration = (name: string, roundsRemaining: number | null) => {
+    setTokenConditions(
+      token.id,
+      token.conditions.map((c) => (c.name === name ? { ...c, roundsRemaining } : c)),
+    )
   }
 
   return (
@@ -135,16 +144,28 @@ export function TokenHpConditionEditor({
 
       <h3>Conditions</h3>
       <div className="token-hp-condition-editor__conditions">
-        {KNOWN_CONDITIONS.map((condition) => (
-          <label key={condition}>
-            <input
-              type="checkbox"
-              checked={token.conditions.includes(condition)}
-              onChange={(e) => toggleCondition(condition, e.target.checked)}
-            />
-            {condition}
-          </label>
-        ))}
+        {KNOWN_CONDITIONS.map((name) => {
+          const active = token.conditions.find((c) => c.name === name)
+          return (
+            <div key={name} className="token-hp-condition-editor__condition-row">
+              <label>
+                <input type="checkbox" checked={!!active} onChange={(e) => toggleCondition(name, e.target.checked)} />
+                {name}
+              </label>
+              {active && (
+                <input
+                  type="number"
+                  min={1}
+                  className="token-hp-condition-editor__condition-duration"
+                  value={active.roundsRemaining ?? ''}
+                  placeholder="Indefinite"
+                  title="Rounds remaining — decrements each round, clears automatically at 0. Blank = indefinite, clear the checkbox manually."
+                  onChange={(e) => setConditionDuration(name, e.target.value === '' ? null : Math.max(1, Number(e.target.value)))}
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <h3>Initiative</h3>

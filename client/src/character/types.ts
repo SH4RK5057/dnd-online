@@ -77,6 +77,12 @@ export interface WeaponEntry {
   damageDice: string
   damageBonus: number
   proficient: boolean
+  /** Drives which half of dice/conditions.ts's TARGET_CONDITION_ROLL_EFFECTS
+   * applies against a conditioned target (e.g. melee attacks against a Prone
+   * target have advantage, ranged have disadvantage) — see
+   * components/AttackRollPanel.tsx. Read as `?? 'melee'` for weapons created
+   * before this field existed. */
+  attackType: 'melee' | 'ranged'
 }
 
 export type CharacterOverrideStatus = 'pending' | 'approved' | 'rejected'

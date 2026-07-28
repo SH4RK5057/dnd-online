@@ -35,6 +35,7 @@ import { SceneBuilderScreen } from './SceneBuilderScreen'
 import { EncounterNotificationBanner } from '../components/EncounterNotificationBanner'
 import { PendingOverridesBanner } from '../components/PendingOverridesBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
+import { useUndoManager } from '../undo/useUndoManager'
 import { MapCanvas } from '../canvas/MapCanvas'
 import type { MeasureShape } from '../canvas/MeasureLayer'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
@@ -49,6 +50,7 @@ export function SessionScreen() {
   const { status, peers, failure, retry } = useConnectionStatus(session)
   const { scenes, activeSceneId, activeScene, switchToScene } = useScenes(session?.doc ?? null)
   const { notification, dismiss: dismissNotification } = useEncounterNotifications(session?.doc ?? null, scenes)
+  const { undo, redo, canUndo, canRedo } = useUndoManager(session?.role === 'dm' ? (session?.doc ?? null) : null)
   const { tokens, createToken, setTokenArt } = useTokens(session?.doc ?? null, activeSceneId)
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
   const [showCharacterManager, setShowCharacterManager] = useState(false)
@@ -82,6 +84,21 @@ export function SessionScreen() {
     const timer = setTimeout(dismissNotification, 12_000)
     return () => clearTimeout(timer)
   }, [notification, dismissNotification])
+
+  useEffect(() => {
+    if (session?.role !== 'dm') return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return
+      const target = event.target as HTMLElement | null
+      // Don't hijack Ctrl+Z inside a text field — that should undo typing, not a map edit.
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      event.preventDefault()
+      if (event.shiftKey) redo()
+      else undo()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [session?.role, undo, redo])
 
   useEffect(() => {
     if (!pendingPoiPlacement) return
@@ -212,6 +229,16 @@ export function SessionScreen() {
       <header className="session-screen__header">
         <h1>{sessionMeta?.sessionName ?? 'Session'}</h1>
         <ConnectionStatusBadge status={status} />
+        {session.role === 'dm' && (
+          <div className="session-screen__undo-redo" title="Undo/redo token, wall, light, and character edits — a misclick safety net, not a general time machine. Keyboard: Ctrl+Z / Ctrl+Shift+Z.">
+            <button type="button" onClick={undo} disabled={!canUndo}>
+              ↶ Undo
+            </button>
+            <button type="button" onClick={redo} disabled={!canRedo}>
+              ↷ Redo
+            </button>
+          </div>
+        )}
       </header>
 
       {session.role === 'dm' && (

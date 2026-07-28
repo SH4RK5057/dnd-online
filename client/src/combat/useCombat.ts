@@ -31,8 +31,15 @@ export interface UseCombatResult {
   /** `setTokenReactionAvailable` is optional so existing callers that don't
    * care about reactions (tests, anywhere reactions aren't surfaced) don't
    * need to thread it through — the new turn's token just keeps whatever
-   * reaction state it already had if omitted. */
-  advanceTurn: (tokens: TokenRecord[], setTokenReactionAvailable?: (tokenId: string, available: boolean) => void) => void
+   * reaction state it already had if omitted. `onRoundIncremented` fires
+   * only when the turn wraps back to the top of the order (a full round
+   * elapsed) — used by InitiativeTracker.tsx to tick down condition
+   * durations once per round, not once per turn. */
+  advanceTurn: (
+    tokens: TokenRecord[],
+    setTokenReactionAvailable?: (tokenId: string, available: boolean) => void,
+    onRoundIncremented?: () => void,
+  ) => void
   setMonsterInitiativeMode: (mode: MonsterInitiativeMode) => void
 }
 
@@ -119,9 +126,14 @@ export function useCombat(doc: Y.Doc | null, sceneId: string | null): UseCombatR
   )
 
   const advanceTurn = useCallback(
-    (tokens: TokenRecord[], setTokenReactionAvailable?: (tokenId: string, available: boolean) => void) => {
+    (
+      tokens: TokenRecord[],
+      setTokenReactionAvailable?: (tokenId: string, available: boolean) => void,
+      onRoundIncremented?: () => void,
+    ) => {
       const { nextTokenId, roundIncremented } = nextTurn(tokens, combat.currentTokenId)
       if (nextTokenId) setTokenReactionAvailable?.(nextTokenId, true)
+      if (roundIncremented) onRoundIncremented?.()
       patchCombat({ currentTokenId: nextTokenId, round: roundIncremented ? combat.round + 1 : combat.round })
     },
     [combat.currentTokenId, combat.round, patchCombat],

@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Text, type FederatedPointerEvent, type Texture } from 'pixi.js'
 import { footprintCells, renderScale, snapToSlot } from '../map/sizeCategory'
-import type { SizeCategory } from '../map/types'
+import type { ActiveCondition, SizeCategory } from '../map/types'
 
 export interface TokenSpriteCallbacks {
   /** Called at most every DRAG_WRITE_INTERVAL_MS while dragging, grid-cell coords. */
@@ -78,7 +78,7 @@ export class TokenSprite {
     gridSizePx: number
     texture: Texture | null
     hp: { current: number; max: number; temp: number } | null
-    conditions: string[]
+    conditions: ActiveCondition[]
     selected: boolean
     /** Only ever true in the DM's own unmasked view — hidden tokens never
      * reach TokenLayer at all for anyone else (see MapCanvas.tsx's token

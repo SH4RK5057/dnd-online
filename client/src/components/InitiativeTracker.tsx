@@ -21,7 +21,7 @@ export function InitiativeTracker() {
   const isDm = session?.role === 'dm'
   const myPlayerId = getOrCreatePlayerId()
   const { activeSceneId, activeScene } = useScenes(doc)
-  const { tokens, setTokenInitiative, setTokenReactionAvailable } = useTokens(doc, activeSceneId)
+  const { tokens, setTokenInitiative, setTokenReactionAvailable, setTokenConditions } = useTokens(doc, activeSceneId)
   const { characters } = useCharacters(doc)
   const { combat, startCombat, endCombat, advanceTurn, setMonsterInitiativeMode } = useCombat(doc, activeSceneId)
   const { logEvent } = useSessionEvents(doc, isDm)
@@ -45,7 +45,22 @@ export function InitiativeTracker() {
     endCombat(tokens, setTokenInitiative)
     logEvent(`Combat ended in ${activeScene?.name ?? 'a scene'}`)
   }
-  const handleAdvance = () => advanceTurn(tokens, setTokenReactionAvailable)
+  const handleAdvance = () =>
+    advanceTurn(tokens, setTokenReactionAvailable, () => {
+      // Once-per-round condition tick-down (see ActiveCondition's doc
+      // comment in map/types.ts) — a simplification of 5e's actual
+      // per-creature "until the start of your next turn" wording, but close
+      // enough for a smoothness feature and much simpler to reason about.
+      for (const token of tokens) {
+        if (token.conditions.length === 0) continue
+        const next = token.conditions
+          .map((c) => (c.roundsRemaining !== null ? { ...c, roundsRemaining: c.roundsRemaining - 1 } : c))
+          .filter((c) => c.roundsRemaining === null || c.roundsRemaining > 0)
+        if (next.length !== token.conditions.length || next.some((c, i) => c.roundsRemaining !== token.conditions[i]?.roundsRemaining)) {
+          setTokenConditions(token.id, next)
+        }
+      }
+    })
 
   return (
     <div className="initiative-tracker">
@@ -78,12 +93,16 @@ export function InitiativeTracker() {
       {combat.active && <p className="character-sheet__hint">Round {combat.round}</p>}
 
       <ol className="initiative-tracker__order">
-        {order.map((token) => {
+        {order.map((token, i) => {
           const canManage = isDm || token.ownerId === myPlayerId
+          const isCurrent = token.id === combat.currentTokenId
+          const currentIndex = order.findIndex((t) => t.id === combat.currentTokenId)
+          const isOnDeck = combat.active && currentIndex !== -1 && i === (currentIndex + 1) % order.length && order.length > 1
           return (
-            <li key={token.id} className={token.id === combat.currentTokenId ? 'initiative-tracker__current' : ''}>
+            <li key={token.id} className={isCurrent ? 'initiative-tracker__current' : ''}>
               {token.name} — {token.initiative}
-              {token.id === combat.currentTokenId && ' (current turn)'}
+              {isCurrent && ' (current turn)'}
+              {isOnDeck && <span className="initiative-tracker__on-deck"> (on deck)</span>}
               {combat.active && (
                 <span className={`initiative-tracker__reaction${token.reactionAvailable ? '' : ' initiative-tracker__reaction--used'}`}>
                   {token.reactionAvailable ? '⚡ Reaction available' : 'Reaction used'}

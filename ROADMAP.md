@@ -368,6 +368,46 @@ depth plus a few things a physical table can't do at all.
       AI-tools entry below for why this app doesn't reach for text
       generation to produce one.
 
+**Combat smoothness, round 2**
+- [x] Condition-vs-target advantage/disadvantage — attacks against a
+      conditioned target now grant the attacker advantage or disadvantage
+      depending on the condition and whether the weapon is melee or ranged
+      (`dice/conditions.ts` `TARGET_CONDITION_ROLL_EFFECTS` +
+      `resolveAttackMode`, e.g. a Prone target is easier to hit in melee but
+      harder at range; Blinded/Paralyzed/Petrified/Restrained/Stunned/
+      Unconscious grant advantage either way, Invisible grants disadvantage
+      either way). Required adding a melee/ranged `attackType` to
+      `WeaponEntry`. Auto-crit rules some of these conditions also grant
+      (a hit on a Paralyzed/Unconscious target from within 5 ft. is a
+      critical) aren't modeled — advantage/disadvantage only.
+- [x] Condition duration tracking — a token's conditions are now
+      `{name, roundsRemaining}` pairs instead of bare names
+      (`map/types.ts` `ActiveCondition`); the DM/owner optionally sets a
+      round count when applying one from the token editor, decremented by 1
+      each time combat's round counter advances and auto-cleared at 0
+      (`combat/useCombat.ts` advanceTurn's `onRoundIncremented` callback,
+      wired from `InitiativeTracker`). This ticks once per full round, not
+      per-creature-relative like 5e's actual "until the start of your next
+      turn" wording — a deliberate simplification. Leaving the duration
+      blank keeps the old behavior: indefinite, cleared manually.
+- [x] Group/bulk roll requests — the DM's "Request a roll" form gained an
+      "Everyone" checkbox that fans a single request out to every connected
+      player at once (e.g. "everyone roll a Dex save, DC 15"), reusing the
+      existing single-target `RollRequestRecord` plumbing unchanged rather
+      than adding a second request data shape.
+- [x] On-deck indicator — the initiative tracker now labels whoever's turn
+      is coming up next, computed client-side from the same derived
+      initiative order used for "current turn." No turn timer was added
+      (deliberately rejected — see below).
+- [x] DM undo/redo — a misclick safety net for moved tokens, misplaced
+      walls/lights, and fat-fingered HP edits, built on Yjs's own
+      `Y.UndoManager` (`undo/useUndoManager.ts`) scoped to the tokens/walls/
+      lights/characters maps. Works because Y.UndoManager only tracks local
+      transactions on this browser's own Y.Doc, so it can never undo another
+      connected peer's edits. DM-only, with an Escape-hatch-free Ctrl+Z /
+      Ctrl+Shift+Z shortcut (ignored while focus is in a text field, so it
+      doesn't hijack normal text-undo).
+
 ## Phase 9 — Explicitly rejected
 
 Decided against, not just deprioritized — don't re-propose these without a
@@ -384,10 +424,49 @@ real change in constraints.
 - **Play-by-post mode** — most of the plumbing already works today (state
   lives in the DM's IndexedDB-backed Yjs doc regardless of who's online),
   but rejected as a supported mode; this app targets live sessions.
+- **Turn timer** — an on-deck indicator (who's up next) shipped in Phase 8's
+  second combat-smoothness batch, but a countdown clock on the current turn
+  was rejected alongside it; this app doesn't pressure table pacing.
 
 ## Phase 10 — Stretch goals
 - [ ] 3D dice roll animations
 - [ ] Support for non-5e systems (generalize the rules engine)
+- [ ] **Multiclassing.** Deferred, not rejected — a real chunk of work, not a
+      quick add, because "single class" is baked fairly deep into the
+      character model. `CharacterRecord` currently has one `className` +
+      one `level` (see its own v1-limitation doc comment in
+      `character/types.ts`); real multiclass support would need:
+      - `classes: { className, subclassName, level }[]` replacing the
+        singular fields, with a UI that goes from three dropdowns to a
+        repeatable "add a class" list.
+      - **Proficiency bonus is actually already fine** — 5e keys it off
+        *total* character level, which this app already computes correctly
+        regardless of how many classes contribute to that total. No change
+        needed there.
+      - **Hit points** would need to change from one HP-die formula to
+        summing each class's own hit die average (or roll) for the levels
+        taken in that class — currently `computeMaxHp` assumes a single die
+        type for the whole character.
+      - **Spell slots** are the hardest part: 5e's multiclass table isn't
+        "add the slot tables together," it's a unified caster-level formula
+        (full casters count their level 1:1, half-casters count half
+        rounded down, third-casters count a third rounded down, and Pact
+        Magic slots from Warlock levels never combine with the rest at
+        all). This needs its own lookup table distinct from the existing
+        single-class one.
+      - **Save proficiencies** only come from the *first* class taken in
+        5e — every subsequent class grants a different, smaller set of
+        proficiencies instead (per its multiclassing prerequisites table).
+        This needs to track which class was taken first, something a flat
+        `classes[]` array doesn't imply on its own.
+      - **ASI/feat levels** are keyed to each class's *own* level in that
+        class (e.g. a Fighter 3/Rogue 2 only gets Fighter's level-4 ASI
+        once Fighter reaches level 4, not when total level hits 4) —
+        `resolvedAsiLevels` would need to become per-class instead of a
+        flat list of total-level numbers.
+      In short: proficiency bonus is free, but HP/spell-slots/saves/ASI all
+      need real rework, plus the level-up wizard and character sheet UI
+      both need to go from "pick one class" to "manage a list of classes."
 
 ---
 

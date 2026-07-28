@@ -33,6 +33,7 @@ export function DiceRollerPanel() {
   const [isPrivate, setIsPrivate] = useState(false)
 
   const [requestTarget, setRequestTarget] = useState('')
+  const [requestEveryone, setRequestEveryone] = useState(false)
   const [requestLabel, setRequestLabel] = useState('')
   const [requestNotation, setRequestNotation] = useState('1d20')
 
@@ -42,7 +43,7 @@ export function DiceRollerPanel() {
   const myConditions = (() => {
     const myCharacter = characters.find((c) => c.ownerId === myPlayerId)
     const myToken = myCharacter ? tokens.find((t) => t.characterId === myCharacter.id) : undefined
-    return myToken?.conditions ?? []
+    return (myToken?.conditions ?? []).map((c) => c.name)
   })()
 
   const doRoll = (
@@ -78,8 +79,16 @@ export function DiceRollerPanel() {
   const handleFreeformRoll = () => doRoll(notation, label, mode, null, undefined, isPrivate)
 
   const handleCreateRequest = () => {
-    if (!requestTarget) return
-    createRequest(requestTarget, myPlayerId, requestLabel || 'Roll requested', requestNotation || null)
+    if (requestEveryone) {
+      if (players.length === 0) return
+      // One RollRequestRecord per connected player — reuses the existing
+      // single-target infrastructure unchanged rather than adding a
+      // separate "group request" record type.
+      for (const p of players) createRequest(p.playerId, myPlayerId, requestLabel || 'Roll requested', requestNotation || null)
+    } else {
+      if (!requestTarget) return
+      createRequest(requestTarget, myPlayerId, requestLabel || 'Roll requested', requestNotation || null)
+    }
     setRequestLabel('')
   }
 
@@ -132,7 +141,7 @@ export function DiceRollerPanel() {
         <div className="dice-roller-panel__request-form">
           <h3>Request a roll</h3>
           <div className="dice-roller-panel__row">
-            <select value={requestTarget} onChange={(e) => setRequestTarget(e.target.value)}>
+            <select value={requestTarget} onChange={(e) => setRequestTarget(e.target.value)} disabled={requestEveryone}>
               <option value="">Choose a player…</option>
               {players.map((p) => (
                 <option key={p.playerId} value={p.playerId}>
@@ -140,13 +149,17 @@ export function DiceRollerPanel() {
                 </option>
               ))}
             </select>
+            <label>
+              <input type="checkbox" checked={requestEveryone} onChange={(e) => setRequestEveryone(e.target.checked)} />
+              Everyone (e.g. group save)
+            </label>
             <input placeholder="e.g. Perception check" value={requestLabel} onChange={(e) => setRequestLabel(e.target.value)} />
             <input
               placeholder="Suggested notation, e.g. 1d20+3"
               value={requestNotation}
               onChange={(e) => setRequestNotation(e.target.value)}
             />
-            <button type="button" onClick={handleCreateRequest} disabled={!requestTarget}>
+            <button type="button" onClick={handleCreateRequest} disabled={requestEveryone ? players.length === 0 : !requestTarget}>
               Send request
             </button>
           </div>

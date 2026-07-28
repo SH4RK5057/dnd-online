@@ -503,6 +503,7 @@ export function CharacterSheet({
       damageDice: '1d6',
       damageBonus: 0,
       proficient: true,
+      attackType: 'melee',
     }
     onUpdate({ weapons: [...character.weapons, weapon] })
   }
@@ -1033,6 +1034,15 @@ export function CharacterSheet({
                   disabled={!canEdit}
                   onChange={(e) => handleUpdateWeapon(weapon.id, { damageDice: e.target.value })}
                 />
+                <select
+                  value={weapon.attackType}
+                  disabled={!canEdit}
+                  title="Melee attacks against a Prone target have advantage; ranged attacks against a Prone target have disadvantage."
+                  onChange={(e) => handleUpdateWeapon(weapon.id, { attackType: e.target.value as WeaponEntry['attackType'] })}
+                >
+                  <option value="melee">Melee</option>
+                  <option value="ranged">Ranged</option>
+                </select>
                 <label>
                   Dmg bonus
                   <input

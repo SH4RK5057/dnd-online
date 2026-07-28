@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import type { CharacterRecord } from '../character/types'
-import type { TokenRecord, WallRecord } from '../map/types'
+import type { ActiveCondition, TokenRecord, WallRecord } from '../map/types'
 import type { RollMode } from '../dice/types'
 import type { UseRollLogResult } from '../dice/useRollLog'
 import { computeModifier, computeProficiencyBonus, resolveTokenAc } from '../character/rules'
 import { parseNotation, rollNotation } from '../dice/notation'
-import { resolveEffectiveMode } from '../dice/conditions'
+import { resolveAttackMode } from '../dice/conditions'
 import { hasLineOfSight } from '../map/visibility'
 import { tokenFootprintCenter } from '../map/sizeCategory'
 
@@ -34,7 +34,7 @@ export function AttackRollPanel({
   character: CharacterRecord
   targets: TokenRecord[]
   charactersById: Map<string, CharacterRecord>
-  actingConditions: string[]
+  actingConditions: ActiveCondition[]
   autoResolveEnabled: boolean
   /** Whose turn it is right now — attacking on your own turn is always
    * allowed. Outside your turn, an attack is only allowed as a reaction
@@ -81,7 +81,12 @@ export function AttackRollPanel({
     const abilityMod = computeModifier(character.abilities[weapon.attackAbility])
     const profBonus = weapon.proficient ? computeProficiencyBonus(character.level) : 0
     const attackBonus = abilityMod + profBonus
-    const effectiveMode = resolveEffectiveMode(mode, actingConditions, 'attack')
+    const effectiveMode = resolveAttackMode(
+      mode,
+      actingConditions.map((c) => c.name),
+      target.conditions.map((c) => c.name),
+      weapon.attackType,
+    )
     const notation = `1d20${attackBonus >= 0 ? '+' : ''}${attackBonus}`
     let result
     try {

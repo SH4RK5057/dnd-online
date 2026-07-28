@@ -760,7 +760,7 @@
 
 .token-hp-condition-editor__conditions {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 4px;
 }
 
@@ -771,6 +771,16 @@
   margin: 0;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.token-hp-condition-editor__condition-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.token-hp-condition-editor__condition-duration {
+  width: 52px;
 }
 
 .initiative-tracker__controls {
@@ -815,6 +825,12 @@
   background: transparent;
   color: var(--text);
   opacity: 0.6;
+}
+
+.initiative-tracker__on-deck {
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.75;
 }
 
 .party-loot__currency {
@@ -1208,6 +1224,12 @@
 
 .session-screen__header h1 {
   margin: 0;
+}
+
+.session-screen__undo-redo {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .session-screen__code {

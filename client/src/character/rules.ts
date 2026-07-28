@@ -24,6 +24,7 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     character.concentratingOn !== undefined &&
     character.pendingConcentrationCheckDc !== undefined &&
     character.weapons &&
+    character.weapons.every((w) => w.attackType) &&
     character.currency
   ) {
     return character
@@ -40,7 +41,7 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     deathSaves: character.deathSaves ?? { successes: 0, failures: 0 },
     concentratingOn: character.concentratingOn ?? '',
     pendingConcentrationCheckDc: character.pendingConcentrationCheckDc ?? null,
-    weapons: character.weapons ?? [],
+    weapons: (character.weapons ?? []).map((w) => ({ ...w, attackType: w.attackType ?? 'melee' })),
     currency: character.currency ?? { pp: 0, gp: 0, ep: 0, sp: 0, cp: 0 },
   }
 }

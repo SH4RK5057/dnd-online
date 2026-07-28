@@ -3,7 +3,7 @@ import * as Y from 'yjs'
 import { publishAsset } from './assetSync'
 import { TOKEN_IMAGE_MAX_DIMENSION, TOKEN_IMAGE_QUALITY } from './constants'
 import { compressImage } from './imageCompress'
-import type { SizeCategory, TokenRecord } from './types'
+import type { ActiveCondition, SizeCategory, TokenRecord } from './types'
 
 function tokensMap(doc: Y.Doc) {
   return doc.getMap<TokenRecord>('tokens')
@@ -35,7 +35,7 @@ export interface UseTokensResult {
   assignOwner: (tokenId: string, ownerId: string | null) => void
   linkCharacter: (tokenId: string, characterId: string | null) => void
   setTokenHp: (tokenId: string, hp: { current: number; max: number; temp: number } | null) => void
-  setTokenConditions: (tokenId: string, conditions: string[]) => void
+  setTokenConditions: (tokenId: string, conditions: ActiveCondition[]) => void
   setTokenInitiative: (tokenId: string, initiative: number | null) => void
   setTokenAc: (tokenId: string, ac: number | null) => void
   setTokenSpeed: (tokenId: string, speed: number | null) => void
@@ -157,7 +157,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     [patchToken],
   )
   const setTokenConditions = useCallback(
-    (tokenId: string, conditions: string[]) => patchToken(tokenId, { conditions }),
+    (tokenId: string, conditions: ActiveCondition[]) => patchToken(tokenId, { conditions }),
     [patchToken],
   )
   const setTokenInitiative = useCallback(

@@ -142,7 +142,7 @@ export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { 
   const handleUpdate = (patch: Partial<Omit<CharacterRecord, 'id'>>) => updateCharacter(character.id, patch)
 
   const handleQuickRoll = (label: string, notation: string, category: RollCategory) => {
-    const effectiveMode = resolveEffectiveMode(rollMode, myToken?.conditions ?? [], category)
+    const effectiveMode = resolveEffectiveMode(rollMode, (myToken?.conditions ?? []).map((c) => c.name), category)
     try {
       const parsed = parseNotation(notation)
       const result = rollNotation(parsed, effectiveMode)

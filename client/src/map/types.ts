@@ -105,10 +105,10 @@ export interface TokenRecord {
   /** Only meaningful (read or written) when characterId is null — a loose
    * monster/NPC token with no character sheet behind it. */
   hp: { current: number; max: number; temp: number } | null
-  /** Condition names (see dice/conditions.ts KNOWN_CONDITIONS). Always
+  /** Active conditions with optional durations — see ActiveCondition. Always
    * meaningful regardless of characterId — combat-instance-scoped, not
    * duplicated onto the character. */
-  conditions: string[]
+  conditions: ActiveCondition[]
   /** This token's rolled initiative for the current encounter, or null
    * outside combat / before it's rolled. Turn order is always derived fresh
    * from this field (see combat/rules.ts computeInitiativeOrder) — never
@@ -167,6 +167,20 @@ export interface TokenRecord {
    * token, which keeps using sizeCategory as before. */
   hazardSize: { widthCells: number; heightCells: number } | null
   createdAt: number
+}
+
+/** One active condition on a token, with an optional duration. */
+export interface ActiveCondition {
+  /** A dice/conditions.ts KNOWN_CONDITIONS name. */
+  name: string
+  /** Rounds remaining, decremented by 1 each time combat's round counter
+   * advances (see combat/useCombat.ts advanceTurn's onRoundIncremented
+   * callback, wired from components/InitiativeTracker.tsx) and removed once
+   * it hits 0. Null = indefinite — the DM/owner clears it manually via the
+   * same checkbox that applied it, matching the original behavior from
+   * before durations existed. Set by whoever applies the condition
+   * (components/TokenHpConditionEditor.tsx). */
+  roundsRemaining: number | null
 }
 
 export interface WallRecord {
