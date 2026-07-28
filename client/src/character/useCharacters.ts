@@ -124,6 +124,7 @@ export function newBlankCharacter(ownerId: string, name: string): CharacterRecor
     resources: [],
     spells: [],
     feats: [],
+    overrides: [],
     createdAt: Date.now(),
   }
 }

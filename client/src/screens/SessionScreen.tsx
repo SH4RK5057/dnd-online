@@ -31,6 +31,7 @@ import { SceneNavigationPanel } from '../components/SceneNavigationPanel'
 import { CharacterManagerScreen } from './CharacterManagerScreen'
 import { SceneBuilderScreen } from './SceneBuilderScreen'
 import { EncounterNotificationBanner } from '../components/EncounterNotificationBanner'
+import { PendingOverridesBanner } from '../components/PendingOverridesBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { MapCanvas } from '../canvas/MapCanvas'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
@@ -55,7 +56,7 @@ export function SessionScreen() {
   const [pendingTokenPlacement, setPendingTokenPlacement] = useState<PendingTokenPlacement | null>(null)
   const [previewPlayerId, setPreviewPlayerId] = useState<string | null>(null)
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null)
-  const [showCharacterSheet, setShowCharacterSheet] = useState(true)
+  const [showCharacterSheetFullscreen, setShowCharacterSheetFullscreen] = useState(false)
   const [showDiceRoller, setShowDiceRoller] = useState(true)
   const [showInitiativeTracker, setShowInitiativeTracker] = useState(true)
   const [showCompendium, setShowCompendium] = useState(false)
@@ -125,16 +126,29 @@ export function SessionScreen() {
 
   if (!session) return null
 
-  // Scene building and character building are both entirely separate views
-  // that fully swap out this screen, the same way — the session/WebRTC
-  // connection stays alive underneath (owned by SessionProvider above this
-  // component, not by anything unmounted here) and picks back up exactly
-  // where it was once the DM returns.
+  // Scene building, character building, and the in-session character sheet
+  // are all entirely separate views that fully swap out this screen, the
+  // same way — the session/WebRTC connection stays alive underneath (owned
+  // by SessionProvider above this component, not by anything unmounted
+  // here) and picks back up exactly where it was once the player/DM returns.
   if (showCharacterManager) {
     return <CharacterManagerScreen onBack={() => setShowCharacterManager(false)} />
   }
   if (showSceneBuilder) {
     return <SceneBuilderScreen onBack={() => setShowSceneBuilder(false)} />
+  }
+  if (showCharacterSheetFullscreen) {
+    return (
+      <section className="character-fullscreen-screen">
+        <header className="session-screen__header">
+          <h1>Your Character</h1>
+          <button type="button" onClick={() => setShowCharacterSheetFullscreen(false)}>
+            Back to session
+          </button>
+        </header>
+        <CharacterPanel />
+      </section>
+    )
   }
 
   const isUnassignedPlayer =
@@ -211,6 +225,8 @@ export function SessionScreen() {
         />
       )}
 
+      {session.role === 'dm' && <PendingOverridesBanner doc={session.doc} />}
+
       <div className="session-screen__body">
         <div className="session-screen__panel">
           {session.role === 'dm' && (
@@ -283,14 +299,15 @@ export function SessionScreen() {
 
           <AnnotationsPanel />
 
-          {/* Character sheet, dice, initiative, chat, handouts, and the
-              compendium lookup are shared between DM and players — everyone
-              rolls dice and sees the initiative order, and a DM can play
-              their own character same as anyone. */}
-          <button type="button" onClick={() => setShowCharacterSheet((v) => !v)}>
-            {showCharacterSheet ? 'Hide character sheet' : 'Show character sheet'}
+          {/* Dice, initiative, chat, handouts, and the compendium lookup are
+              shared between DM and players — everyone rolls dice and sees
+              the initiative order, and a DM can play their own character
+              same as anyone. The character sheet itself opens full-screen
+              (see showCharacterSheetFullscreen above) rather than cramming
+              into this narrow sidebar. */}
+          <button type="button" onClick={() => setShowCharacterSheetFullscreen(true)}>
+            Open character sheet
           </button>
-          {showCharacterSheet && <CharacterPanel />}
 
           <button type="button" onClick={() => setShowDiceRoller((v) => !v)}>
             {showDiceRoller ? 'Hide dice roller' : 'Show dice roller'}

@@ -246,6 +246,7 @@ export function CharacterPanel() {
         classes={classes}
         subclasses={subclasses}
         backgrounds={backgrounds}
+        isDm={isDm}
       />
     </div>
   )

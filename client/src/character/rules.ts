@@ -8,9 +8,9 @@ const ABILITY_KEYS_SET = new Set<string>(['str', 'dex', 'con', 'int', 'wis', 'ch
  * existing campaign Yjs doc) before those fields existed — `abilities` is
  * treated as if it were already the base (no racial bonus known), which is
  * the only reasonable assumption without re-deriving history; `xp`/
- * `subclassName`/`resolvedAsiLevels`/`featureChoices` default to "hasn't
- * leveled up / made any choices under this system yet." Every character
- * read path should go through this. */
+ * `subclassName`/`resolvedAsiLevels`/`featureChoices`/`overrides` default to
+ * "hasn't leveled up / made any choices under this system yet." Every
+ * character read path should go through this. */
 export function normalizeCharacterRecord(character: CharacterRecord): CharacterRecord {
   if (
     character.abilityMethod &&
@@ -18,7 +18,8 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     character.resolvedAsiLevels &&
     character.subclassName !== undefined &&
     character.xp !== undefined &&
-    character.featureChoices
+    character.featureChoices &&
+    character.overrides
   ) {
     return character
   }
@@ -30,6 +31,7 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     xp: character.xp ?? 0,
     resolvedAsiLevels: character.resolvedAsiLevels ?? [],
     featureChoices: character.featureChoices ?? {},
+    overrides: character.overrides ?? [],
   }
 }
 

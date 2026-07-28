@@ -132,6 +132,7 @@ export function JoinSetupScreen({
               classes={classes}
               subclasses={subclasses}
               backgrounds={backgrounds}
+              isDm={false}
             />
           </div>
         )}

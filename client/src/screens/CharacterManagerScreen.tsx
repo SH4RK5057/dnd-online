@@ -116,6 +116,7 @@ export function CharacterManagerScreen({ onBack }: { onBack: () => void }) {
                 classes={classes}
                 subclasses={subclasses}
                 backgrounds={backgrounds}
+                isDm={false}
               />
             </>
           ) : (

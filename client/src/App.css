@@ -108,6 +108,28 @@
   margin: 0;
 }
 
+.character-sheet__override-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.character-sheet__override-status--pending {
+  background: color-mix(in srgb, goldenrod 30%, transparent);
+  color: #8a6d00;
+}
+
+.character-sheet__override-status--approved {
+  background: color-mix(in srgb, seagreen 25%, transparent);
+  color: #1e6b45;
+}
+
+.character-sheet__override-status--rejected {
+  background: color-mix(in srgb, firebrick 20%, transparent);
+  color: #a13333;
+}
+
 .character-sheet__identity {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -527,6 +549,29 @@
   background: var(--accent-bg);
   border-radius: 8px;
   margin-bottom: 16px;
+}
+
+.pending-overrides-banner {
+  padding: 12px;
+  border: 1px solid goldenrod;
+  background: color-mix(in srgb, goldenrod 12%, transparent);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.pending-overrides-banner ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pending-overrides-banner li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .dm-notes-panel__new {

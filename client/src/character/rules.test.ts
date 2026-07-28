@@ -90,6 +90,7 @@ function baseCharacter(): CharacterRecord {
     resources: [],
     spells: [],
     feats: [],
+    overrides: [],
     createdAt: 0,
   }
 }
@@ -318,6 +319,13 @@ describe('normalizeCharacterRecord', () => {
     expect(normalized.subclassName).toBe('')
     expect(normalized.xp).toBe(0)
     expect(normalized.resolvedAsiLevels).toEqual([])
+  })
+
+  it('backfills overrides for a record persisted before that field existed', () => {
+    const legacy = baseCharacter()
+    // @ts-expect-error -- simulating a pre-migration record read from storage
+    delete legacy.overrides
+    expect(normalizeCharacterRecord(legacy).overrides).toEqual([])
   })
 })
 

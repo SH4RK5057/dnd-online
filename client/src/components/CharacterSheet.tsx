@@ -74,6 +74,7 @@ export function CharacterSheet({
   classes,
   subclasses,
   backgrounds,
+  isDm,
 }: {
   character: CharacterRecord
   /** isDm || isOwner — gates every edit control. */
@@ -97,6 +98,11 @@ export function CharacterSheet({
   subclasses: SubclassData[]
   /** SRD-only reference data — see BackgroundData's doc comment. */
   backgrounds: BackgroundData[]
+  /** Distinct from `canEdit` (isDm || isOwner) — gates DM-only actions on
+   * custom overrides (approve/reject) where the owning player themselves
+   * shouldn't be able to self-approve their own proposal. False in the
+   * standalone (pre-campaign) editors, where there's no DM/campaign yet. */
+  isDm: boolean
 }) {
   const [tab, setTab] = useState<Tab>('stats')
   const blueprintEditable = canEdit && !character.locked
@@ -416,6 +422,36 @@ export function CharacterSheet({
         </ul>
       </div>
     )
+  }
+
+  const [overrideLabel, setOverrideLabel] = useState('')
+  const [overrideValue, setOverrideValue] = useState('')
+
+  /** A player's proposed override starts 'pending' — nothing else in this
+   * app treats a pending override as mechanically active, it's purely a
+   * request the DM must approve. A DM adding one directly is trusted
+   * immediately, same as every other DM-authored entity in this app. */
+  function handleAddOverride() {
+    if (!overrideLabel.trim() || !overrideValue.trim()) return
+    const override = {
+      id: crypto.randomUUID(),
+      label: overrideLabel.trim(),
+      value: overrideValue.trim(),
+      createdBy: isDm ? ('dm' as const) : ('player' as const),
+      status: isDm ? ('approved' as const) : ('pending' as const),
+      createdAt: Date.now(),
+    }
+    onUpdate({ overrides: [...character.overrides, override] })
+    setOverrideLabel('')
+    setOverrideValue('')
+  }
+
+  function handleSetOverrideStatus(id: string, status: 'approved' | 'rejected') {
+    onUpdate({ overrides: character.overrides.map((o) => (o.id === id ? { ...o, status } : o)) })
+  }
+
+  function handleRemoveOverride(id: string) {
+    onUpdate({ overrides: character.overrides.filter((o) => o.id !== id) })
   }
 
   return (
@@ -1029,6 +1065,50 @@ export function CharacterSheet({
             >
               Add resource
             </button>
+          )}
+
+          <h3>Custom overrides</h3>
+          <p className="character-sheet__hint">
+            House-rule tweaks specific to this character (e.g. "Speed = 35"). Ones you propose need DM approval
+            before they're official — a DM adding one here is approved immediately.
+          </p>
+          {character.overrides.length > 0 && (
+            <ul className="character-sheet__row-list">
+              {character.overrides.map((o) => (
+                <li key={o.id} className="character-sheet__row">
+                  <span>
+                    <strong>{o.label}</strong> = {o.value}
+                  </span>
+                  <span className={`character-sheet__override-status character-sheet__override-status--${o.status}`}>
+                    {o.status === 'pending' ? 'Pending DM approval' : o.status === 'approved' ? 'Approved' : 'Rejected'}
+                  </span>
+                  {isDm && o.status === 'pending' && (
+                    <>
+                      <button type="button" onClick={() => handleSetOverrideStatus(o.id, 'approved')}>
+                        Approve
+                      </button>
+                      <button type="button" onClick={() => handleSetOverrideStatus(o.id, 'rejected')}>
+                        Reject
+                      </button>
+                    </>
+                  )}
+                  {canEdit && (
+                    <button type="button" onClick={() => handleRemoveOverride(o.id)}>
+                      Remove
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && (
+            <div className="character-sheet__row">
+              <input placeholder="What (e.g. Speed)" value={overrideLabel} onChange={(e) => setOverrideLabel(e.target.value)} />
+              <input placeholder="New value (e.g. 35)" value={overrideValue} onChange={(e) => setOverrideValue(e.target.value)} />
+              <button type="button" onClick={handleAddOverride} disabled={!overrideLabel.trim() || !overrideValue.trim()}>
+                Propose override
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -64,6 +64,27 @@ export interface ResourceEntry {
   max: number
 }
 
+export type CharacterOverrideStatus = 'pending' | 'approved' | 'rejected'
+
+/** A player- or DM-authored tweak to a rule/stat for THIS character
+ * specifically — e.g. "Speed = 35" or "Darkvision = 90 ft." Deliberately
+ * freeform (label + value strings), the same philosophy as
+ * content/ruleOverrides.ts's campaign-wide DM rule-override engine, but
+ * attached to the character record itself rather than a campaign's Yjs doc
+ * — that's what lets it travel with a standalone character into whatever
+ * campaign later binds it, before any DM/campaign doc exists yet.
+ * Player-authored overrides start 'pending' and shouldn't be treated as
+ * mechanically active by anything reading them until a DM sets them
+ * 'approved'; DM-authored ones start 'approved' immediately. */
+export interface CharacterOverrideRecord {
+  id: string
+  label: string
+  value: string
+  createdBy: 'player' | 'dm'
+  status: CharacterOverrideStatus
+  createdAt: number
+}
+
 /**
  * A character's data. The SAME shape is used for a standalone character
  * (stored locally, see character/standaloneStorage.ts, `campaignId: null`)
@@ -151,6 +172,9 @@ export interface CharacterRecord {
   resources: ResourceEntry[]
   spells: SpellEntry[]
   feats: FeatEntry[]
+  /** Player- or DM-proposed custom rule/stat tweaks for this character —
+   * see CharacterOverrideRecord's doc comment. */
+  overrides: CharacterOverrideRecord[]
   createdAt: number
 }
 

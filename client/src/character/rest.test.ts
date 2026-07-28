@@ -36,6 +36,7 @@ function baseCharacter(overrides: Partial<CharacterRecord> = {}): CharacterRecor
     resources: [{ id: 'r1', name: 'Ki', current: 1, max: 5 }],
     spells: [],
     feats: [],
+    overrides: [],
     createdAt: 0,
     ...overrides,
   }
