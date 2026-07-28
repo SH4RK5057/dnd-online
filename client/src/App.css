@@ -780,6 +780,33 @@
   color: var(--accent);
 }
 
+.initiative-tracker__reaction {
+  margin-left: 8px;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, goldenrod 25%, transparent);
+  color: #8a6d00;
+}
+
+.initiative-tracker__reaction--used {
+  background: transparent;
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.party-loot__currency {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.party-loot__denomination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .landing-screen__actions,
 .setup-screen__actions {
   display: flex;
@@ -1038,6 +1065,16 @@
 .token-upload input:not([type]) {
   flex: 1 1 160px;
   width: auto;
+}
+
+.token-upload__hazard-size {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.token-upload__hazard-size input {
+  width: 48px;
 }
 
 .token-upload--pending {

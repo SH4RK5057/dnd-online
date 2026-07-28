@@ -14,6 +14,7 @@ import { FogLightingPanel } from '../components/FogLightingPanel'
 import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
 import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
 import { AnnotationsPanel } from '../components/AnnotationsPanel'
+import { PartyLootPanel } from '../components/PartyLootPanel'
 import { TokenUploadButton } from '../components/TokenUploadButton'
 import { DiceRollerPanel } from '../components/DiceRollerPanel'
 import { RollLog } from '../components/RollLog'
@@ -34,6 +35,7 @@ import { EncounterNotificationBanner } from '../components/EncounterNotification
 import { PendingOverridesBanner } from '../components/PendingOverridesBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { MapCanvas } from '../canvas/MapCanvas'
+import type { MeasureShape } from '../canvas/MeasureLayer'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
 import { footprintCells, snapToSlot } from '../map/sizeCategory'
@@ -57,6 +59,11 @@ export function SessionScreen() {
   const [previewPlayerId, setPreviewPlayerId] = useState<string | null>(null)
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null)
   const [showCharacterSheetFullscreen, setShowCharacterSheetFullscreen] = useState(false)
+  /** Set by SpellCastPanel (inside CharacterPanel or TokenInspector) when a
+   * spell's AoE template is armed — lives here, above the fullscreen
+   * character-sheet swap below, so arming a template from the character
+   * sheet survives switching back to the map view to actually place it. */
+  const [armedTemplate, setArmedTemplate] = useState<{ shape: MeasureShape; sizeFt: number } | null>(null)
   const [showDiceRoller, setShowDiceRoller] = useState(true)
   const [showInitiativeTracker, setShowInitiativeTracker] = useState(true)
   const [showCompendium, setShowCompendium] = useState(false)
@@ -146,7 +153,7 @@ export function SessionScreen() {
             Back to session
           </button>
         </header>
-        <CharacterPanel />
+        <CharacterPanel onArmTemplate={setArmedTemplate} />
       </section>
     )
   }
@@ -177,13 +184,21 @@ export function SessionScreen() {
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingTokenPlacement || !activeSceneId) return
-    const { name, sizeCategory, file } = pendingTokenPlacement
+    const { name, sizeCategory, file, hazardSize } = pendingTokenPlacement
     setPendingTokenPlacement(null)
     try {
-      const footprint = footprintCells(sizeCategory)
+      const footprint = hazardSize ? Math.max(hazardSize.widthCells, hazardSize.heightCells) : footprintCells(sizeCategory)
       const snappedX = snapToSlot(x, footprint)
       const snappedY = snapToSlot(y, footprint)
-      const tokenId = createToken({ sceneId: activeSceneId, name, sizeCategory, x: snappedX, y: snappedY })
+      const tokenId = createToken({
+        sceneId: activeSceneId,
+        name,
+        sizeCategory,
+        x: snappedX,
+        y: snappedY,
+        hazardSize,
+        hidden: !!hazardSize,
+      })
       if (file) void setTokenArt(tokenId, file)
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not add that token.')
@@ -299,6 +314,8 @@ export function SessionScreen() {
 
           <AnnotationsPanel />
 
+          <PartyLootPanel />
+
           {/* Dice, initiative, chat, handouts, and the compendium lookup are
               shared between DM and players — everyone rolls dice and sees
               the initiative order, and a DM can play their own character
@@ -351,7 +368,13 @@ export function SessionScreen() {
             />
           )}
           {activeSceneId && selectedTokenId && (
-            <TokenInspector doc={session.doc} sceneId={activeSceneId} isDm={session.role === 'dm'} selectedTokenId={selectedTokenId} />
+            <TokenInspector
+              doc={session.doc}
+              sceneId={activeSceneId}
+              isDm={session.role === 'dm'}
+              selectedTokenId={selectedTokenId}
+              onArmTemplate={setArmedTemplate}
+            />
           )}
         </div>
 
@@ -372,6 +395,8 @@ export function SessionScreen() {
                 previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
                 selectedTokenId={selectedTokenId}
                 onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
+                armedTemplate={armedTemplate}
+                onArmedTemplatePlaced={() => setArmedTemplate(null)}
               />
               <button
                 type="button"

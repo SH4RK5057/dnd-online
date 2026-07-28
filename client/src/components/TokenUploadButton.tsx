@@ -27,12 +27,21 @@ export function TokenUploadButton({
   const [name, setName] = useState('')
   const [sizeCategory, setSizeCategory] = useState<SizeCategory>('medium')
   const [file, setFile] = useState<File | null>(null)
+  const [isHazard, setIsHazard] = useState(false)
+  const [hazardWidth, setHazardWidth] = useState(2)
+  const [hazardHeight, setHazardHeight] = useState(2)
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    onRequestPlacement({ name: trimmed, sizeCategory, file, monsterInit: null })
+    onRequestPlacement({
+      name: trimmed,
+      sizeCategory,
+      file,
+      monsterInit: null,
+      hazardSize: isHazard ? { widthCells: Math.max(1, hazardWidth), heightCells: Math.max(1, hazardHeight) } : null,
+    })
     setName('')
     setFile(null)
   }
@@ -60,13 +69,38 @@ export function TokenUploadButton({
   return (
     <form className="token-upload" onSubmit={handleSubmit}>
       <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Token name" />
-      <select value={sizeCategory} onChange={(event) => setSizeCategory(event.target.value as SizeCategory)}>
-        {SIZE_OPTIONS.map((size) => (
-          <option key={size} value={size}>
-            {SIZE_LABELS[size]}
-          </option>
-        ))}
-      </select>
+      <label>
+        <input type="checkbox" checked={isHazard} onChange={(event) => setIsHazard(event.target.checked)} />
+        Hazard/trap (custom size, starts hidden)
+      </label>
+      {isHazard ? (
+        <span className="token-upload__hazard-size">
+          <input
+            type="number"
+            min={1}
+            value={hazardWidth}
+            onChange={(event) => setHazardWidth(Math.max(1, Number(event.target.value)))}
+            title="Width (grid cells)"
+          />
+          ×
+          <input
+            type="number"
+            min={1}
+            value={hazardHeight}
+            onChange={(event) => setHazardHeight(Math.max(1, Number(event.target.value)))}
+            title="Height (grid cells)"
+          />
+          cells
+        </span>
+      ) : (
+        <select value={sizeCategory} onChange={(event) => setSizeCategory(event.target.value as SizeCategory)}>
+          {SIZE_OPTIONS.map((size) => (
+            <option key={size} value={size}>
+              {SIZE_LABELS[size]}
+            </option>
+          ))}
+        </select>
+      )}
       <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
       <button type="submit" disabled={!name.trim()}>
         Add token

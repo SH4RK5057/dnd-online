@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import type { CharacterRecord } from '../character/types'
-import type { TokenRecord } from '../map/types'
+import type { TokenRecord, WallRecord } from '../map/types'
 import type { RollMode } from '../dice/types'
 import type { UseRollLogResult } from '../dice/useRollLog'
 import { computeModifier, computeProficiencyBonus, resolveTokenAc } from '../character/rules'
 import { parseNotation, rollNotation } from '../dice/notation'
 import { resolveEffectiveMode } from '../dice/conditions'
+import { hasLineOfSight } from '../map/visibility'
+import { tokenFootprintCenter } from '../map/sizeCategory'
 
 /** Weapon-select + target-select + roll-mode attack flow, shared by
  * CharacterPanel (player rolling for their own character) and
@@ -20,21 +22,40 @@ export function AttackRollPanel({
   charactersById,
   actingConditions,
   autoResolveEnabled,
-  canRoll,
+  isMyTurn,
+  reactionAvailable,
+  onUseReaction,
   playerId,
   playerName,
   pushRoll,
+  attackerToken,
+  walls,
 }: {
   character: CharacterRecord
   targets: TokenRecord[]
   charactersById: Map<string, CharacterRecord>
   actingConditions: string[]
   autoResolveEnabled: boolean
-  canRoll: boolean
+  /** Whose turn it is right now — attacking on your own turn is always
+   * allowed. Outside your turn, an attack is only allowed as a reaction
+   * (see `reactionAvailable`) — an opportunity attack against something
+   * moving away, for instance. */
+  isMyTurn: boolean
+  /** Whether this attacker still has their reaction this round — lets the
+   * roll go through outside `isMyTurn`, consumed via `onUseReaction` once
+   * the roll fires. Irrelevant (and ignored) when `isMyTurn` is true. */
+  reactionAvailable: boolean
+  onUseReaction: () => void
   playerId: string
   playerName: string
   pushRoll: UseRollLogResult['pushRoll']
+  /** The attacker's own token, if it's on this scene — needed to compute
+   * line of sight. When null (e.g. the caster has no token placed yet),
+   * line-of-sight checking is skipped entirely rather than blocking. */
+  attackerToken: TokenRecord | null
+  walls: WallRecord[]
 }) {
+  const canRoll = isMyTurn || reactionAvailable
   const [weaponId, setWeaponId] = useState('')
   const [targetId, setTargetId] = useState('')
   const [mode, setMode] = useState<RollMode>('normal')
@@ -46,8 +67,17 @@ export function AttackRollPanel({
   const weapon = character.weapons.find((w) => w.id === weaponId) ?? character.weapons[0]
   const target = targets.find((t) => t.id === targetId) ?? null
 
+  const blockedByWall =
+    !!attackerToken &&
+    !!target &&
+    !hasLineOfSight(
+      tokenFootprintCenter(attackerToken.x, attackerToken.y, attackerToken.sizeCategory),
+      tokenFootprintCenter(target.x, target.y, target.sizeCategory),
+      walls,
+    )
+
   const handleRollAttack = () => {
-    if (!weapon || !target) return
+    if (!weapon || !target || blockedByWall) return
     const abilityMod = computeModifier(character.abilities[weapon.attackAbility])
     const profBonus = weapon.proficient ? computeProficiencyBonus(character.level) : 0
     const attackBonus = abilityMod + profBonus
@@ -85,6 +115,7 @@ export function AttackRollPanel({
         damageApplied: false,
       },
     })
+    if (!isMyTurn) onUseReaction()
   }
 
   return (
@@ -124,7 +155,17 @@ export function AttackRollPanel({
           Disadvantage
         </label>
       </div>
-      <button type="button" disabled={!canRoll || !target} onClick={handleRollAttack}>
+      {blockedByWall && (
+        <p className="character-sheet__hint">
+          No line of sight to this target — a wall is in the way. (Resolve manually with the standalone dice roller if
+          this should be allowed anyway, e.g. firing through a window.)
+        </p>
+      )}
+      {!isMyTurn && reactionAvailable && (
+        <p className="character-sheet__hint">Not your turn — this will use your reaction for an opportunity attack.</p>
+      )}
+      {!isMyTurn && !reactionAvailable && <p className="character-sheet__hint">Not your turn, and your reaction is already used.</p>}
+      <button type="button" disabled={!canRoll || !target || blockedByWall} onClick={handleRollAttack}>
         Roll Attack
       </button>
     </div>

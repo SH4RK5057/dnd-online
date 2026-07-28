@@ -94,6 +94,30 @@ function raySegmentIntersection(origin: Point, dir: Point, seg: Segment): number
   return t1
 }
 
+/**
+ * True when nothing in `segments` blocks a straight line from `from` to
+ * `to` — used for attack-roll targeting (a wall between attacker and target
+ * should block a shot the same way it blocks vision), not the radial-sweep
+ * fog-of-war computation above. Reuses the same ray/segment intersection as
+ * castRay, checking only the one segment from origin to target rather than
+ * sweeping every angle.
+ */
+export function hasLineOfSight(from: Point, to: Point, segments: Segment[]): boolean {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const distance = Math.hypot(dx, dy)
+  if (distance < EPSILON) return true
+  const dir = { x: dx / distance, y: dy / distance }
+  for (const seg of segments) {
+    if (segmentLength(seg) <= EPSILON) continue
+    const t = raySegmentIntersection(from, dir, seg)
+    // A hit essentially AT the target (within EPSILON) doesn't count as
+    // blocking — e.g. the target is standing right against a wall.
+    if (t !== null && t < distance - EPSILON) return false
+  }
+  return true
+}
+
 export function distanceToSegment(p: Point, seg: Segment): number {
   const dx = seg.x2 - seg.x1
   const dy = seg.y2 - seg.y1

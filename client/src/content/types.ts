@@ -185,6 +185,28 @@ export interface SubclassData {
   features: ClassFeatureData[]
 }
 
+/** Structured mechanical data for a spell's area effect — deliberately
+ * separate from SpellData above (whose `range`/`entries` are free descriptive
+ * text meant for reading, not computing with). Matched against a character's
+ * known SpellEntry list by name (case-insensitive) — see
+ * components/SpellCastPanel.tsx. SRD-authored only, a small hand-picked set
+ * of common AoE spells rather than exhaustive coverage; a spell with no
+ * matching entry here just isn't offered in the auto-template flow. */
+export interface SpellEffectData {
+  name: string
+  areaShape: 'cone' | 'sphere' | 'cube' | 'line'
+  /** Feet — the template's radius (sphere), edge length (cube), length
+   * (cone/line, 5e cones are always as wide as they are long). */
+  areaSizeFt: number
+  /** Feet from the caster to the template's origin point — 0 for
+   * self-originating shapes (most cones/cubes). */
+  rangeFt: number
+  savingThrow: AbilityKey
+  savingThrowEffect: 'half' | 'negates'
+  /** e.g. "8d6" */
+  damageDice: string
+}
+
 export type CompendiumEntry =
   | { kind: 'spell'; data: SpellData }
   | { kind: 'monster'; data: MonsterData }

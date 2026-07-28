@@ -294,11 +294,116 @@ movement" bullet with a full DM-configurable navigation mode per scene)
 - [x] Mobile/responsive pass (DM stays locked to computer/tablet — this is
       about the player-facing layout)
 
-## Phase 8 — Stretch goals
+## Phase 8 — Tactical combat depth & campaign-life features
+
+Complete. Two batches of work, both aimed at closing the gap between "a VTT
+with dice and fog of war" and "feels like sitting at the table" — the first
+batch closes out core combat resolution, the second adds reaction/targeting
+depth plus a few things a physical table can't do at all.
+
+**Combat resolution**
+- [x] Weapon-based attack rolls — pick a weapon and a target, roll
+      1d20 + ability mod + proficiency
+- [x] DM toggle between auto-resolving a hit (compare the roll to the
+      target's AC automatically) and deciding hit/miss manually from the
+      roll log
+- [x] A confirmed hit's damage roll applies straight to the target's HP
+      (character-linked or token-only, same split resolveTokenHp already
+      uses)
+- [x] Death saving throws — tracker appears once HP hits 0, natural 20
+      heals to 1, natural 1 counts double, 3/3 stabilizes or kills
+- [x] Concentration tracking — a damage hit while concentrating flags a
+      Constitution save at the standard DC (max(10, floor(damage/2)))
+- [x] Full player-style character sheets a DM can attach to NPC tokens,
+      alongside the existing monster-stat-block link — a DM-created NPC
+      gets abilities/inventory/spells/weapons like any player character
+- [x] Map measuring tool + circle/cone AoE template preview (Ctrl-drag,
+      Ctrl+Shift-drag, Ctrl+Alt-drag) — personal/local to each viewer, works
+      for the DM and players alike
+
+**Reactions, targeting, and party logistics**
+- [x] Reaction economy — each combatant's reaction resets at the start of
+      their own turn; an attack rolled outside your turn (an opportunity
+      attack) consumes it automatically, or a DM/owner can mark it used
+      manually from the initiative tracker for a non-attack reaction (a
+      readied spell, Shield, etc. — narrated outside the app, this just
+      tracks whether it's still available)
+- [x] Line of sight for attacks — a wall between attacker and target blocks
+      the Roll Attack button, reusing the same ray/segment math the fog-of-
+      war visibility polygon is built from
+- [x] Shared party loot pool + pooled coin purse — anyone can drop found
+      items into the pool, any player can claim one into their own
+      inventory (or the DM assigns it), and a "split evenly" action divides
+      the purse across the party's characters, remainder staying pooled
+- [x] Spell casting with an auto-sized AoE template — a small hand-authored
+      table of common SRD spells (Fireball, Burning Hands, Thunderwave,
+      Shatter, Cone of Cold, Lightning Bolt, Spirit Guardians, Sunbeam)
+      drives the template's exact shape/size once armed and dragged onto
+      the map, auto-computes the save DC, rolls damage once, and resolves
+      each manually-checked target's save against it (the template is a
+      visual aid, not hit-tested geometry — the DM/caster judges who was
+      caught, same trust model as everywhere else in this app)
+- [x] Custom-size hazard/trap tokens — a DM places a token sized in grid
+      cells (not a fixed creature size category), starts hidden by
+      default; the first time another token's footprint overlaps it, it
+      auto-reveals (the DM resolves the actual trap effect manually with
+      existing tools — a save, damage, whatever the trap does — same as
+      any other damage/save flow)
+
+## Phase 9 — Roadmapped, not yet built
+
+Explained here so the design intent isn't lost, but deliberately not
+scheduled — either lower priority right now or needs a decision this repo
+hasn't made yet. Pull one of these into an active phase when it's actually
+next.
+
+- **Passive perception** — every character already has a Perception skill
+  bonus computed (`computeSkillBonus`); passive perception is just
+  `10 + that bonus` (no roll). The DM-useful version of this feature isn't
+  the number itself (trivial to show on the sheet) but comparing it against
+  a hidden token's/trap's stealth/DC automatically as it comes into a
+  player's fog-of-war sight — "did anyone notice the hidden goblin that just
+  entered their vision?" — which means hooking into the *same* fog/
+  visibility recompute that already runs every frame per viewer
+  (`map/visibility.ts` → `FogLayer`) and diffing "newly visible hidden
+  tokens" against each viewer's passive Perception. That diff-and-notify
+  hook is the actual work; the arithmetic is a one-liner.
+- **Encounter difficulty calculator** — 5e's DMG method: each monster's CR
+  maps to an XP value (a public table, safe to hand-author like the XP-to-
+  level table already in `character/rules.ts`), multiplied by a scaling
+  factor for how many monsters are in the fight, compared against
+  Easy/Medium/Hard/Deadly thresholds derived from the party's levels. All
+  the inputs already exist in this app (encounter builder's selected
+  tokens, each linked character's level) — this is a pure function plus a
+  readout in `EncounterBuilder`/`InitiativeTracker`, no new data model.
+- **Session recap** — stitch the roll log, chat log, and combat/encounter
+  events (already all timestamped Yjs records) into a chronological "what
+  happened this session" summary the DM can review or share. The
+  mechanical part (merge + sort three logs by `createdAt`) is
+  straightforward; the open design question is whether the recap is just
+  that raw merged timeline (cheap, always accurate) or an actual
+  written-prose summary (needs either a DM-authored pass or a text-
+  generation dependency this app doesn't have — see "AI-assisted DM tools,"
+  explicitly rejected below, for why that's not a given here).
+- **Play-by-post mode** — the party plays out a scene asynchronously
+  through this app's own text chat and dice roller instead of a live
+  session with everyone connected at once: each player posts their action
+  whenever they're free, the DM responds and rolls when they get to it.
+  Most of the plumbing already works today (state lives in the DM's
+  IndexedDB-backed Yjs doc regardless of who's online), so this is really a
+  UI-affordance gap, not an architecture one — "whose turn is it to post"
+  and unread/new-post indicators for a cadence measured in hours/days
+  instead of minutes, without requiring everyone connected simultaneously.
+
+**Explicitly rejected, not just deprioritized:**
+- AI-assisted DM tools (NPC dialogue, encounter suggestions, generated prose
+  recaps) — decided against; not on this roadmap at any priority.
+- Built-in voice/video — out of scope per the original Decisions section;
+  Discord/Google Meet alongside the app remains the answer.
+
+## Phase 10 — Stretch goals
 - [ ] 3D dice roll animations
 - [ ] Support for non-5e systems (generalize the rules engine)
-- [ ] AI-assisted DM tools (NPC dialogue, encounter suggestions)
-- [ ] Party shared inventory/loot
 
 ---
 
@@ -308,6 +413,4 @@ Kept here so nothing gets lost even before it's scheduled into a phase above.
 Pruned periodically as items get scheduled into a phase or turn out to
 already be covered by something shipped.
 
-**Maps:** drawing/measurement tools, ruler
-**Rules:** automated attack/save/damage resolution
 **Technical:** desktop-app packaging (Electron) if browser-only proves limiting

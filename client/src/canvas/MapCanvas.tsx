@@ -14,6 +14,7 @@ import { usePois } from '../map/usePois'
 import { useAssetUrl } from '../map/assetSync'
 import { useCharacters } from '../character/useCharacters'
 import { resolveTokenHp } from '../character/rules'
+import { footprintCells, rectanglesOverlap, tokenFootprintRect } from '../map/sizeCategory'
 import {
   PERSONAL_VISION_RADIUS_CELLS,
   MAX_VISION_RADIUS_CELLS,
@@ -61,6 +62,13 @@ interface MapCanvasProps {
    * fired when a token is clicked. */
   selectedTokenId?: string | null
   onSelectToken?: (tokenId: string) => void
+  /** Set while a spell's AoE template is armed (see components/
+   * SpellCastPanel.tsx) — the next drag anywhere on the map (no Ctrl needed)
+   * previews that exact shape/size instead of a free-hand one, then
+   * auto-disarms via `onArmedTemplatePlaced` once placed. Same one-shot
+   * override pattern as `onPlaceToken`/`onPlacePoi`. */
+  armedTemplate?: { shape: MeasureShape; sizeFt: number } | null
+  onArmedTemplatePlaced?: () => void
 }
 
 export function MapCanvas({
@@ -74,6 +82,8 @@ export function MapCanvas({
   previewPlayerId = null,
   selectedTokenId = null,
   onSelectToken,
+  armedTemplate = null,
+  onArmedTemplatePlaced,
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const app = usePixiApp(containerRef)
@@ -91,7 +101,7 @@ export function MapCanvas({
   const isDmUnmasked = isDm && !previewPlayerId
   const { activeScene } = useScenes(doc)
   const mapUrl = useAssetUrl(doc, activeScene?.mapAssetId ?? null)
-  const { tokens, moveToken } = useTokens(doc, activeScene?.id ?? null)
+  const { tokens, moveToken, setTokenHidden } = useTokens(doc, activeScene?.id ?? null)
   const { walls, createWall, updateWallEndpoint, deleteWall } = useWalls(doc, activeScene?.id ?? null)
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
   const { exploredCells, revealCells } = useExploration(doc, activeScene?.id ?? null, effectiveViewerId)
@@ -276,6 +286,25 @@ export function MapCanvas({
     const visibleTokens = isDmUnmasked ? tokens : tokens.filter((t) => !t.hidden)
     const charactersById = new Map(characters.map((c) => [c.id, c]))
     const resolvedHpByTokenId = new Map(visibleTokens.map((t) => [t.id, resolveTokenHp(t, charactersById)]))
+    // A hidden hazard token (trap) reveals itself the first time some other
+    // token's footprint overlaps its own — a lightweight "trigger" that
+    // doesn't try to guess or auto-apply the trap's actual effect (DM
+    // resolves that manually with the same tools as any other damage/save,
+    // same reasoning as the spell-cast flow's manual target checklist).
+    // Hazards don't trigger each other.
+    const handleMoveEnd = (tokenId: string, x: number, y: number) => {
+      moveToken(tokenId, x, y)
+      const movedToken = tokens.find((t) => t.id === tokenId)
+      if (!movedToken || movedToken.hazardSize) return
+      const size = footprintCells(movedToken.sizeCategory)
+      const movedRect = tokenFootprintRect(x, y, size, size)
+      for (const hazard of tokens) {
+        if (!hazard.hazardSize || !hazard.hidden) continue
+        const hazardRect = tokenFootprintRect(hazard.x, hazard.y, hazard.hazardSize.widthCells, hazard.hazardSize.heightCells)
+        if (rectanglesOverlap(movedRect, hazardRect)) setTokenHidden(hazard.id, false)
+      }
+    }
+
     tokenLayerRef.current.update(
       doc,
       visibleTokens,
@@ -286,11 +315,11 @@ export function MapCanvas({
       resolvedHpByTokenId,
       {
         onMove: moveToken,
-        onMoveEnd: moveToken,
+        onMoveEnd: handleMoveEnd,
         onSelect: (tokenId) => onSelectToken?.(tokenId),
       },
     )
-  }, [doc, tokens, characters, activeScene, isDmUnmasked, toolMode, selectedTokenId, moveToken, onSelectToken])
+  }, [doc, tokens, characters, activeScene, isDmUnmasked, toolMode, selectedTokenId, moveToken, onSelectToken, setTokenHidden])
 
   // Keep the measure layer's grid-cell-to-pixel conversion in sync.
   useEffect(() => {
@@ -458,14 +487,34 @@ export function MapCanvas({
     let measuring = false
     let measureShape: MeasureShape = 'line'
     let measureOrigin: { x: number; y: number } | null = null
+    let measureLockedSizeFt: number | undefined
+    let measuringArmedTemplate = false
 
     const onPointerDown = (event: FederatedPointerEvent) => {
       if (event.target !== app.stage || event.button !== 0) return
+
+      // Armed spell template (see SpellCastPanel) takes priority over
+      // everything else, same one-shot-override tier as place-tokens/
+      // place-pois below — a click here places the spell's exact-sized
+      // template rather than panning or starting any other gesture.
+      if (armedTemplate) {
+        const world = worldRef.current
+        if (!world || !activeScene) return
+        measuring = true
+        measuringArmedTemplate = true
+        measureShape = armedTemplate.shape
+        measureLockedSizeFt = armedTemplate.sizeFt
+        const local = world.toLocal(event.global)
+        measureOrigin = { x: local.x / activeScene.gridSizePx, y: local.y / activeScene.gridSizePx }
+        return
+      }
 
       if (event.ctrlKey) {
         const world = worldRef.current
         if (!world || !activeScene) return
         measuring = true
+        measuringArmedTemplate = false
+        measureLockedSizeFt = undefined
         measureShape = event.shiftKey ? 'circle' : event.altKey ? 'cone' : 'line'
         const local = world.toLocal(event.global)
         measureOrigin = { x: local.x / activeScene.gridSizePx, y: local.y / activeScene.gridSizePx }
@@ -508,7 +557,7 @@ export function MapCanvas({
         if (!world || !activeScene || !measureOrigin) return
         const local = world.toLocal(event.global)
         const current = { x: local.x / activeScene.gridSizePx, y: local.y / activeScene.gridSizePx }
-        measureLayerRef.current?.setPreview(measureShape, measureOrigin, current)
+        measureLayerRef.current?.setPreview(measureShape, measureOrigin, current, measureLockedSizeFt)
         return
       }
       if (annotating) {
@@ -530,6 +579,10 @@ export function MapCanvas({
         measuring = false
         measureOrigin = null
         measureLayerRef.current?.setPreview('line', null, null)
+        if (measuringArmedTemplate) {
+          measuringArmedTemplate = false
+          onArmedTemplatePlaced?.()
+        }
         return
       }
       if (annotating) {
@@ -566,6 +619,8 @@ export function MapCanvas({
     createPing,
     createAnnotation,
     session?.displayName,
+    armedTemplate,
+    onArmedTemplatePlaced,
   ])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />

@@ -16,6 +16,35 @@ export function tokenSidePx(size: SizeCategory, gridSizePx: number): number {
   return footprintCells(size) * gridSizePx * renderScale(size)
 }
 
+/** Center point of a token's footprint, in grid-cell units — `x`/`y` are the
+ * footprint's top-left anchor (TokenRecord's convention). Used wherever a
+ * single representative point stands in for a token's position (line-of-
+ * sight checks, hazard-overlap detection), rather than its top-left corner. */
+export function tokenFootprintCenter(x: number, y: number, size: SizeCategory): { x: number; y: number } {
+  const cells = footprintCells(size)
+  return { x: x + cells / 2, y: y + cells / 2 }
+}
+
+export interface CellRect {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
+/** A token's footprint as a rectangle in grid-cell units — `x`/`y` are the
+ * top-left anchor. Used for hazard-overlap detection (see
+ * canvas/MapCanvas.tsx's onMoveEnd handler). */
+export function tokenFootprintRect(x: number, y: number, widthCells: number, heightCells: number): CellRect {
+  return { x1: x, y1: y, x2: x + widthCells, y2: y + heightCells }
+}
+
+/** Axis-aligned rectangle overlap — touching edges don't count (a token
+ * standing exactly adjacent to a hazard hasn't stepped into it). */
+export function rectanglesOverlap(a: CellRect, b: CellRect): boolean {
+  return a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1
+}
+
 /** Snaps a raw grid-cell coordinate (the token's top-left anchor, same
  * convention as TokenRecord.x/y) so the token lands filling whichever slot
  * the point falls within, rather than snapping to the nearest grid

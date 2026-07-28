@@ -46,7 +46,8 @@ export class TokenSprite {
   private readonly callbacks: TokenSpriteCallbacks
   private readonly draggable: boolean
   private gridSizePx = 1
-  private footprintInCells = 1
+  private footprintWCells = 1
+  private footprintHCells = 1
   private dragging = false
   private dragPointerOffset = { x: 0, y: 0 }
   private pointerDownLocal: { x: number; y: number } | null = null
@@ -84,50 +85,61 @@ export class TokenSprite {
      * effect). Rendered translucent with a dashed ring so the DM can tell
      * at a glance which tokens players can't see. */
     hidden: boolean
+    /** Overrides sizeCategory's fixed square footprint with a custom
+     * rectangle, in grid cells — for DM-placed hazard/trap tokens (see
+     * TokenRecord.hazardSize). Renders at full size (no tiny-style
+     * shrink-and-center) and with a distinct placeholder color so it reads
+     * as "not a creature" at a glance. Null for every normal token. */
+    hazardSize: { widthCells: number; heightCells: number } | null
   }): void {
-    const { name, sizeCategory, gridX, gridY, gridSizePx, texture, hp, conditions, selected, hidden } = options
+    const { name, sizeCategory, gridX, gridY, gridSizePx, texture, hp, conditions, selected, hidden, hazardSize } = options
     this.container.alpha = hidden ? 0.55 : 1
     this.gridSizePx = gridSizePx
-    this.footprintInCells = footprintCells(sizeCategory)
-    const footprint = footprintCells(sizeCategory) * gridSizePx
-    const side = footprint * renderScale(sizeCategory)
-    const inset = (footprint - side) / 2
+    this.footprintWCells = hazardSize ? hazardSize.widthCells : footprintCells(sizeCategory)
+    this.footprintHCells = hazardSize ? hazardSize.heightCells : footprintCells(sizeCategory)
+    const footprintW = this.footprintWCells * gridSizePx
+    const footprintH = this.footprintHCells * gridSizePx
+    const scale = hazardSize ? 1 : renderScale(sizeCategory)
+    const sideW = footprintW * scale
+    const sideH = footprintH * scale
+    const insetX = (footprintW - sideW) / 2
+    const insetY = (footprintH - sideH) / 2
 
     this.placeholder.clear()
     if (texture) {
       this.art.texture = texture
       this.art.visible = true
-      this.art.width = side
-      this.art.height = side
-      this.art.position.set(inset, inset)
+      this.art.width = sideW
+      this.art.height = sideH
+      this.art.position.set(insetX, insetY)
     } else {
       this.art.visible = false
       this.placeholder
-        .rect(inset, inset, side, side)
-        .fill({ color: 0x6b6375, alpha: 0.7 })
-        .stroke({ width: 2, color: 0xffffff, alpha: 0.85 })
+        .rect(insetX, insetY, sideW, sideH)
+        .fill({ color: hazardSize ? 0xcc5522 : 0x6b6375, alpha: 0.7 })
+        .stroke({ width: 2, color: hazardSize ? 0xffaa66 : 0xffffff, alpha: 0.85 })
     }
 
     this.selectionRing.clear()
     if (hidden) {
       this.selectionRing
-        .rect(inset - 3, inset - 3, side + 6, side + 6)
+        .rect(insetX - 3, insetY - 3, sideW + 6, sideH + 6)
         .stroke({ width: 2, color: 0x9a6bff, alpha: 0.9, alignment: 0.5 })
     }
     if (selected) {
-      this.selectionRing.rect(inset - 6, inset - 6, side + 12, side + 12).stroke({ width: 3, color: 0xffd54a, alpha: 0.95 })
+      this.selectionRing.rect(insetX - 6, insetY - 6, sideW + 12, sideH + 12).stroke({ width: 3, color: 0xffd54a, alpha: 0.95 })
     }
 
     this.hpBar.clear()
     if (hp) {
-      const barY = inset - HP_BAR_GAP_PX - HP_BAR_HEIGHT_PX
+      const barY = insetY - HP_BAR_GAP_PX - HP_BAR_HEIGHT_PX
       const ratio = hp.max > 0 ? Math.max(0, Math.min(1, hp.current / hp.max)) : 0
       const fillColor = ratio > 0.5 ? 0x3fbf5f : ratio > 0.25 ? 0xe0a72e : 0xd1273d
-      this.hpBar.rect(inset, barY, side, HP_BAR_HEIGHT_PX).fill({ color: 0x1a1a1a, alpha: 0.8 })
-      if (ratio > 0) this.hpBar.rect(inset, barY, side * ratio, HP_BAR_HEIGHT_PX).fill({ color: fillColor, alpha: 0.95 })
+      this.hpBar.rect(insetX, barY, sideW, HP_BAR_HEIGHT_PX).fill({ color: 0x1a1a1a, alpha: 0.8 })
+      if (ratio > 0) this.hpBar.rect(insetX, barY, sideW * ratio, HP_BAR_HEIGHT_PX).fill({ color: fillColor, alpha: 0.95 })
       if (hp.temp > 0) {
         const tempRatio = Math.min(1, hp.temp / Math.max(hp.max, 1))
-        this.hpBar.rect(inset, barY, side * tempRatio, HP_BAR_HEIGHT_PX).stroke({ width: 1, color: 0x7ec8ff, alpha: 0.9 })
+        this.hpBar.rect(insetX, barY, sideW * tempRatio, HP_BAR_HEIGHT_PX).stroke({ width: 1, color: 0x7ec8ff, alpha: 0.9 })
       }
     }
 
@@ -136,13 +148,13 @@ export class TokenSprite {
     const maxDots = 6
     const shown = conditions.slice(0, maxDots)
     shown.forEach((_condition, i) => {
-      const cx = inset + dotRadius + i * (dotRadius * 2 + 2)
-      const cy = footprint + HP_BAR_GAP_PX + dotRadius
+      const cx = insetX + dotRadius + i * (dotRadius * 2 + 2)
+      const cy = footprintH + HP_BAR_GAP_PX + dotRadius
       this.conditionDots.circle(cx, cy, dotRadius).fill({ color: 0xd1273d, alpha: 0.9 }).stroke({ width: 1, color: 0xffffff, alpha: 0.8 })
     })
 
     this.label.text = name
-    this.label.position.set(footprint / 2, footprint + (conditions.length > 0 ? HP_BAR_GAP_PX * 2 + dotRadius * 2 : 2))
+    this.label.position.set(footprintW / 2, footprintH + (conditions.length > 0 ? HP_BAR_GAP_PX * 2 + dotRadius * 2 : 2))
 
     if (!this.dragging) {
       this.container.position.set(gridX * gridSizePx, gridY * gridSizePx)
@@ -201,8 +213,8 @@ export class TokenSprite {
       // fractional for smooth remote-viewer motion. See snapToSlot's doc
       // comment for why this isn't a plain Math.round (that's corner-snapping,
       // correct for walls but not for a token that should fill one slot).
-      const gridX = snapToSlot(x / this.gridSizePx, this.footprintInCells)
-      const gridY = snapToSlot(y / this.gridSizePx, this.footprintInCells)
+      const gridX = snapToSlot(x / this.gridSizePx, this.footprintWCells)
+      const gridY = snapToSlot(y / this.gridSizePx, this.footprintHCells)
       this.container.position.set(gridX * this.gridSizePx, gridY * this.gridSizePx)
       this.callbacks.onDragEnd(gridX, gridY)
     }

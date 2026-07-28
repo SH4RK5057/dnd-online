@@ -145,6 +145,19 @@ export interface TokenRecord {
    * inspection and usable for range/line-of-sight math (see
    * map/distance3D.ts). Defaults to 0 (same plane as everything else). */
   z: number
+  /** Whether this combatant has an unused reaction right now — resets to
+   * true whenever combat advances TO this token's turn (5e rule: you regain
+   * your reaction at the start of your own turn), and whenever combat
+   * starts. Consumed either by an opportunity-attack roll outside your own
+   * turn (see components/AttackRollPanel.tsx) or manually via the
+   * initiative tracker's "Use reaction" button for a non-attack reaction
+   * (a readied spell, Shield, etc. — narrated outside the app). */
+  reactionAvailable: boolean
+  /** Custom rectangular footprint in grid cells, overriding sizeCategory's
+   * fixed footprint — for DM-placed hazard/trap tokens sized to an actual
+   * area rather than a creature size category. Null for every normal
+   * token, which keeps using sizeCategory as before. */
+  hazardSize: { widthCells: number; heightCells: number } | null
   createdAt: number
 }
 

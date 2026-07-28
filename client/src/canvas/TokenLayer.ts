@@ -132,6 +132,7 @@ export class TokenLayer {
       conditions: token.conditions,
       selected: token.id === this.selectedTokenId,
       hidden: token.hidden,
+      hazardSize: token.hazardSize,
     })
   }
 

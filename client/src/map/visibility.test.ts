@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeVisibilityPolygon, type Point, type Segment } from './visibility'
+import { computeVisibilityPolygon, hasLineOfSight, type Point, type Segment } from './visibility'
 
 function distance(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
@@ -179,5 +179,26 @@ describe('computeVisibilityPolygon', () => {
     const throughLeftCorner = { x: -20, y: 20 }
     expect(pointInPolygon(throughRightCorner, polygon)).toBe(false)
     expect(pointInPolygon(throughLeftCorner, polygon)).toBe(false)
+  })
+})
+
+describe('hasLineOfSight', () => {
+  it('is true with no walls between attacker and target', () => {
+    expect(hasLineOfSight({ x: 0, y: 0 }, { x: 10, y: 0 }, [])).toBe(true)
+  })
+
+  it('is false when a wall crosses the line between them', () => {
+    const wall: Segment = { x1: 5, y1: -5, x2: 5, y2: 5 }
+    expect(hasLineOfSight({ x: 0, y: 0 }, { x: 10, y: 0 }, [wall])).toBe(false)
+  })
+
+  it('is true when the wall is off to the side, not between them', () => {
+    const wall: Segment = { x1: 5, y1: 10, x2: 5, y2: 20 }
+    expect(hasLineOfSight({ x: 0, y: 0 }, { x: 10, y: 0 }, [wall])).toBe(true)
+  })
+
+  it('is true when the wall is behind the target, not blocking it', () => {
+    const wall: Segment = { x1: 15, y1: -5, x2: 15, y2: 5 }
+    expect(hasLineOfSight({ x: 0, y: 0 }, { x: 10, y: 0 }, [wall])).toBe(true)
   })
 })

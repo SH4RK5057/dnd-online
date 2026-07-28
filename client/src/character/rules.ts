@@ -23,7 +23,8 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     character.deathSaves &&
     character.concentratingOn !== undefined &&
     character.pendingConcentrationCheckDc !== undefined &&
-    character.weapons
+    character.weapons &&
+    character.currency
   ) {
     return character
   }
@@ -40,6 +41,7 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     concentratingOn: character.concentratingOn ?? '',
     pendingConcentrationCheckDc: character.pendingConcentrationCheckDc ?? null,
     weapons: character.weapons ?? [],
+    currency: character.currency ?? { pp: 0, gp: 0, ep: 0, sp: 0, cp: 0 },
   }
 }
 
@@ -407,6 +409,32 @@ export function casterTypeForClass(className: string): CasterType {
   if (HALF_CASTER_CLASSES.has(name)) return 'half'
   if (name === 'warlock') return 'pact'
   return 'none'
+}
+
+/** Standard SRD spellcasting ability per class — null for non-casters
+ * (including classes this app doesn't recognize as a caster). Used to
+ * compute a spell save DC (8 + proficiency + this modifier). */
+const SPELLCASTING_ABILITY_BY_CLASS: Record<string, AbilityKey> = {
+  bard: 'cha',
+  cleric: 'wis',
+  druid: 'wis',
+  paladin: 'cha',
+  ranger: 'wis',
+  sorcerer: 'cha',
+  warlock: 'cha',
+  wizard: 'int',
+}
+
+export function spellcastingAbilityForClass(className: string): AbilityKey | null {
+  return SPELLCASTING_ABILITY_BY_CLASS[className.trim().toLowerCase()] ?? null
+}
+
+/** Standard 5e spell save DC formula. Returns null when the class has no
+ * recognized spellcasting ability (see spellcastingAbilityForClass). */
+export function computeSpellSaveDc(character: Pick<CharacterRecord, 'className' | 'level' | 'abilities'>): number | null {
+  const ability = spellcastingAbilityForClass(character.className)
+  if (!ability) return null
+  return 8 + computeProficiencyBonus(character.level) + computeModifier(character.abilities[ability])
 }
 
 /** Standard 5e full-caster slot table — index 0 = level 1, each row is

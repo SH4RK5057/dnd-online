@@ -205,6 +205,10 @@ export interface CharacterRecord {
    * pending. */
   pendingConcentrationCheckDc: number | null
   weapons: WeaponEntry[]
+  /** Standard 5e coin denominations this character personally carries —
+   * separate from the shared party pool (loot/usePartyLoot.ts), which is
+   * for treasure not yet split up. */
+  currency: { pp: number; gp: number; ep: number; sp: number; cp: number }
   createdAt: number
 }
 

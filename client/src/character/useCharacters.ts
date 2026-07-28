@@ -146,6 +146,7 @@ export function newBlankCharacter(ownerId: string, name: string): CharacterRecor
     concentratingOn: '',
     pendingConcentrationCheckDc: null,
     weapons: [],
+    currency: { pp: 0, gp: 0, ep: 0, sp: 0, cp: 0 },
     createdAt: Date.now(),
   }
 }

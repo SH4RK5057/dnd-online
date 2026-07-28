@@ -1,4 +1,14 @@
-import type { BackgroundData, ClassData, FeatureChoiceOption, ItemData, MonsterData, RaceData, SpellData, SubclassData } from './types'
+import type {
+  BackgroundData,
+  ClassData,
+  FeatureChoiceOption,
+  ItemData,
+  MonsterData,
+  RaceData,
+  SpellData,
+  SpellEffectData,
+  SubclassData,
+} from './types'
 import { SKILL_LABELS, type SkillId } from '../character/types'
 
 /**
@@ -396,6 +406,22 @@ export const SRD_SPELLS: SpellData[] = [
       'You create three rays of fire and hurl them at targets within range. You can hurl them at one target or several. Make a ranged spell attack for each ray. On a hit, the target takes {@damage 2d6} fire damage.',
     ],
   },
+]
+
+/** Structured mechanical data (shape/size/range/save/damage) for a small,
+ * hand-picked set of common SRD 5.1 area-effect spells — see
+ * content/types.ts SpellEffectData's doc comment for why this is separate
+ * from SRD_SPELLS above. Matched by name (case-insensitive) against a
+ * character's own known spells in components/SpellCastPanel.tsx. */
+export const SRD_SPELL_EFFECTS: SpellEffectData[] = [
+  { name: 'Fireball', areaShape: 'sphere', areaSizeFt: 20, rangeFt: 150, savingThrow: 'dex', savingThrowEffect: 'half', damageDice: '8d6' },
+  { name: 'Burning Hands', areaShape: 'cone', areaSizeFt: 15, rangeFt: 0, savingThrow: 'dex', savingThrowEffect: 'half', damageDice: '3d6' },
+  { name: 'Thunderwave', areaShape: 'cube', areaSizeFt: 15, rangeFt: 0, savingThrow: 'con', savingThrowEffect: 'half', damageDice: '2d8' },
+  { name: 'Shatter', areaShape: 'sphere', areaSizeFt: 10, rangeFt: 60, savingThrow: 'con', savingThrowEffect: 'half', damageDice: '3d8' },
+  { name: 'Cone of Cold', areaShape: 'cone', areaSizeFt: 60, rangeFt: 0, savingThrow: 'con', savingThrowEffect: 'half', damageDice: '8d8' },
+  { name: 'Lightning Bolt', areaShape: 'line', areaSizeFt: 100, rangeFt: 0, savingThrow: 'dex', savingThrowEffect: 'half', damageDice: '8d6' },
+  { name: 'Spirit Guardians', areaShape: 'sphere', areaSizeFt: 15, rangeFt: 0, savingThrow: 'wis', savingThrowEffect: 'half', damageDice: '3d8' },
+  { name: 'Sunbeam', areaShape: 'line', areaSizeFt: 60, rangeFt: 0, savingThrow: 'con', savingThrowEffect: 'half', damageDice: '6d8' },
 ]
 
 export const SRD_MONSTERS: MonsterData[] = [

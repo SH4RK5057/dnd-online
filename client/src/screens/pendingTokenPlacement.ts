@@ -13,4 +13,7 @@ export interface PendingTokenPlacement {
    * button (encounter drag-and-drop) instead of TokenUploadButton — carries
    * the stat block fields to initialize on the token once it's placed. */
   monsterInit: { monsterKey: string; hp: { current: number; max: number; temp: number }; ac: number; speed: number } | null
+  /** Set when placing a DM-configured hazard/trap token (custom rectangular
+   * size, starts hidden) instead of a normal creature token. */
+  hazardSize: { widthCells: number; heightCells: number } | null
 }

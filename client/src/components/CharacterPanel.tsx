@@ -3,6 +3,7 @@ import { useSession } from '../session/useSession'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
+import { useWalls } from '../map/useWalls'
 import { useCombat } from '../combat/useCombat'
 import { useCharacters, newBlankCharacter } from '../character/useCharacters'
 import { useCompendium } from '../content/useCompendium'
@@ -22,8 +23,10 @@ import { parseNotation, rollNotation } from '../dice/notation'
 import { resolveEffectiveMode, type RollCategory } from '../dice/conditions'
 import type { RollMode } from '../dice/types'
 import type { CharacterRecord } from '../character/types'
+import type { MeasureShape } from '../canvas/MeasureLayer'
 import { CharacterSheet } from './CharacterSheet'
 import { AttackRollPanel } from './AttackRollPanel'
+import { SpellCastPanel } from './SpellCastPanel'
 
 /** In-session: shows the viewer's own campaign character (auto-found by
  * ownerId — this IS the "auto-reconnect to your assigned campaign
@@ -31,14 +34,15 @@ import { AttackRollPanel } from './AttackRollPanel'
  * is already sitting in the doc). If they don't have one yet, offers to
  * bind a standalone character (picked from local storage or imported fresh)
  * into this campaign, which clones and locks it. */
-export function CharacterPanel() {
+export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { shape: MeasureShape; sizeFt: number }) => void }) {
   const { session } = useSession()
   const doc = session?.doc ?? null
   const isDm = session?.role === 'dm'
   const myPlayerId = getOrCreatePlayerId()
 
   const { activeSceneId, activeScene } = useScenes(doc)
-  const { tokens } = useTokens(doc, activeSceneId)
+  const { tokens, setTokenReactionAvailable, setTokenHp } = useTokens(doc, activeSceneId)
+  const { walls } = useWalls(doc, activeSceneId)
   const { combat } = useCombat(doc, activeSceneId)
   const { characters, myCharacter, bindCharacter, updateCharacter } = useCharacters(doc)
   const { races, classes, subclasses, backgrounds } = useCompendium(doc)
@@ -271,10 +275,27 @@ export function CharacterPanel() {
         charactersById={new Map(characters.map((c) => [c.id, c]))}
         actingConditions={myToken?.conditions ?? []}
         autoResolveEnabled={campaignSettings.autoResolveAttacksEnabled ?? true}
-        canRoll={canRoll}
+        isMyTurn={isMyTurn}
+        reactionAvailable={myToken?.reactionAvailable ?? false}
+        onUseReaction={() => myToken && setTokenReactionAvailable(myToken.id, false)}
         playerId={myPlayerId}
         playerName={session?.displayName ?? 'Player'}
         pushRoll={pushRoll}
+        attackerToken={myToken ?? null}
+        walls={walls}
+      />
+
+      <h3>Cast a spell</h3>
+      <SpellCastPanel
+        character={character}
+        targets={tokens.filter((t) => t.id !== myToken?.id)}
+        charactersById={new Map(characters.map((c) => [c.id, c]))}
+        updateCharacter={updateCharacter}
+        setTokenHp={setTokenHp}
+        playerId={myPlayerId}
+        playerName={session?.displayName ?? 'Player'}
+        pushRoll={pushRoll}
+        onArmTemplate={onArmTemplate}
       />
 
       <CharacterSheet

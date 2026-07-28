@@ -62,13 +62,21 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingPlacement || !activeSceneId) return
-    const { name, sizeCategory, file, monsterInit } = pendingPlacement
+    const { name, sizeCategory, file, monsterInit, hazardSize } = pendingPlacement
     setPendingPlacement(null)
     try {
-      const footprint = footprintCells(sizeCategory)
+      const footprint = hazardSize ? Math.max(hazardSize.widthCells, hazardSize.heightCells) : footprintCells(sizeCategory)
       const snappedX = snapToSlot(x, footprint)
       const snappedY = snapToSlot(y, footprint)
-      const tokenId = createToken({ sceneId: activeSceneId, name, sizeCategory, x: snappedX, y: snappedY })
+      const tokenId = createToken({
+        sceneId: activeSceneId,
+        name,
+        sizeCategory,
+        x: snappedX,
+        y: snappedY,
+        hazardSize,
+        hidden: !!hazardSize,
+      })
       if (file) void setTokenArt(tokenId, file)
       if (monsterInit) initTokenFromMonster(tokenId, monsterInit)
     } catch (err) {
@@ -87,6 +95,7 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
         ac: monster.ac,
         speed: parseSpeedFeet(monster.speed),
       },
+      hazardSize: null,
     })
   }
 

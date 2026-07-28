@@ -14,6 +14,7 @@ import {
   computeProficiencyBonus,
   computeSaveBonus,
   computeSkillBonus,
+  computeSpellSaveDc,
   computeSpellSlotsByLevel,
   deathSaveResetPatch,
   isValidAbilityScoreImprovement,
@@ -25,6 +26,7 @@ import {
   pointBuyCost,
   resolveTokenAc,
   resolveTokenHp,
+  spellcastingAbilityForClass,
   xpToLevel,
 } from './rules'
 import type { CharacterRecord } from './types'
@@ -99,6 +101,7 @@ function baseCharacter(): CharacterRecord {
     concentratingOn: '',
     pendingConcentrationCheckDc: null,
     weapons: [],
+    currency: { pp: 0, gp: 0, ep: 0, sp: 0, cp: 0 },
     createdAt: 0,
   }
 }
@@ -157,6 +160,8 @@ describe('resolveTokenHp', () => {
       description: '',
       hidden: false,
       z: 0,
+      reactionAvailable: true,
+      hazardSize: null,
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toEqual({ max: 44, current: 44, temp: 0, fromCharacter: true })
@@ -182,6 +187,8 @@ describe('resolveTokenHp', () => {
       description: '',
       hidden: false,
       z: 0,
+      reactionAvailable: true,
+      hazardSize: null,
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toEqual({ max: 7, current: 7, temp: 0, fromCharacter: false })
@@ -207,6 +214,8 @@ describe('resolveTokenHp', () => {
       description: '',
       hidden: false,
       z: 0,
+      reactionAvailable: true,
+      hazardSize: null,
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toBeNull()
@@ -235,6 +244,8 @@ describe('resolveTokenAc', () => {
     description: '',
     hidden: false,
     z: 0,
+    reactionAvailable: true,
+    hazardSize: null,
     createdAt: 0,
   }
 
@@ -295,6 +306,28 @@ describe('computeDamagePatch', () => {
   it('does not flag a concentration check when not concentrating', () => {
     const c = baseCharacter()
     expect(computeDamagePatch(c, 10).pendingConcentrationCheckDc).toBeUndefined()
+  })
+})
+
+describe('spellcastingAbilityForClass / computeSpellSaveDc', () => {
+  it('maps each caster class to its standard spellcasting ability', () => {
+    expect(spellcastingAbilityForClass('Wizard')).toBe('int')
+    expect(spellcastingAbilityForClass('Cleric')).toBe('wis')
+    expect(spellcastingAbilityForClass('Sorcerer')).toBe('cha')
+  })
+
+  it('returns null for a class with no recognized spellcasting ability', () => {
+    expect(spellcastingAbilityForClass('Fighter')).toBeNull()
+  })
+
+  it('computes DC as 8 + proficiency + ability modifier', () => {
+    // Wizard, level 5 (prof +3), Int 16 (+3) => 8 + 3 + 3 = 14
+    const c = { ...baseCharacter(), className: 'Wizard', level: 5, abilities: { ...baseCharacter().abilities, int: 16 } }
+    expect(computeSpellSaveDc(c)).toBe(14)
+  })
+
+  it('returns null for a non-caster class', () => {
+    expect(computeSpellSaveDc({ ...baseCharacter(), className: 'Fighter' })).toBeNull()
   })
 })
 

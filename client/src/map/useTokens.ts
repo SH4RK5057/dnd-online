@@ -16,6 +16,11 @@ export interface CreateTokenInput {
   x: number
   y: number
   assetId?: string | null
+  /** Set only for DM-placed hazard/trap tokens — see TokenRecord.hazardSize. */
+  hazardSize?: { widthCells: number; heightCells: number } | null
+  /** Hazard tokens are placed hidden by default (reveal-on-trigger); other
+   * callers omit this and get the normal `false`. */
+  hidden?: boolean
 }
 
 export interface UseTokensResult {
@@ -37,6 +42,8 @@ export interface UseTokensResult {
   setTokenDescription: (tokenId: string, description: string) => void
   setTokenHidden: (tokenId: string, hidden: boolean) => void
   setTokenZ: (tokenId: string, z: number) => void
+  setTokenReactionAvailable: (tokenId: string, available: boolean) => void
+  setTokenHazardSize: (tokenId: string, size: { widthCells: number; heightCells: number } | null) => void
   /** Encounter drag-and-drop: one atomic patch initializing HP/AC/speed and
    * recording the compendium source, instead of several separate writes. */
   initTokenFromMonster: (
@@ -96,8 +103,10 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         ac: null,
         speed: null,
         description: '',
-        hidden: false,
+        hidden: input.hidden ?? false,
         z: 0,
+        reactionAvailable: true,
+        hazardSize: input.hazardSize ?? null,
         createdAt: Date.now(),
       }
       tokensMap(doc).set(id, record)
@@ -161,6 +170,14 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
   )
   const setTokenHidden = useCallback((tokenId: string, hidden: boolean) => patchToken(tokenId, { hidden }), [patchToken])
   const setTokenZ = useCallback((tokenId: string, z: number) => patchToken(tokenId, { z }), [patchToken])
+  const setTokenReactionAvailable = useCallback(
+    (tokenId: string, available: boolean) => patchToken(tokenId, { reactionAvailable: available }),
+    [patchToken],
+  )
+  const setTokenHazardSize = useCallback(
+    (tokenId: string, size: { widthCells: number; heightCells: number } | null) => patchToken(tokenId, { hazardSize: size }),
+    [patchToken],
+  )
   const initTokenFromMonster = useCallback(
     (
       tokenId: string,
@@ -200,6 +217,8 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     setTokenDescription,
     setTokenHidden,
     setTokenZ,
+    setTokenReactionAvailable,
+    setTokenHazardSize,
     initTokenFromMonster,
   }
 }

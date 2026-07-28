@@ -1,4 +1,5 @@
 import { useSession } from '../session/useSession'
+import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useCharacters } from '../character/useCharacters'
@@ -17,8 +18,9 @@ export function InitiativeTracker() {
   const { session } = useSession()
   const doc = session?.doc ?? null
   const isDm = session?.role === 'dm'
+  const myPlayerId = getOrCreatePlayerId()
   const { activeSceneId } = useScenes(doc)
-  const { tokens, setTokenInitiative } = useTokens(doc, activeSceneId)
+  const { tokens, setTokenInitiative, setTokenReactionAvailable } = useTokens(doc, activeSceneId)
   const { characters } = useCharacters(doc)
   const { combat, startCombat, endCombat, advanceTurn, setMonsterInitiativeMode } = useCombat(doc, activeSceneId)
 
@@ -33,9 +35,10 @@ export function InitiativeTracker() {
   const order = computeInitiativeOrder(tokens)
 
   const handleModeChange = (mode: MonsterInitiativeMode) => setMonsterInitiativeMode(mode)
-  const handleStart = (selectedTokens: TokenRecord[]) => startCombat(selectedTokens, rollBonusForToken, setTokenInitiative)
+  const handleStart = (selectedTokens: TokenRecord[]) =>
+    startCombat(selectedTokens, rollBonusForToken, setTokenInitiative, setTokenReactionAvailable)
   const handleEnd = () => endCombat(tokens, setTokenInitiative)
-  const handleAdvance = () => advanceTurn(tokens)
+  const handleAdvance = () => advanceTurn(tokens, setTokenReactionAvailable)
 
   return (
     <div className="initiative-tracker">
@@ -68,12 +71,29 @@ export function InitiativeTracker() {
       {combat.active && <p className="character-sheet__hint">Round {combat.round}</p>}
 
       <ol className="initiative-tracker__order">
-        {order.map((token) => (
-          <li key={token.id} className={token.id === combat.currentTokenId ? 'initiative-tracker__current' : ''}>
-            {token.name} — {token.initiative}
-            {token.id === combat.currentTokenId && ' (current turn)'}
-          </li>
-        ))}
+        {order.map((token) => {
+          const canManage = isDm || token.ownerId === myPlayerId
+          return (
+            <li key={token.id} className={token.id === combat.currentTokenId ? 'initiative-tracker__current' : ''}>
+              {token.name} — {token.initiative}
+              {token.id === combat.currentTokenId && ' (current turn)'}
+              {combat.active && (
+                <span className={`initiative-tracker__reaction${token.reactionAvailable ? '' : ' initiative-tracker__reaction--used'}`}>
+                  {token.reactionAvailable ? '⚡ Reaction available' : 'Reaction used'}
+                </span>
+              )}
+              {combat.active && canManage && token.reactionAvailable && (
+                <button
+                  type="button"
+                  title="Mark this reaction used for a non-attack reaction (a readied spell, Shield, etc.) — an opportunity attack rolled from the character sheet consumes it automatically."
+                  onClick={() => setTokenReactionAvailable(token.id, false)}
+                >
+                  Use reaction
+                </button>
+              )}
+            </li>
+          )
+        })}
         {order.length === 0 && <li className="character-sheet__hint">No initiative rolled yet.</li>}
       </ol>
     </div>

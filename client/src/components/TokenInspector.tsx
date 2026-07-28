@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import type * as Y from 'yjs'
 import { useTokens } from '../map/useTokens'
+import { useWalls } from '../map/useWalls'
 import { useCompendium, findByKey } from '../content/useCompendium'
 import { useCharacters } from '../character/useCharacters'
 import { useCampaignSettings } from '../character/useCampaignSettings'
 import { useRollLog } from '../dice/useRollLog'
 import { parseNotation, rollNotation } from '../dice/notation'
+import type { MeasureShape } from '../canvas/MeasureLayer'
 import { StatBlockCard } from './StatBlockCard'
 import { CharacterSheet } from './CharacterSheet'
 import { AttackRollPanel } from './AttackRollPanel'
+import { SpellCastPanel } from './SpellCastPanel'
 
 /** Shown for ANY selected token, to ANY viewer — unlike
  * TokenHpConditionEditor (which edits HP/conditions and is gated to
@@ -22,13 +25,16 @@ export function TokenInspector({
   sceneId,
   isDm,
   selectedTokenId,
+  onArmTemplate,
 }: {
   doc: Y.Doc | null
   sceneId: string
   isDm: boolean
   selectedTokenId: string | null
+  onArmTemplate: (template: { shape: MeasureShape; sizeFt: number }) => void
 }) {
-  const { tokens, setTokenDescription } = useTokens(doc, sceneId)
+  const { tokens, setTokenDescription, setTokenHp } = useTokens(doc, sceneId)
+  const { walls } = useWalls(doc, sceneId)
   const compendium = useCompendium(doc)
   const { characters, updateCharacter } = useCharacters(doc)
   const { settings: campaignSettings } = useCampaignSettings(doc)
@@ -117,10 +123,25 @@ export function TokenInspector({
                 charactersById={new Map(characters.map((c) => [c.id, c]))}
                 actingConditions={token.conditions}
                 autoResolveEnabled={campaignSettings.autoResolveAttacksEnabled ?? true}
-                canRoll
+                isMyTurn
+                reactionAvailable={false}
+                onUseReaction={() => {}}
                 playerId="npc"
                 playerName={npcRollLabelName}
                 pushRoll={pushRoll}
+                attackerToken={token}
+                walls={walls}
+              />
+              <SpellCastPanel
+                character={linkedCharacter}
+                targets={tokens.filter((t) => t.id !== token.id)}
+                charactersById={new Map(characters.map((c) => [c.id, c]))}
+                updateCharacter={updateCharacter}
+                setTokenHp={setTokenHp}
+                playerId="npc"
+                playerName={npcRollLabelName}
+                pushRoll={pushRoll}
+                onArmTemplate={onArmTemplate}
               />
               <CharacterSheet
                 character={linkedCharacter}

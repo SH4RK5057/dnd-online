@@ -1,6 +1,6 @@
 import { Container, Graphics, Text } from 'pixi.js'
 
-export type MeasureShape = 'line' | 'circle' | 'cone'
+export type MeasureShape = 'line' | 'circle' | 'cone' | 'cube'
 
 /** Feet per grid square — the standard 5e convention, same one implied
  * everywhere else distance already matters in this app (light/vision radii
@@ -36,8 +36,21 @@ export class MeasureLayer {
     this.gridSizePx = gridSizePx > 0 ? gridSizePx : 1
   }
 
-  /** `origin`/`current` are in grid-cell units. Pass null to clear. */
-  setPreview(shape: MeasureShape, origin: { x: number; y: number } | null, current: { x: number; y: number } | null): void {
+  /**
+   * `origin`/`current` are in grid-cell units. Pass null to clear.
+   * `lockedSizeFt`, when given, fixes the template's size (radius for
+   * circle, edge length for cube, length for line/cone) regardless of drag
+   * distance — used by SpellCastPanel so a spell's template always matches
+   * its real SRD size; `current` still supplies direction for line/cone.
+   * Free-hand measuring/AoE (no `lockedSizeFt`) sizes off the drag distance
+   * as before.
+   */
+  setPreview(
+    shape: MeasureShape,
+    origin: { x: number; y: number } | null,
+    current: { x: number; y: number } | null,
+    lockedSizeFt?: number,
+  ): void {
     this.graphics.clear()
     if (!origin || !current) {
       this.label.visible = false
@@ -48,26 +61,34 @@ export class MeasureLayer {
     const oy = origin.y * this.gridSizePx
     const cx = current.x * this.gridSizePx
     const cy = current.y * this.gridSizePx
-    const distanceCells = Math.hypot(current.x - origin.x, current.y - origin.y)
-    const feet = Math.round(distanceCells * FEET_PER_CELL)
+    const dragDistanceCells = Math.hypot(current.x - origin.x, current.y - origin.y)
+    const sizeCells = lockedSizeFt !== undefined ? lockedSizeFt / FEET_PER_CELL : dragDistanceCells
+    const sizePx = sizeCells * this.gridSizePx
+    const feet = Math.round(sizeCells * FEET_PER_CELL)
 
     if (shape === 'line') {
-      this.graphics.moveTo(ox, oy).lineTo(cx, cy).stroke({ width: 3, color: 0xffee66, alpha: 0.85, cap: 'round' })
+      const angle = Math.atan2(cy - oy, cx - ox)
+      const endX = ox + sizePx * Math.cos(angle)
+      const endY = oy + sizePx * Math.sin(angle)
+      this.graphics.moveTo(ox, oy).lineTo(endX, endY).stroke({ width: 3, color: 0xffee66, alpha: 0.85, cap: 'round' })
       this.graphics.circle(ox, oy, 4).fill({ color: 0xffee66 })
       this.label.text = `${feet} ft`
     } else if (shape === 'circle') {
-      const radiusPx = Math.hypot(cx - ox, cy - oy)
-      this.graphics.circle(ox, oy, radiusPx).fill({ color: 0xffee66, alpha: 0.2 }).stroke({ width: 2, color: 0xffee66, alpha: 0.85 })
+      this.graphics.circle(ox, oy, sizePx).fill({ color: 0xffee66, alpha: 0.2 }).stroke({ width: 2, color: 0xffee66, alpha: 0.85 })
       this.label.text = `${feet} ft radius`
+    } else if (shape === 'cube') {
+      this.graphics
+        .rect(ox - sizePx / 2, oy - sizePx / 2, sizePx, sizePx)
+        .fill({ color: 0xffee66, alpha: 0.2 })
+        .stroke({ width: 2, color: 0xffee66, alpha: 0.85 })
+      this.label.text = `${feet} ft cube`
     } else {
-      // 5e cone: a 90-degree wedge from origin, pointing toward `current`,
-      // with length = the drag distance.
-      const lengthPx = Math.hypot(cx - ox, cy - oy)
-      if (lengthPx > 0) {
+      // 5e cone: a 90-degree wedge from origin, pointing toward `current`.
+      if (sizePx > 0) {
         const angle = Math.atan2(cy - oy, cx - ox)
         const spread = Math.PI / 4 // ±45° = 90° total
-        const p1 = { x: ox + lengthPx * Math.cos(angle - spread), y: oy + lengthPx * Math.sin(angle - spread) }
-        const p2 = { x: ox + lengthPx * Math.cos(angle + spread), y: oy + lengthPx * Math.sin(angle + spread) }
+        const p1 = { x: ox + sizePx * Math.cos(angle - spread), y: oy + sizePx * Math.sin(angle - spread) }
+        const p2 = { x: ox + sizePx * Math.cos(angle + spread), y: oy + sizePx * Math.sin(angle + spread) }
         this.graphics
           .moveTo(ox, oy)
           .lineTo(p1.x, p1.y)

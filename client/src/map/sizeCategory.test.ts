@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { snapToSlot } from './sizeCategory'
+import { rectanglesOverlap, snapToSlot, tokenFootprintRect } from './sizeCategory'
 
 describe('snapToSlot', () => {
   it('for a 1-cell token, anchors to whichever cell the point falls within (not the nearest grid line)', () => {
@@ -29,5 +29,31 @@ describe('snapToSlot', () => {
   it('for a 3-cell (huge) token, centers similarly', () => {
     expect(snapToSlot(3.0, 3)).toBe(2)
     expect(snapToSlot(4.0, 3)).toBe(3)
+  })
+})
+
+describe('rectanglesOverlap', () => {
+  it('is true for overlapping rectangles', () => {
+    const a = tokenFootprintRect(0, 0, 2, 2)
+    const b = tokenFootprintRect(1, 1, 2, 2)
+    expect(rectanglesOverlap(a, b)).toBe(true)
+  })
+
+  it('is false for rectangles that only touch edges', () => {
+    const a = tokenFootprintRect(0, 0, 2, 2)
+    const b = tokenFootprintRect(2, 0, 2, 2)
+    expect(rectanglesOverlap(a, b)).toBe(false)
+  })
+
+  it('is false for separated rectangles', () => {
+    const a = tokenFootprintRect(0, 0, 1, 1)
+    const b = tokenFootprintRect(5, 5, 1, 1)
+    expect(rectanglesOverlap(a, b)).toBe(false)
+  })
+
+  it('is true when one rectangle fully contains the other', () => {
+    const a = tokenFootprintRect(0, 0, 5, 5)
+    const b = tokenFootprintRect(2, 2, 1, 1)
+    expect(rectanglesOverlap(a, b)).toBe(true)
   })
 })

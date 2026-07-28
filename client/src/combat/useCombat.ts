@@ -24,10 +24,15 @@ export interface UseCombatResult {
     tokens: TokenRecord[],
     rollBonusForToken: (token: TokenRecord) => number,
     setTokenInitiative: (tokenId: string, value: number | null) => void,
+    setTokenReactionAvailable: (tokenId: string, available: boolean) => void,
     randomSource?: () => number,
   ) => void
   endCombat: (tokens: TokenRecord[], setTokenInitiative: (tokenId: string, value: number | null) => void) => void
-  advanceTurn: (tokens: TokenRecord[]) => void
+  /** `setTokenReactionAvailable` is optional so existing callers that don't
+   * care about reactions (tests, anywhere reactions aren't surfaced) don't
+   * need to thread it through — the new turn's token just keeps whatever
+   * reaction state it already had if omitted. */
+  advanceTurn: (tokens: TokenRecord[], setTokenReactionAvailable?: (tokenId: string, available: boolean) => void) => void
   setMonsterInitiativeMode: (mode: MonsterInitiativeMode) => void
 }
 
@@ -63,9 +68,13 @@ export function useCombat(doc: Y.Doc | null, sceneId: string | null): UseCombatR
       tokens: TokenRecord[],
       rollBonusForToken: (token: TokenRecord) => number,
       setTokenInitiative: (tokenId: string, value: number | null) => void,
+      setTokenReactionAvailable: (tokenId: string, available: boolean) => void,
       randomSource: () => number = Math.random,
     ) => {
       if (!sceneId) return
+      // Everyone starts a fresh encounter with their reaction available,
+      // regardless of what a previous fight left it at.
+      for (const token of tokens) setTokenReactionAvailable(token.id, true)
       const rollD20 = () => Math.floor(randomSource() * 20) + 1
       const assigned = new Map<string, number>()
       const assign = (token: TokenRecord, value: number) => {
@@ -110,8 +119,9 @@ export function useCombat(doc: Y.Doc | null, sceneId: string | null): UseCombatR
   )
 
   const advanceTurn = useCallback(
-    (tokens: TokenRecord[]) => {
+    (tokens: TokenRecord[], setTokenReactionAvailable?: (tokenId: string, available: boolean) => void) => {
       const { nextTokenId, roundIncremented } = nextTurn(tokens, combat.currentTokenId)
+      if (nextTokenId) setTokenReactionAvailable?.(nextTokenId, true)
       patchCombat({ currentTokenId: nextTokenId, round: roundIncremented ? combat.round + 1 : combat.round })
     },
     [combat.currentTokenId, combat.round, patchCombat],
