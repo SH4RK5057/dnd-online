@@ -30,6 +30,7 @@ import { FogLayer } from './FogLayer'
 import { PingLayer } from './PingLayer'
 import { AnnotationLayer } from './AnnotationLayer'
 import { PoiLayer } from './PoiLayer'
+import { MeasureLayer, type MeasureShape } from './MeasureLayer'
 import type { Point } from '../map/annotationTypes'
 import type { ToolMode } from './interactionMode'
 
@@ -114,6 +115,7 @@ export function MapCanvas({
   const pingLayerRef = useRef<PingLayer | null>(null)
   const annotationLayerRef = useRef<AnnotationLayer | null>(null)
   const poiLayerRef = useRef<PoiLayer | null>(null)
+  const measureLayerRef = useRef<MeasureLayer | null>(null)
 
   // Build the layer graph once the Pixi app is ready. fogTarget (map+grid+
   // walls) uses FogLayer's full mask — live sight plus remembered
@@ -143,6 +145,7 @@ export function MapCanvas({
     const pingLayer = new PingLayer(app)
     const annotationLayer = new AnnotationLayer()
     const poiLayer = new PoiLayer()
+    const measureLayer = new MeasureLayer()
 
     fogTarget.addChild(mapLayer.container, gridLayer.container, wallLayer.container)
     tokenTarget.addChild(tokenLayer.container)
@@ -153,6 +156,7 @@ export function MapCanvas({
       poiLayer.container,
       lightLayer.container,
       pingLayer.container,
+      measureLayer.container,
       fogLayer.mask,
       fogLayer.liveMask,
     )
@@ -174,6 +178,7 @@ export function MapCanvas({
     pingLayerRef.current = pingLayer
     annotationLayerRef.current = annotationLayer
     poiLayerRef.current = poiLayer
+    measureLayerRef.current = measureLayer
 
     return () => {
       mapLayer.destroy()
@@ -185,6 +190,7 @@ export function MapCanvas({
       pingLayer.destroy()
       annotationLayer.destroy()
       poiLayer.destroy()
+      measureLayer.destroy()
       world.destroy()
       camera.destroy()
       cameraRef.current = null
@@ -200,6 +206,7 @@ export function MapCanvas({
       pingLayerRef.current = null
       annotationLayerRef.current = null
       poiLayerRef.current = null
+      measureLayerRef.current = null
     }
   }, [app])
 
@@ -284,6 +291,11 @@ export function MapCanvas({
       },
     )
   }, [doc, tokens, characters, activeScene, isDmUnmasked, toolMode, selectedTokenId, moveToken, onSelectToken])
+
+  // Keep the measure layer's grid-cell-to-pixel conversion in sync.
+  useEffect(() => {
+    measureLayerRef.current?.setGridSizePx(activeScene?.gridSizePx ?? 1)
+  }, [activeScene?.gridSizePx])
 
   // Update walls.
   useEffect(() => {
@@ -436,8 +448,29 @@ export function MapCanvas({
     let annotating = false
     let annotationPoints: Point[] = []
 
+    // Ctrl-drag (any toolMode, any viewer — DM or player) measures distance;
+    // Ctrl+Shift-drag previews a circle AoE template; Ctrl+Alt-drag previews
+    // a cone. Checked ahead of the shift-drag annotation gesture so Ctrl
+    // always wins if somehow both modifiers are held. Deliberately not
+    // gated by toolMode/enableAnnotations — this is a personal ruler, not a
+    // scene-editing tool, so it should work the same for everyone the same
+    // way double-click-to-ping does.
+    let measuring = false
+    let measureShape: MeasureShape = 'line'
+    let measureOrigin: { x: number; y: number } | null = null
+
     const onPointerDown = (event: FederatedPointerEvent) => {
       if (event.target !== app.stage || event.button !== 0) return
+
+      if (event.ctrlKey) {
+        const world = worldRef.current
+        if (!world || !activeScene) return
+        measuring = true
+        measureShape = event.shiftKey ? 'circle' : event.altKey ? 'cone' : 'line'
+        const local = world.toLocal(event.global)
+        measureOrigin = { x: local.x / activeScene.gridSizePx, y: local.y / activeScene.gridSizePx }
+        return
+      }
 
       if (event.shiftKey && enableAnnotations) {
         const world = worldRef.current
@@ -470,6 +503,14 @@ export function MapCanvas({
       cameraStart = { x: camera.position.x, y: camera.position.y }
     }
     const onPointerMove = (event: FederatedPointerEvent) => {
+      if (measuring) {
+        const world = worldRef.current
+        if (!world || !activeScene || !measureOrigin) return
+        const local = world.toLocal(event.global)
+        const current = { x: local.x / activeScene.gridSizePx, y: local.y / activeScene.gridSizePx }
+        measureLayerRef.current?.setPreview(measureShape, measureOrigin, current)
+        return
+      }
       if (annotating) {
         const world = worldRef.current
         if (!world || !activeScene) return
@@ -485,6 +526,12 @@ export function MapCanvas({
       )
     }
     const onPointerUp = () => {
+      if (measuring) {
+        measuring = false
+        measureOrigin = null
+        measureLayerRef.current?.setPreview('line', null, null)
+        return
+      }
       if (annotating) {
         annotating = false
         if (annotationPoints.length >= 2) createAnnotation(getOrCreatePlayerId(), annotationPoints)

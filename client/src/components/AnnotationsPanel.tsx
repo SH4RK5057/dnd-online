@@ -25,6 +25,10 @@ export function AnnotationsPanel() {
         Shift-drag anywhere on the map to sketch a temporary annotation — it fades away on its own after about a
         minute. Double-click anywhere to ping that spot for everyone.
       </p>
+      <p className="scene-toolbar__hint">
+        Ctrl-drag to measure distance. Ctrl+Shift-drag to preview a circle AoE template; Ctrl+Alt-drag for a cone.
+        These are personal — only you see your own measurement — and work for the DM and players alike.
+      </p>
       {isDm && (
         <button type="button" onClick={clearAll} disabled={annotations.length === 0}>
           Clear all annotations ({annotations.length})

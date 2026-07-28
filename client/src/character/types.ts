@@ -64,6 +64,21 @@ export interface ResourceEntry {
   max: number
 }
 
+/** A character's own melee/ranged weapon for the attack-roll flow (see
+ * components/AttackRollPanel.tsx) — distinct from the freeform `inventory`
+ * list, which has no mechanical stats. `damageBonus` is a flat extra (magic
+ * weapon, etc.) on top of the attackAbility modifier, which is added
+ * automatically at roll time. */
+export interface WeaponEntry {
+  id: string
+  name: string
+  attackAbility: AbilityKey
+  /** e.g. "1d8" */
+  damageDice: string
+  damageBonus: number
+  proficient: boolean
+}
+
 export type CharacterOverrideStatus = 'pending' | 'approved' | 'rejected'
 
 /** A player- or DM-authored tweak to a rule/stat for THIS character
@@ -175,6 +190,21 @@ export interface CharacterRecord {
   /** Player- or DM-proposed custom rule/stat tweaks for this character —
    * see CharacterOverrideRecord's doc comment. */
   overrides: CharacterOverrideRecord[]
+  /** Death saving throws — only meaningful (shown/rolled) while
+   * `hp.current === 0`. Reset to {0,0} whenever current HP moves back above
+   * 0 by any means (heal, rest, damage-application helper). 3 successes =
+   * stabilized, 3 failures = dead; both cap at 3, never higher. */
+  deathSaves: { successes: number; failures: number }
+  /** Name of the spell currently being concentrated on, '' if none. Purely
+   * player/DM-declared — nothing enforces that a spell was actually cast. */
+  concentratingOn: string
+  /** Set by the damage-application helper (character/rules.ts
+   * computeDamagePatch) when this character takes damage while
+   * concentrating — the DC (5e rule: max(10, floor(damage/2))) for the
+   * Constitution save the sheet then prompts for. Null when no check is
+   * pending. */
+  pendingConcentrationCheckDc: number | null
+  weapons: WeaponEntry[]
   createdAt: number
 }
 

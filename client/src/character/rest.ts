@@ -1,5 +1,5 @@
 import type { CharacterRecord } from './types'
-import { computeModifier, parseHitDiceCount } from './rules'
+import { computeModifier, deathSaveResetPatch, parseHitDiceCount } from './rules'
 
 /** Extracts the die SIZE from a hit-dice string like "3d8" (8). Used
  * alongside parseHitDiceCount's die COUNT to build a short-rest healing
@@ -31,13 +31,15 @@ export function shortRestHealingNotation(character: Pick<CharacterRecord, 'hitDi
  * capped at max HP. Everything else (spell slots, other resources) is
  * untouched — only a long rest recovers those. */
 export function applyShortRest(
-  character: Pick<CharacterRecord, 'hp' | 'hitDiceUsed'>,
+  character: Pick<CharacterRecord, 'hp' | 'hitDiceUsed' | 'deathSaves'>,
   hitDiceSpent: number,
   healingRolled: number,
 ): Partial<CharacterRecord> {
+  const nextCurrent = Math.min(character.hp.max, character.hp.current + healingRolled)
   return {
     hitDiceUsed: character.hitDiceUsed + hitDiceSpent,
-    hp: { ...character.hp, current: Math.min(character.hp.max, character.hp.current + healingRolled) },
+    hp: { ...character.hp, current: nextCurrent },
+    ...deathSaveResetPatch(character, nextCurrent),
   }
 }
 
@@ -56,5 +58,6 @@ export function applyLongRest(character: CharacterRecord): Partial<CharacterReco
     hitDiceUsed: Math.max(0, character.hitDiceUsed - recovered),
     spellSlotsUsedByLevel: character.spellSlotsUsedByLevel.map(() => 0),
     resources: character.resources.map((r) => ({ ...r, current: r.max })),
+    ...deathSaveResetPatch(character, character.hp.max),
   }
 }

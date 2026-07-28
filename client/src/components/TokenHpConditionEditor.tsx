@@ -26,7 +26,7 @@ export function TokenHpConditionEditor({
 
   const { tokens, setTokenHp, setTokenConditions, setTokenInitiative, linkCharacter, setTokenHidden, setTokenZ } =
     useTokens(doc, sceneId)
-  const { characters, updateCharacter } = useCharacters(doc)
+  const { characters, updateCharacter, createNpcCharacter } = useCharacters(doc)
 
   const token = tokens.find((t) => t.id === selectedTokenId)
   if (!doc || !token) return null
@@ -73,6 +73,18 @@ export function TokenHpConditionEditor({
             ))}
           </select>
         </label>
+      )}
+
+      {isDm && !token.characterId && session && (
+        <button
+          type="button"
+          onClick={() => {
+            const id = createNpcCharacter(token.name, session.roomName)
+            linkCharacter(token.id, id)
+          }}
+        >
+          + Create NPC character sheet
+        </button>
       )}
 
       {isDm && (

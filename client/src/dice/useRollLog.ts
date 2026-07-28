@@ -13,6 +13,10 @@ export interface UseRollLogResult {
    * convention as scenes/other lists in this app, not a Y.Array. */
   rolls: RollRecord[]
   pushRoll: (roll: Omit<RollRecord, 'id' | 'createdAt'>) => void
+  /** Patches an existing roll — used for attack-resolution follow-ups (DM
+   * marking hit/miss, flagging damage applied) rather than creating a new
+   * roll each time. */
+  updateRoll: (id: string, patch: Partial<Omit<RollRecord, 'id'>>) => void
 }
 
 /**
@@ -59,5 +63,16 @@ export function useRollLog(doc: Y.Doc | null, isDm: boolean): UseRollLogResult {
     [doc],
   )
 
-  return { rolls, pushRoll }
+  const updateRoll = useCallback(
+    (id: string, patch: Partial<Omit<RollRecord, 'id'>>) => {
+      if (!doc) return
+      const rollsM = rollsMap(doc)
+      const roll = rollsM.get(id)
+      if (!roll) return
+      rollsM.set(id, { ...roll, ...patch })
+    },
+    [doc],
+  )
+
+  return { rolls, pushRoll, updateRoll }
 }

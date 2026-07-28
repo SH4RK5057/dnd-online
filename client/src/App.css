@@ -130,6 +130,74 @@
   color: #a13333;
 }
 
+.character-sheet__death-saves {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.character-sheet__death-dot,
+.character-sheet__death-dot--filled {
+  font-size: 16px;
+  margin-right: 2px;
+}
+
+.character-sheet__death-dot {
+  opacity: 0.25;
+}
+
+.character-sheet__death-dot--filled {
+  color: firebrick;
+}
+
+.attack-roll-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.attack-roll-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.roll-log__attack {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  padding: 4px 0 4px 12px;
+}
+
+.roll-log__outcome {
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.roll-log__outcome--pending {
+  background: color-mix(in srgb, goldenrod 30%, transparent);
+  color: #8a6d00;
+}
+
+.roll-log__outcome--hit {
+  background: color-mix(in srgb, seagreen 25%, transparent);
+  color: #1e6b45;
+}
+
+.roll-log__outcome--miss {
+  background: color-mix(in srgb, firebrick 20%, transparent);
+  color: #a13333;
+}
+
 .character-sheet__identity {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

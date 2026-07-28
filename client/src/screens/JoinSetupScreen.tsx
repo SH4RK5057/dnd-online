@@ -5,6 +5,7 @@ import { importCharacterFromFile, listStandaloneCharacters, saveStandaloneCharac
 import { savePendingCharacterBind } from '../character/pendingBind'
 import { CharacterSheet } from '../components/CharacterSheet'
 import { useCompendium } from '../content/useCompendium'
+import { parseNotation, rollNotation } from '../dice/notation'
 import type { CharacterRecord } from '../character/types'
 
 export function JoinSetupScreen({
@@ -128,6 +129,7 @@ export function JoinSetupScreen({
               canRoll={false}
               onUpdate={handleUpdateEditingCharacter}
               onQuickRoll={() => {}}
+              onRawRoll={(_label, notation) => rollNotation(parseNotation(notation), 'normal').total}
               races={races}
               classes={classes}
               subclasses={subclasses}

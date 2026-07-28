@@ -14,6 +14,28 @@ export interface RollTerm {
   kept: number[]
 }
 
+/** Attached to a weapon attack roll's RollRecord — carries everything the
+ * roll log needs to show hit/miss and, once hit, roll+apply damage without
+ * re-deriving the attacker's weapon stats later (they're snapshotted here
+ * at roll time instead). */
+export interface AttackContext {
+  targetTokenId: string
+  targetName: string
+  weaponName: string
+  /** e.g. "1d8" */
+  damageDice: string
+  /** Ability modifier + the weapon's flat damageBonus, combined. */
+  damageBonus: number
+  /** Null when the target's AC couldn't be resolved (e.g. an unlinked
+   * token with no ac set) — auto-resolve can't run, so outcome stays
+   * 'pending' regardless of the campaign setting. */
+  targetAc: number | null
+  /** 'pending' until either auto-resolve compares total vs targetAc at
+   * roll time, or the DM marks it manually. */
+  outcome: 'pending' | 'hit' | 'miss'
+  damageApplied: boolean
+}
+
 export interface RollRecord {
   id: string
   playerId: string
@@ -33,6 +55,8 @@ export interface RollRecord {
    * UI-level visibility check) but only rendered for the roller and the
    * DM; everyone else's client just doesn't show the entry. */
   private: boolean
+  /** Set only on weapon-attack rolls — see AttackContext's doc comment. */
+  attackContext?: AttackContext
   createdAt: number
 }
 

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyAbilityScoreImprovement,
+  applyDamage,
   applyRacialBonus,
   casterTypeForClass,
   combineAbilityBonuses,
   computeChosenAbilityBonuses,
   computeClassResourceGrants,
+  computeDamagePatch,
   computeInitiativeBonus,
   computeMaxHp,
   computeModifier,
@@ -13,6 +15,7 @@ import {
   computeSaveBonus,
   computeSkillBonus,
   computeSpellSlotsByLevel,
+  deathSaveResetPatch,
   isValidAbilityScoreImprovement,
   isValidPointBuy,
   isValidStandardArray,
@@ -20,6 +23,7 @@ import {
   normalizeCharacterRecord,
   parseHitDiceCount,
   pointBuyCost,
+  resolveTokenAc,
   resolveTokenHp,
   xpToLevel,
 } from './rules'
@@ -91,6 +95,10 @@ function baseCharacter(): CharacterRecord {
     spells: [],
     feats: [],
     overrides: [],
+    deathSaves: { successes: 0, failures: 0 },
+    concentratingOn: '',
+    pendingConcentrationCheckDc: null,
+    weapons: [],
     createdAt: 0,
   }
 }
@@ -202,6 +210,106 @@ describe('resolveTokenHp', () => {
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toBeNull()
+  })
+})
+
+describe('resolveTokenAc', () => {
+  const character = baseCharacter()
+  const charactersById = new Map([[character.id, character]])
+  const baseToken: TokenRecord = {
+    id: 't1',
+    sceneId: 's1',
+    name: 'Hero',
+    assetId: null,
+    sizeCategory: 'medium',
+    x: 0,
+    y: 0,
+    ownerId: 'p1',
+    characterId: null,
+    hp: null,
+    conditions: [],
+    initiative: null,
+    monsterKey: null,
+    ac: null,
+    speed: null,
+    description: '',
+    hidden: false,
+    z: 0,
+    createdAt: 0,
+  }
+
+  it('reads from the linked character when characterId is set', () => {
+    expect(resolveTokenAc({ ...baseToken, characterId: character.id }, charactersById)).toBe(16)
+  })
+
+  it('reads from the token directly when unlinked', () => {
+    expect(resolveTokenAc({ ...baseToken, ac: 13 }, charactersById)).toBe(13)
+  })
+
+  it('returns null when unlinked and no ac is set', () => {
+    expect(resolveTokenAc(baseToken, charactersById)).toBeNull()
+  })
+})
+
+describe('applyDamage', () => {
+  it('drains temp HP before current HP', () => {
+    expect(applyDamage({ current: 10, max: 10, temp: 5 }, 3)).toEqual({ current: 10, max: 10, temp: 2 })
+    expect(applyDamage({ current: 10, max: 10, temp: 5 }, 8)).toEqual({ current: 7, max: 10, temp: 0 })
+  })
+
+  it('clamps current HP at 0, never negative', () => {
+    expect(applyDamage({ current: 5, max: 10, temp: 0 }, 20)).toEqual({ current: 0, max: 10, temp: 0 })
+  })
+
+  it('is a no-op for zero or negative amounts', () => {
+    const hp = { current: 5, max: 10, temp: 0 }
+    expect(applyDamage(hp, 0)).toBe(hp)
+    expect(applyDamage(hp, -3)).toBe(hp)
+  })
+})
+
+describe('deathSaveResetPatch', () => {
+  it('resets death saves once current HP moves back above 0', () => {
+    const c = { deathSaves: { successes: 1, failures: 2 } }
+    expect(deathSaveResetPatch(c, 5)).toEqual({ deathSaves: { successes: 0, failures: 0 } })
+  })
+
+  it('is a no-op when still at 0 HP or nothing to reset', () => {
+    expect(deathSaveResetPatch({ deathSaves: { successes: 1, failures: 0 } }, 0)).toEqual({})
+    expect(deathSaveResetPatch({ deathSaves: { successes: 0, failures: 0 } }, 5)).toEqual({})
+  })
+})
+
+describe('computeDamagePatch', () => {
+  it('applies damage to HP', () => {
+    const c = { ...baseCharacter(), hp: { current: 10, max: 44, temp: 0 } }
+    expect(computeDamagePatch(c, 4).hp).toEqual({ current: 6, max: 44, temp: 0 })
+  })
+
+  it('flags a pending concentration check at max(10, floor(damage/2)) when concentrating', () => {
+    const c = { ...baseCharacter(), concentratingOn: 'Fireball' }
+    expect(computeDamagePatch(c, 30).pendingConcentrationCheckDc).toBe(15)
+    expect(computeDamagePatch(c, 4).pendingConcentrationCheckDc).toBe(10)
+  })
+
+  it('does not flag a concentration check when not concentrating', () => {
+    const c = baseCharacter()
+    expect(computeDamagePatch(c, 10).pendingConcentrationCheckDc).toBeUndefined()
+  })
+})
+
+describe('normalizeCharacterRecord', () => {
+  it('backfills death saves, concentration, and weapons on an older record', () => {
+    const legacy = baseCharacter() as unknown as Record<string, unknown>
+    delete legacy.deathSaves
+    delete legacy.concentratingOn
+    delete legacy.pendingConcentrationCheckDc
+    delete legacy.weapons
+    const normalized = normalizeCharacterRecord(legacy as unknown as CharacterRecord)
+    expect(normalized.deathSaves).toEqual({ successes: 0, failures: 0 })
+    expect(normalized.concentratingOn).toBe('')
+    expect(normalized.pendingConcentrationCheckDc).toBeNull()
+    expect(normalized.weapons).toEqual([])
   })
 })
 

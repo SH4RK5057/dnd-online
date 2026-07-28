@@ -37,6 +37,10 @@ function baseCharacter(overrides: Partial<CharacterRecord> = {}): CharacterRecor
     spells: [],
     feats: [],
     overrides: [],
+    deathSaves: { successes: 0, failures: 0 },
+    concentratingOn: '',
+    pendingConcentrationCheckDc: null,
+    weapons: [],
     createdAt: 0,
     ...overrides,
   }

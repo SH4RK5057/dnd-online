@@ -203,3 +203,27 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     initTokenFromMonster,
   }
 }
+
+/** Every token across every scene in this doc, unfiltered — for consumers
+ * (e.g. RollLog's attack-damage application) that need to look up a token
+ * by id without already knowing which scene it's on. The setter functions
+ * from useTokens work regardless of the sceneId passed to it (patchToken
+ * only ever looks a token up by id), so callers needing both reads and
+ * writes across scenes can pair this with `useTokens(doc, null)`. */
+export function useAllTokens(doc: Y.Doc | null): TokenRecord[] {
+  const [allTokens, setAllTokens] = useState<TokenRecord[]>([])
+
+  useEffect(() => {
+    if (!doc) {
+      setAllTokens([])
+      return
+    }
+    const tokensM = tokensMap(doc)
+    const sync = () => setAllTokens(Array.from(tokensM.values()))
+    sync()
+    tokensM.observe(sync)
+    return () => tokensM.unobserve(sync)
+  }, [doc])
+
+  return allTokens
+}

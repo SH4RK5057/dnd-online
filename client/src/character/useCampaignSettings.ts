@@ -9,6 +9,11 @@ export interface CampaignSettingsRecord {
    * "just rest it off" shouldn't be available. Read as `?? true` so a
    * campaign that predates this field defaults to allowed. */
   restsEnabled: boolean
+  /** When true, a weapon attack roll immediately compares its total to the
+   * target's AC and sets hit/miss itself; when false, the DM decides hit or
+   * miss manually from the roll log. Read as `?? true` so a campaign that
+   * predates this field defaults to auto-resolving. */
+  autoResolveAttacksEnabled: boolean
 }
 
 function settingsMap(doc: Y.Doc) {
@@ -16,12 +21,13 @@ function settingsMap(doc: Y.Doc) {
 }
 
 function defaultSettings(): CampaignSettingsRecord {
-  return { restsEnabled: true }
+  return { restsEnabled: true, autoResolveAttacksEnabled: true }
 }
 
 export interface UseCampaignSettingsResult {
   settings: CampaignSettingsRecord
   setRestsEnabled: (enabled: boolean) => void
+  setAutoResolveAttacksEnabled: (enabled: boolean) => void
 }
 
 /** Campaign-wide DM preferences that don't belong to any single scene or
@@ -51,5 +57,14 @@ export function useCampaignSettings(doc: Y.Doc | null): UseCampaignSettingsResul
     [doc],
   )
 
-  return { settings, setRestsEnabled }
+  const setAutoResolveAttacksEnabled = useCallback(
+    (enabled: boolean) => {
+      if (!doc) return
+      const m = settingsMap(doc)
+      m.set(SETTINGS_KEY, { ...defaultSettings(), ...m.get(SETTINGS_KEY), autoResolveAttacksEnabled: enabled })
+    },
+    [doc],
+  )
+
+  return { settings, setRestsEnabled, setAutoResolveAttacksEnabled }
 }

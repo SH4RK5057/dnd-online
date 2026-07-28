@@ -11,6 +11,7 @@ import {
 import type { CharacterRecord } from '../character/types'
 import { CharacterSheet } from '../components/CharacterSheet'
 import { useCompendium } from '../content/useCompendium'
+import { parseNotation, rollNotation } from '../dice/notation'
 
 /** Standalone character creation/editing, fully decoupled from any active
  * campaign — reachable from the landing screen before hosting or joining a
@@ -112,6 +113,7 @@ export function CharacterManagerScreen({ onBack }: { onBack: () => void }) {
                 canRoll={false}
                 onUpdate={handleUpdate}
                 onQuickRoll={() => {}}
+                onRawRoll={(_label, notation) => rollNotation(parseNotation(notation), 'normal').total}
                 races={races}
                 classes={classes}
                 subclasses={subclasses}

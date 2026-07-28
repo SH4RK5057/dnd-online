@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AbilityKey, AbilityScores, CharacterRecord, SkillId, SkillProficiency } from '../character/types'
+import type { AbilityKey, AbilityScores, CharacterRecord, SkillId, SkillProficiency, WeaponEntry } from '../character/types'
 import { ABILITY_LABELS, SKILL_LABELS } from '../character/types'
 import {
   applyAbilityScoreImprovement,
@@ -68,6 +68,7 @@ export function CharacterSheet({
   canRoll,
   onUpdate,
   onQuickRoll,
+  onRawRoll,
   inventoryActions,
   otherCharacters,
   races,
@@ -85,6 +86,11 @@ export function CharacterSheet({
   canRoll: boolean
   onUpdate: (patch: Partial<Omit<CharacterRecord, 'id'>>) => void
   onQuickRoll: (label: string, notation: string, category: RollCategory) => void
+  /** Like onQuickRoll, but rolls "now" and hands back the raw total instead
+   * of only logging it — needed wherever the sheet has to branch on the
+   * actual result (death saves' nat 20/nat 1, whether a concentration save
+   * met its DC), which onQuickRoll's fire-and-forget shape can't support. */
+  onRawRoll: (label: string, notation: string) => number
   /** Omitted in the standalone (pre-campaign) character editor — there's no
    * shared doc or other characters to log/transfer against there, so
    * inventory add/remove falls back to plain onUpdate with no history. */
@@ -452,6 +458,60 @@ export function CharacterSheet({
 
   function handleRemoveOverride(id: string) {
     onUpdate({ overrides: character.overrides.filter((o) => o.id !== id) })
+  }
+
+  /** 5e death-save rules: natural 20 stabilizes AND heals to 1 HP outright;
+   * natural 1 counts as two failures; a plain 10+ is a success, anything
+   * else a failure. Both counters cap at 3 — a 3rd success stabilizes
+   * (tracker just stays maxed until HP changes again), a 3rd failure means
+   * dead (this app doesn't hard-block further play on that, just shows it). */
+  function handleDeathSaveRoll() {
+    const d20 = onRawRoll('Death Saving Throw', '1d20')
+    if (d20 === 20) {
+      onUpdate({ hp: { ...character.hp, current: 1 }, deathSaves: { successes: 0, failures: 0 } })
+      return
+    }
+    if (d20 === 1) {
+      onUpdate({ deathSaves: { ...character.deathSaves, failures: Math.min(3, character.deathSaves.failures + 2) } })
+      return
+    }
+    if (d20 >= 10) {
+      onUpdate({ deathSaves: { ...character.deathSaves, successes: Math.min(3, character.deathSaves.successes + 1) } })
+    } else {
+      onUpdate({ deathSaves: { ...character.deathSaves, failures: Math.min(3, character.deathSaves.failures + 1) } })
+    }
+  }
+
+  /** Rolls the Constitution save the sheet is prompting for (set by
+   * character/rules.ts computeDamagePatch when this character took damage
+   * while concentrating) — meeting or beating the DC keeps concentration,
+   * falling short breaks it. Either way the prompt itself clears. */
+  function handleConcentrationSaveRoll() {
+    const dc = character.pendingConcentrationCheckDc
+    if (dc === null) return
+    const bonus = computeSaveBonus(character, 'con')
+    const total = onRawRoll('Concentration save', `1d20${bonus >= 0 ? '+' : ''}${bonus}`)
+    onUpdate(total >= dc ? { pendingConcentrationCheckDc: null } : { concentratingOn: '', pendingConcentrationCheckDc: null })
+  }
+
+  function handleAddWeapon() {
+    const weapon: WeaponEntry = {
+      id: crypto.randomUUID(),
+      name: '',
+      attackAbility: 'str',
+      damageDice: '1d6',
+      damageBonus: 0,
+      proficient: true,
+    }
+    onUpdate({ weapons: [...character.weapons, weapon] })
+  }
+
+  function handleUpdateWeapon(id: string, patch: Partial<Omit<WeaponEntry, 'id'>>) {
+    onUpdate({ weapons: character.weapons.map((w) => (w.id === id ? { ...w, ...patch } : w)) })
+  }
+
+  function handleRemoveWeapon(id: string) {
+    onUpdate({ weapons: character.weapons.filter((w) => w.id !== id) })
   }
 
   return (
@@ -944,6 +1004,65 @@ export function CharacterSheet({
             )}
           </div>
 
+          <h3>Weapons</h3>
+          <ul className="character-sheet__row-list">
+            {character.weapons.map((weapon) => (
+              <li key={weapon.id} className="character-sheet__row">
+                <input
+                  placeholder="Name (e.g. Longsword)"
+                  value={weapon.name}
+                  disabled={!canEdit}
+                  onChange={(e) => handleUpdateWeapon(weapon.id, { name: e.target.value })}
+                />
+                <select
+                  value={weapon.attackAbility}
+                  disabled={!canEdit}
+                  onChange={(e) => handleUpdateWeapon(weapon.id, { attackAbility: e.target.value as AbilityKey })}
+                >
+                  {ABILITY_KEYS.map((key) => (
+                    <option key={key} value={key}>
+                      {ABILITY_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  placeholder="Damage dice (e.g. 1d8)"
+                  value={weapon.damageDice}
+                  disabled={!canEdit}
+                  onChange={(e) => handleUpdateWeapon(weapon.id, { damageDice: e.target.value })}
+                />
+                <label>
+                  Dmg bonus
+                  <input
+                    type="number"
+                    value={weapon.damageBonus}
+                    disabled={!canEdit}
+                    onChange={(e) => handleUpdateWeapon(weapon.id, { damageBonus: Number(e.target.value) })}
+                  />
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={weapon.proficient}
+                    disabled={!canEdit}
+                    onChange={(e) => handleUpdateWeapon(weapon.id, { proficient: e.target.checked })}
+                  />
+                  Proficient
+                </label>
+                {canEdit && (
+                  <button type="button" onClick={() => handleRemoveWeapon(weapon.id)}>
+                    Remove
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {canEdit && (
+            <button type="button" onClick={handleAddWeapon}>
+              Add weapon
+            </button>
+          )}
+
           <h3>Hit points</h3>
           <div className="character-sheet__hp">
             <label>
@@ -952,9 +1071,15 @@ export function CharacterSheet({
                 type="number"
                 value={character.hp.current}
                 disabled={!canEdit}
-                onChange={(e) =>
-                  onUpdate({ hp: { ...character.hp, current: Math.max(0, Math.min(character.hp.max + character.hp.temp, Number(e.target.value))) } })
-                }
+                onChange={(e) => {
+                  const nextCurrent = Math.max(0, Math.min(character.hp.max + character.hp.temp, Number(e.target.value)))
+                  onUpdate({
+                    hp: { ...character.hp, current: nextCurrent },
+                    ...(nextCurrent > 0 && (character.deathSaves.successes > 0 || character.deathSaves.failures > 0)
+                      ? { deathSaves: { successes: 0, failures: 0 } }
+                      : {}),
+                  })
+                }}
               />
             </label>
             <label>
@@ -982,6 +1107,62 @@ export function CharacterSheet({
               />
             </label>
           </div>
+
+          {character.hp.current === 0 && (
+            <>
+              <h3>Death saves</h3>
+              <div className="character-sheet__death-saves">
+                <span>
+                  Successes:{' '}
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className={i < character.deathSaves.successes ? 'character-sheet__death-dot--filled' : 'character-sheet__death-dot'}>
+                      ●
+                    </span>
+                  ))}
+                </span>
+                <span>
+                  Failures:{' '}
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className={i < character.deathSaves.failures ? 'character-sheet__death-dot--filled' : 'character-sheet__death-dot'}>
+                      ●
+                    </span>
+                  ))}
+                </span>
+                {character.deathSaves.successes >= 3 && <span className="character-sheet__hint">Stabilized.</span>}
+                {character.deathSaves.failures >= 3 && <span className="character-sheet__hint">Dead.</span>}
+                {canEdit && character.deathSaves.successes < 3 && character.deathSaves.failures < 3 && (
+                  <button type="button" onClick={handleDeathSaveRoll}>
+                    Roll Death Save
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          <h3>Concentration</h3>
+          <div className="character-sheet__row">
+            <input
+              placeholder="Concentrating on (spell name)"
+              value={character.concentratingOn}
+              disabled={!canEdit}
+              onChange={(e) => onUpdate({ concentratingOn: e.target.value })}
+            />
+            {canEdit && character.concentratingOn && (
+              <button type="button" onClick={() => onUpdate({ concentratingOn: '', pendingConcentrationCheckDc: null })}>
+                Clear
+              </button>
+            )}
+          </div>
+          {character.pendingConcentrationCheckDc !== null && (
+            <p className="character-sheet__hint">
+              Concentration check needed (DC {character.pendingConcentrationCheckDc}) — you took damage while concentrating.
+              {canEdit && (
+                <button type="button" onClick={handleConcentrationSaveRoll}>
+                  Roll Constitution save
+                </button>
+              )}
+            </p>
+          )}
 
           <h3>Resources</h3>
           <ul className="character-sheet__row-list">

@@ -23,6 +23,7 @@ import { resolveEffectiveMode, type RollCategory } from '../dice/conditions'
 import type { RollMode } from '../dice/types'
 import type { CharacterRecord } from '../character/types'
 import { CharacterSheet } from './CharacterSheet'
+import { AttackRollPanel } from './AttackRollPanel'
 
 /** In-session: shows the viewer's own campaign character (auto-found by
  * ownerId — this IS the "auto-reconnect to your assigned campaign
@@ -43,7 +44,7 @@ export function CharacterPanel() {
   const { races, classes, subclasses, backgrounds } = useCompendium(doc)
   const { pushRoll } = useRollLog(doc, isDm)
   const inventoryActions = useInventoryActions(doc, isDm)
-  const { settings: campaignSettings, setRestsEnabled } = useCampaignSettings(doc)
+  const { settings: campaignSettings, setRestsEnabled, setAutoResolveAttacksEnabled } = useCampaignSettings(doc)
 
   const [standaloneList, setStandaloneList] = useState(() => listStandaloneCharacters())
   const [selectedStandaloneId, setSelectedStandaloneId] = useState('')
@@ -158,6 +159,23 @@ export function CharacterPanel() {
     }
   }
 
+  const handleRawRoll = (label: string, notation: string): number => {
+    const result = rollNotation(parseNotation(notation), 'normal')
+    pushRoll({
+      playerId: myPlayerId,
+      playerName: session?.displayName ?? 'Player',
+      label,
+      notation,
+      mode: 'normal',
+      terms: result.terms,
+      modifier: result.modifier,
+      total: result.total,
+      requestedBy: null,
+      private: false,
+    })
+    return result.total
+  }
+
   const canRest = campaignSettings.restsEnabled ?? true
   const diceAvailable = hitDiceAvailable(character)
 
@@ -213,6 +231,17 @@ export function CharacterPanel() {
         </label>
       )}
 
+      {isDm && (
+        <label className="character-panel__rests-toggle">
+          <input
+            type="checkbox"
+            checked={campaignSettings.autoResolveAttacksEnabled ?? true}
+            onChange={(e) => setAutoResolveAttacksEnabled(e.target.checked)}
+          />
+          Auto-resolve attacks (compare roll to target AC automatically)
+        </label>
+      )}
+
       <div className="character-panel__rest-row">
         <button type="button" onClick={handleLongRest} disabled={!canRest}>
           Long rest
@@ -234,12 +263,27 @@ export function CharacterPanel() {
 
       {combat.active && !isMyTurn && <p className="character-sheet__hint">It's not your turn — quick-roll buttons are disabled.</p>}
       {!activeScene && <p className="character-sheet__hint">No active scene.</p>}
+
+      <h3>Attack</h3>
+      <AttackRollPanel
+        character={character}
+        targets={tokens.filter((t) => t.id !== myToken?.id)}
+        charactersById={new Map(characters.map((c) => [c.id, c]))}
+        actingConditions={myToken?.conditions ?? []}
+        autoResolveEnabled={campaignSettings.autoResolveAttacksEnabled ?? true}
+        canRoll={canRoll}
+        playerId={myPlayerId}
+        playerName={session?.displayName ?? 'Player'}
+        pushRoll={pushRoll}
+      />
+
       <CharacterSheet
         character={character}
         canEdit={isDm || character.ownerId === myPlayerId}
         canRoll={canRoll}
         onUpdate={handleUpdate}
         onQuickRoll={handleQuickRoll}
+        onRawRoll={handleRawRoll}
         inventoryActions={inventoryActions}
         otherCharacters={characters.filter((c) => c.id !== character.id).map((c) => ({ id: c.id, name: c.name }))}
         races={races}

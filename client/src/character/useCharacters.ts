@@ -17,6 +17,12 @@ export interface UseCharactersResult {
   /** Clones a standalone character (see standaloneStorage.ts) into this
    * campaign's doc, locked so its blueprint can't be edited mid-session. */
   bindCharacter: (standalone: CharacterRecord, ownerId: string, campaignId: string) => string
+  /** Creates a full character sheet directly in the campaign doc, owned by
+   * no real player (ownerId `'npc'`) — for DM-controlled NPCs that need the
+   * same abilities/inventory/spells mechanics a player character has,
+   * beyond what a monsterKey stat-block link offers. Unlocked, since a DM
+   * should always be able to freely edit an NPC's sheet. */
+  createNpcCharacter: (name: string, campaignId: string) => string
   updateCharacter: (characterId: string, patch: Partial<Omit<CharacterRecord, 'id'>>) => void
   deleteCharacter: (characterId: string) => void
   reassignOwner: (characterId: string, ownerId: string) => void
@@ -64,6 +70,17 @@ export function useCharacters(doc: Y.Doc | null): UseCharactersResult {
     [doc],
   )
 
+  const createNpcCharacter = useCallback(
+    (name: string, campaignId: string): string => {
+      if (!doc) throw new Error('No active session.')
+      const id = crypto.randomUUID()
+      const record: CharacterRecord = { ...newBlankCharacter('npc', name), id, campaignId, locked: false }
+      charactersMap(doc).set(id, record)
+      return id
+    },
+    [doc],
+  )
+
   const updateCharacter = useCallback(
     (characterId: string, patch: Partial<Omit<CharacterRecord, 'id'>>) => {
       if (!doc) return
@@ -88,7 +105,7 @@ export function useCharacters(doc: Y.Doc | null): UseCharactersResult {
     [updateCharacter],
   )
 
-  return { characters, myCharacter, bindCharacter, updateCharacter, deleteCharacter, reassignOwner }
+  return { characters, myCharacter, bindCharacter, createNpcCharacter, updateCharacter, deleteCharacter, reassignOwner }
 }
 
 export function newBlankCharacter(ownerId: string, name: string): CharacterRecord {
@@ -125,6 +142,10 @@ export function newBlankCharacter(ownerId: string, name: string): CharacterRecor
     spells: [],
     feats: [],
     overrides: [],
+    deathSaves: { successes: 0, failures: 0 },
+    concentratingOn: '',
+    pendingConcentrationCheckDc: null,
+    weapons: [],
     createdAt: Date.now(),
   }
 }

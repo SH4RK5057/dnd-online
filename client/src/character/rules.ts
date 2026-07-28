@@ -19,7 +19,11 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     character.subclassName !== undefined &&
     character.xp !== undefined &&
     character.featureChoices &&
-    character.overrides
+    character.overrides &&
+    character.deathSaves &&
+    character.concentratingOn !== undefined &&
+    character.pendingConcentrationCheckDc !== undefined &&
+    character.weapons
   ) {
     return character
   }
@@ -32,6 +36,10 @@ export function normalizeCharacterRecord(character: CharacterRecord): CharacterR
     resolvedAsiLevels: character.resolvedAsiLevels ?? [],
     featureChoices: character.featureChoices ?? {},
     overrides: character.overrides ?? [],
+    deathSaves: character.deathSaves ?? { successes: 0, failures: 0 },
+    concentratingOn: character.concentratingOn ?? '',
+    pendingConcentrationCheckDc: character.pendingConcentrationCheckDc ?? null,
+    weapons: character.weapons ?? [],
   }
 }
 
@@ -112,6 +120,64 @@ export function resolveTokenHp(token: TokenRecord, charactersById: Map<string, C
   }
   if (token.hp) return { ...token.hp, fromCharacter: false }
   return null
+}
+
+/**
+ * Same split as resolveTokenHp: a character-linked token's AC lives on the
+ * CharacterRecord, an unlinked token's on itself. Used to compare an attack
+ * roll's total against a target's AC for auto-resolve.
+ */
+export function resolveTokenAc(token: TokenRecord, charactersById: Map<string, CharacterRecord>): number | null {
+  if (token.characterId) {
+    const character = charactersById.get(token.characterId)
+    return character ? character.ac : null
+  }
+  return token.ac
+}
+
+/** Applies damage through temp HP first, then current HP, clamped at 0 —
+ * healing (amount <= 0) is a no-op here, this is damage-application only. */
+export function applyDamage(
+  hp: { current: number; max: number; temp: number },
+  amount: number,
+): { current: number; max: number; temp: number } {
+  if (amount <= 0) return hp
+  const fromTemp = Math.min(hp.temp, amount)
+  const remaining = amount - fromTemp
+  return { ...hp, temp: hp.temp - fromTemp, current: Math.max(0, hp.current - remaining) }
+}
+
+/** Patch for whenever a character's current HP is being SET to a new value
+ * (heal, rest, manual edit) — resets death saves once current HP moves back
+ * above 0, since a stable/healed character no longer needs to track them.
+ * A no-op patch (`{}`) when there's nothing to reset, so every call site can
+ * spread this in unconditionally. */
+export function deathSaveResetPatch(
+  character: Pick<CharacterRecord, 'deathSaves'>,
+  nextCurrentHp: number,
+): Partial<Pick<CharacterRecord, 'deathSaves'>> {
+  if (nextCurrentHp > 0 && (character.deathSaves.successes > 0 || character.deathSaves.failures > 0)) {
+    return { deathSaves: { successes: 0, failures: 0 } }
+  }
+  return {}
+}
+
+/**
+ * The shared damage-application path for a character-linked target (attack
+ * resolution, or anything else that deals damage to a character): applies
+ * the damage to HP, resets death saves if this brought current HP back
+ * above 0 (rare for damage specifically, but harmless to check), and — the
+ * actual point of this helper — flags a pending concentration check
+ * (5e rule: DC = max(10, floor(damage/2))) if the character was
+ * concentrating on something when they took the hit.
+ */
+export function computeDamagePatch(character: CharacterRecord, amount: number): Partial<CharacterRecord> {
+  const hp = applyDamage(character.hp, amount)
+  const patch: Partial<CharacterRecord> = { hp, ...deathSaveResetPatch(character, hp.current) }
+  if (amount > 0 && character.concentratingOn) {
+    patch.pendingConcentrationCheckDc = Math.max(10, Math.floor(amount / 2))
+  }
+  return patch
 }
 
 export function emptyAbilityScores(): AbilityScores {
