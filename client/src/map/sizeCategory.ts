@@ -1,5 +1,12 @@
 import { SIZE_FOOTPRINT_CELLS, SIZE_RENDER_SCALE } from './constants'
-import type { SizeCategory } from './types'
+import type { SizeCategory, TokenRecord } from './types'
+
+/** World units per footprint-cell of standing-mini height in the 3D
+ * flat-plane view (canvas3d/Scene3D.tsx) — tuned so a medium creature reads
+ * as a believable tabletop mini relative to a 1-cell plane square, not so
+ * tall it looks like a tower. Only used when a token has no explicit
+ * modelHeightCells override (see resolveModelHeight). */
+const AUTO_MODEL_HEIGHT_PER_FOOTPRINT_CELL = 0.85
 
 /** Token's on-screen footprint in grid cells (width == height, tokens are square). */
 export function footprintCells(size: SizeCategory): number {
@@ -58,4 +65,17 @@ export function rectanglesOverlap(a: CellRect, b: CellRect): boolean {
  * this centers the point within the NxN block instead of just one cell. */
 export function snapToSlot(raw: number, footprintInCells: number): number {
   return Math.floor(raw - (footprintInCells - 1) / 2)
+}
+
+/** A token's standing height in the 3D flat-plane view (canvas3d/Scene3D.tsx),
+ * in grid-cell world units. `modelHeightCells` (DM-set, see TokenRecord's
+ * doc comment) always wins when set — a direct size override, not a
+ * multiplier, so the DM doesn't have to do scale-factor math for an
+ * oddly-proportioned STL. Otherwise falls back to an automatic size derived
+ * from sizeCategory (or a flat, low height for hazard/trap tokens, which
+ * read as ground markers rather than standing minis). */
+export function resolveModelHeight(token: Pick<TokenRecord, 'sizeCategory' | 'hazardSize' | 'modelHeightCells'>): number {
+  if (token.modelHeightCells !== null) return token.modelHeightCells
+  if (token.hazardSize) return 0.12
+  return footprintCells(token.sizeCategory) * renderScale(token.sizeCategory) * AUTO_MODEL_HEIGHT_PER_FOOTPRINT_CELL
 }

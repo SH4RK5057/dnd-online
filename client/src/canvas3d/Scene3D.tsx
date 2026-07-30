@@ -7,14 +7,10 @@ import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useAssetUrl, subscribeAssetUrl } from '../map/assetSync'
 import { BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS } from '../map/constants'
-import { footprintCells, renderScale, snapToSlot } from '../map/sizeCategory'
+import { footprintCells, resolveModelHeight, snapToSlot } from '../map/sizeCategory'
 import { getCachedModelGeometry, loadModelGeometry } from './modelCache'
 import type { TokenRecord } from '../map/types'
 
-/** World units per footprint-cell of standing-mini height — tuned so a
- * medium creature reads as a believable tabletop mini relative to a 1-cell
- * plane square, not so tall it looks like a tower. */
-const TOKEN_HEIGHT_SCALE = 0.85
 const PLACEHOLDER_COLOR = 0x6b6375
 const HAZARD_COLOR = 0xcc5522
 const STL_COLOR = 0xcfc9bd
@@ -53,11 +49,11 @@ function positionGroup(group: THREE.Group, token: TokenRecord): void {
 }
 
 function applyPlaceholderTransform(mesh: THREE.Mesh, token: TokenRecord): void {
+  const height = resolveModelHeight(token)
   if (token.hazardSize) {
-    mesh.scale.set(token.hazardSize.widthCells, 0.12, token.hazardSize.heightCells)
+    mesh.scale.set(token.hazardSize.widthCells, height, token.hazardSize.heightCells)
   } else {
     const footprint = footprintCells(token.sizeCategory)
-    const height = footprint * renderScale(token.sizeCategory) * TOKEN_HEIGHT_SCALE
     const radius = Math.max(0.3, footprint * 0.4)
     mesh.scale.set(radius, height, radius)
   }
@@ -67,10 +63,7 @@ function applyPlaceholderTransform(mesh: THREE.Mesh, token: TokenRecord): void {
  * height with feet at y=0, so sizing it is just a uniform scale — unlike
  * the placeholder cone/box, which scale non-uniformly by footprint. */
 function applyStlTransform(mesh: THREE.Mesh, token: TokenRecord): void {
-  const height = token.hazardSize
-    ? Math.max(0.5, Math.min(token.hazardSize.widthCells, token.hazardSize.heightCells) * TOKEN_HEIGHT_SCALE)
-    : footprintCells(token.sizeCategory) * renderScale(token.sizeCategory) * TOKEN_HEIGHT_SCALE
-  mesh.scale.setScalar(height)
+  mesh.scale.setScalar(resolveModelHeight(token))
 }
 
 function ensurePlaceholderChild(group: THREE.Group, token: TokenRecord): void {

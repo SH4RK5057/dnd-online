@@ -3,6 +3,7 @@ import { getOrCreatePlayerId } from '../session/lastSession'
 import { useTokens } from '../map/useTokens'
 import { useCharacters } from '../character/useCharacters'
 import { resolveTokenHp } from '../character/rules'
+import { resolveModelHeight } from '../map/sizeCategory'
 import { KNOWN_CONDITIONS } from '../dice/conditions'
 
 /** Inline panel shown when a token is selected on the map — HP, conditions,
@@ -34,6 +35,7 @@ export function TokenHpConditionEditor({
     setTokenPerceptionDc,
     setTokenZ,
     setTokenModel,
+    setTokenModelHeight,
   } = useTokens(doc, sceneId)
   const { characters, updateCharacter, createNpcCharacter } = useCharacters(doc)
 
@@ -143,6 +145,17 @@ export function TokenHpConditionEditor({
               Clear 3D model
             </button>
           )}
+          <label title="Standing height in grid cells for the 3D flat-plane view — overrides the automatic size-category-based height. Leave blank for automatic sizing.">
+            3D model size (grid cells, optional)
+            <input
+              type="number"
+              min={0.1}
+              step={0.1}
+              value={token.modelHeightCells ?? ''}
+              placeholder={`Auto (${resolveModelHeight(token).toFixed(2)})`}
+              onChange={(e) => setTokenModelHeight(token.id, e.target.value === '' ? null : Math.max(0.1, Number(e.target.value)))}
+            />
+          </label>
         </div>
       )}
 

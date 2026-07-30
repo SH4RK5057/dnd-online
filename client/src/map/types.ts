@@ -173,6 +173,13 @@ export interface TokenRecord {
    * falls back to a plain placeholder mini in 3D. Irrelevant to the normal
    * 2D map view, which keeps using `assetId` exactly as before. */
   modelAssetId: string | null
+  /** Explicit standing height, in grid-cell world units, for this token's 3D
+   * flat-plane mesh (STL or placeholder) — overrides the automatic
+   * sizeCategory-derived height (see map/sizeCategory.ts resolveModelHeight).
+   * Null means "automatic." Directly sets the mesh's world-space height
+   * rather than a multiplier, so the DM can size an oddly-proportioned STL
+   * (or just eyeball a look they like) without doing scale-factor math. */
+  modelHeightCells: number | null
   createdAt: number
 }
 

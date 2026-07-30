@@ -459,7 +459,11 @@ real change in constraints.
       drag convention. STL files are assumed Z-up (the near-universal
       convention for 3D-printable miniature files) and auto-normalized to
       stand upright at the correct scale regardless of the original file's
-      real-world dimensions (`canvas3d/modelCache.ts`).
+      real-world dimensions (`canvas3d/modelCache.ts`). Standing height is
+      automatic by sizeCategory by default, but each token can override it
+      directly (`TokenRecord.modelHeightCells`, grid-cell world units — an
+      exact size, not a scale multiplier, so an oddly-proportioned STL
+      doesn't need scale-factor math) via the token editor.
       **v1 limitations, deliberately scoped out:** no fog-of-war/line-of-
       sight masking (every non-hidden token is visible to everyone
       regardless of vision — hidden tokens still stay DM-only); a drag only

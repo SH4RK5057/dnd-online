@@ -181,6 +181,7 @@ describe('resolveTokenHp', () => {
       reactionAvailable: true,
       hazardSize: null,
       modelAssetId: null,
+      modelHeightCells: null,
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toEqual({ max: 44, current: 44, temp: 0, fromCharacter: true })
@@ -210,6 +211,7 @@ describe('resolveTokenHp', () => {
       reactionAvailable: true,
       hazardSize: null,
       modelAssetId: null,
+      modelHeightCells: null,
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toEqual({ max: 7, current: 7, temp: 0, fromCharacter: false })
@@ -239,6 +241,7 @@ describe('resolveTokenHp', () => {
       reactionAvailable: true,
       hazardSize: null,
       modelAssetId: null,
+      modelHeightCells: null,
       createdAt: 0,
     }
     expect(resolveTokenHp(token, charactersById)).toBeNull()
@@ -271,6 +274,7 @@ describe('resolveTokenAc', () => {
     reactionAvailable: true,
     hazardSize: null,
     modelAssetId: null,
+    modelHeightCells: null,
     createdAt: 0,
   }
 

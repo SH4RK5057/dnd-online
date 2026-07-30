@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { rectanglesOverlap, snapToSlot, tokenFootprintRect } from './sizeCategory'
+import { rectanglesOverlap, resolveModelHeight, snapToSlot, tokenFootprintRect } from './sizeCategory'
+import type { TokenRecord } from './types'
+
+function baseToken(overrides: Partial<Pick<TokenRecord, 'sizeCategory' | 'hazardSize' | 'modelHeightCells'>> = {}) {
+  return {
+    sizeCategory: 'medium' as const,
+    hazardSize: null,
+    modelHeightCells: null,
+    ...overrides,
+  }
+}
 
 describe('snapToSlot', () => {
   it('for a 1-cell token, anchors to whichever cell the point falls within (not the nearest grid line)', () => {
@@ -55,5 +65,26 @@ describe('rectanglesOverlap', () => {
     const a = tokenFootprintRect(0, 0, 5, 5)
     const b = tokenFootprintRect(2, 2, 1, 1)
     expect(rectanglesOverlap(a, b)).toBe(true)
+  })
+})
+
+describe('resolveModelHeight', () => {
+  it('uses an explicit modelHeightCells override over everything else', () => {
+    expect(resolveModelHeight(baseToken({ modelHeightCells: 3.5 }))).toBe(3.5)
+    expect(resolveModelHeight(baseToken({ sizeCategory: 'huge', modelHeightCells: 0.5 }))).toBe(0.5)
+    expect(resolveModelHeight(baseToken({ hazardSize: { widthCells: 2, heightCells: 2 }, modelHeightCells: 2 }))).toBe(2)
+  })
+
+  it('gives hazard/trap tokens a flat, low automatic height', () => {
+    expect(resolveModelHeight(baseToken({ hazardSize: { widthCells: 2, heightCells: 3 } }))).toBe(0.12)
+  })
+
+  it('computes an automatic height from sizeCategory when no override is set', () => {
+    // medium: footprint 1 * renderScale 1 * 0.85 = 0.85
+    expect(resolveModelHeight(baseToken({ sizeCategory: 'medium' }))).toBeCloseTo(0.85)
+    // tiny: footprint 1 * renderScale 0.5 * 0.85 = 0.425
+    expect(resolveModelHeight(baseToken({ sizeCategory: 'tiny' }))).toBeCloseTo(0.425)
+    // huge: footprint 3 * renderScale 1 * 0.85 = 2.55
+    expect(resolveModelHeight(baseToken({ sizeCategory: 'huge' }))).toBeCloseTo(2.55)
   })
 })

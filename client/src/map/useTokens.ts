@@ -35,6 +35,8 @@ export interface UseTokensResult {
   /** Uploads (or clears, when `file` is null) the STL 3D model standing in
    * for this token in the 3D flat-plane view — see TokenRecord.modelAssetId. */
   setTokenModel: (tokenId: string, file: File | null) => Promise<void>
+  /** Explicit 3D-view standing height override — see TokenRecord.modelHeightCells. */
+  setTokenModelHeight: (tokenId: string, heightCells: number | null) => void
   assignOwner: (tokenId: string, ownerId: string | null) => void
   linkCharacter: (tokenId: string, characterId: string | null) => void
   setTokenHp: (tokenId: string, hp: { current: number; max: number; temp: number } | null) => void
@@ -113,6 +115,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         reactionAvailable: true,
         hazardSize: input.hazardSize ?? null,
         modelAssetId: null,
+        modelHeightCells: null,
         createdAt: Date.now(),
       }
       tokensMap(doc).set(id, record)
@@ -224,6 +227,11 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     [doc, patchToken],
   )
 
+  const setTokenModelHeight = useCallback(
+    (tokenId: string, heightCells: number | null) => patchToken(tokenId, { modelHeightCells: heightCells }),
+    [patchToken],
+  )
+
   const tokens = sceneId ? allTokens.filter((t) => t.sceneId === sceneId) : []
 
   return {
@@ -236,6 +244,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     moveToken,
     setTokenArt,
     setTokenModel,
+    setTokenModelHeight,
     assignOwner,
     linkCharacter,
     setTokenHp,
