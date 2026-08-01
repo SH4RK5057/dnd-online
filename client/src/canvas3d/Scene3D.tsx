@@ -274,10 +274,22 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     // arrives (MapCanvas needs at least one render pass first).
     applyDims(BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS)
 
+    let refreshCallCount = 0
+    let refreshSuccessCount = 0
     const refreshBoard = () => {
+      refreshCallCount++
       const { getBoardCanvas: getBoard, activeScene: scene2 } = latestRef.current
       const extracted = getBoard?.()
+      ;(window as unknown as Record<string, unknown>).__scene3dDiag = {
+        refreshCallCount,
+        refreshSuccessCount,
+        hasGetBoard: !!getBoard,
+        extractedSize: extracted ? [extracted.width, extracted.height] : null,
+        hasScene: !!scene2,
+        gridSizePx: scene2?.gridSizePx,
+      }
       if (!extracted || extracted.width <= 0 || extracted.height <= 0 || !scene2 || scene2.gridSizePx <= 0) return
+      refreshSuccessCount++
 
       boardCanvas.width = extracted.width
       boardCanvas.height = extracted.height
