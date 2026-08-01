@@ -679,12 +679,13 @@ export function MapCanvas({
   // MapCanvasProps.onBoardCanvasHandle's doc comment for why this exists.
   useEffect(() => {
     if (!onBoardCanvasHandle) return
-    if (!app || !fogTargetRef.current || !tokenTargetRef.current || !mapSize) {
+    if (!app || !fogTargetRef.current || !tokenTargetRef.current || !lightLayerRef.current || !mapSize) {
       onBoardCanvasHandle(null)
       return
     }
     const fogTarget = fogTargetRef.current
     const tokenTarget = tokenTargetRef.current
+    const lightLayerContainer = lightLayerRef.current.container
     const { width, height } = mapSize
 
     const extract = (): HTMLCanvasElement | null => {
@@ -697,8 +698,13 @@ export function MapCanvas({
       if (!ctx) return null
       const terrain = app.renderer.extract.canvas({ target: fogTarget, frame })
       const tokensCanvas = app.renderer.extract.canvas({ target: tokenTarget, frame })
+      // lightLayer.container is never fog-masked (a lit torch/lamp is a
+      // visible object, same as 2D shows it to everyone unmasked), so it's
+      // safe to layer in here too — no DM-only info leaks to players.
+      const lightsCanvas = app.renderer.extract.canvas({ target: lightLayerContainer, frame })
       ctx.drawImage(terrain as unknown as CanvasImageSource, 0, 0)
       ctx.drawImage(tokensCanvas as unknown as CanvasImageSource, 0, 0)
+      ctx.drawImage(lightsCanvas as unknown as CanvasImageSource, 0, 0)
       return combined
     }
 
