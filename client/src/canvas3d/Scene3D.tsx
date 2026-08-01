@@ -295,8 +295,19 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
       const extracted = getBoard?.()
       if (!extracted || extracted.width <= 0 || extracted.height <= 0 || !scene2 || scene2.gridSizePx <= 0) return
 
-      boardCanvas.width = extracted.width
-      boardCanvas.height = extracted.height
+      // Only touch width/height when the size actually changes: assigning
+      // a canvas's width/height resets its backing store even when set to
+      // its current value, and doing that unconditionally on every 200ms
+      // refresh — while a CanvasTexture holds a live reference to this same
+      // canvas — is what was triggering Chrome's
+      // "glCopySubTextureCHROMIUM: Offset overflows texture dimensions"
+      // WebGL error and leaving the GPU-side texture blank/corrupted (the
+      // plane rendering solid black) despite this canvas's own pixels
+      // always being correct.
+      if (boardCanvas.width !== extracted.width || boardCanvas.height !== extracted.height) {
+        boardCanvas.width = extracted.width
+        boardCanvas.height = extracted.height
+      }
       const ctx = boardCanvas.getContext('2d')
       if (!ctx) return
       // The extracted 2D render is mostly transparent outside whatever's
