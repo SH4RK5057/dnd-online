@@ -12,6 +12,15 @@ export interface ParsedNotation {
 }
 
 const TOKEN_RE = /([+-])?\s*(\d*d\d+|\d+)/gi
+/** Generous ceilings on a single dice term's count/sides — well beyond any
+ * legitimate 5e use (weapon/spell damage rarely exceeds low double digits
+ * of dice; even a large freeform group check tops out far below this), but
+ * enough to reject an absurd or typo'd value (e.g. an extra digit) before
+ * it reaches `rollNotation`, which would otherwise happily allocate and
+ * roll an enormous results array — a real perf/hang risk since roll
+ * results get broadcast to every viewer in the session. */
+const MAX_DICE_COUNT = 100
+const MAX_DICE_SIDES = 1000
 
 /** Parses standard dice notation with multiple terms, e.g. "2d6+1d4+3" or
  * "1d20-1". Whitespace around signs is tolerant; a leading term with no
@@ -34,6 +43,9 @@ export function parseNotation(notation: string): ParsedNotation {
       const sides = parseInt(sidesPart, 10)
       if (!Number.isFinite(count) || count <= 0 || !Number.isFinite(sides) || sides <= 0) {
         throw new Error(`Invalid dice term "${match[0]}".`)
+      }
+      if (count > MAX_DICE_COUNT || sides > MAX_DICE_SIDES) {
+        throw new Error(`Dice term "${match[0]}" is out of range (max ${MAX_DICE_COUNT}d${MAX_DICE_SIDES}).`)
       }
       diceTerms.push({ sign, count, sides })
     } else {

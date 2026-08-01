@@ -4,6 +4,12 @@ import type { Currency, LootItemRecord } from './types'
 import type { CharacterRecord } from '../character/types'
 
 const CURRENCY_KEY = 'currency'
+/** Reasonable ceiling per coin denomination — the "+"/"−" steppers have no
+ * other limit, so this keeps the shared purse from growing to an absurd,
+ * clearly-mistaken number (a stuck key, a script) rather than actually
+ * constraining normal play; no real campaign gets anywhere close to this
+ * much of one coin type. */
+const MAX_CURRENCY_PER_DENOMINATION = 999_999
 
 function lootMap(doc: Y.Doc) {
   return doc.getMap<LootItemRecord>('partyLoot')
@@ -111,12 +117,13 @@ export function usePartyLoot(doc: Y.Doc | null): UsePartyLootResult {
       if (!doc) return
       const m = currencyMap(doc)
       const current = { ...defaultCurrency(), ...m.get(CURRENCY_KEY) }
+      const clamp = (value: number) => Math.max(0, Math.min(MAX_CURRENCY_PER_DENOMINATION, value))
       const next: Currency = {
-        pp: Math.max(0, current.pp + (patch.pp ?? 0)),
-        gp: Math.max(0, current.gp + (patch.gp ?? 0)),
-        ep: Math.max(0, current.ep + (patch.ep ?? 0)),
-        sp: Math.max(0, current.sp + (patch.sp ?? 0)),
-        cp: Math.max(0, current.cp + (patch.cp ?? 0)),
+        pp: clamp(current.pp + (patch.pp ?? 0)),
+        gp: clamp(current.gp + (patch.gp ?? 0)),
+        ep: clamp(current.ep + (patch.ep ?? 0)),
+        sp: clamp(current.sp + (patch.sp ?? 0)),
+        cp: clamp(current.cp + (patch.cp ?? 0)),
       }
       m.set(CURRENCY_KEY, next)
     },

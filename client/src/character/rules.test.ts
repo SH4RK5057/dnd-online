@@ -513,19 +513,29 @@ describe('xpToLevel', () => {
 })
 
 describe('isValidAbilityScoreImprovement / applyAbilityScoreImprovement', () => {
+  const mid = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }
+
   it('accepts +2 to one ability', () => {
-    expect(isValidAbilityScoreImprovement({ str: 2 })).toBe(true)
+    expect(isValidAbilityScoreImprovement({ str: 2 }, mid)).toBe(true)
   })
 
   it('accepts +1 to two different abilities', () => {
-    expect(isValidAbilityScoreImprovement({ str: 1, dex: 1 })).toBe(true)
+    expect(isValidAbilityScoreImprovement({ str: 1, dex: 1 }, mid)).toBe(true)
   })
 
   it('rejects +2 to two abilities, an uneven split, or no change', () => {
-    expect(isValidAbilityScoreImprovement({ str: 2, dex: 2 })).toBe(false)
-    expect(isValidAbilityScoreImprovement({ str: 1, dex: 2 })).toBe(false)
-    expect(isValidAbilityScoreImprovement({})).toBe(false)
-    expect(isValidAbilityScoreImprovement({ str: 3 })).toBe(false)
+    expect(isValidAbilityScoreImprovement({ str: 2, dex: 2 }, mid)).toBe(false)
+    expect(isValidAbilityScoreImprovement({ str: 1, dex: 2 }, mid)).toBe(false)
+    expect(isValidAbilityScoreImprovement({}, mid)).toBe(false)
+    expect(isValidAbilityScoreImprovement({ str: 3 }, mid)).toBe(false)
+  })
+
+  it('rejects an improvement that would push a score above the 20 cap', () => {
+    const high = { ...mid, str: 19 }
+    expect(isValidAbilityScoreImprovement({ str: 2 }, high)).toBe(false)
+    expect(isValidAbilityScoreImprovement({ str: 1, dex: 1 }, high)).toBe(true)
+    const atCap = { ...mid, str: 20 }
+    expect(isValidAbilityScoreImprovement({ str: 1, dex: 1 }, atCap)).toBe(false)
   })
 
   it('applies the changes onto base scores', () => {
@@ -533,6 +543,11 @@ describe('isValidAbilityScoreImprovement / applyAbilityScoreImprovement', () => 
     expect(applyAbilityScoreImprovement(base, { str: 1, dex: 1 })).toEqual({
       str: 11, dex: 11, con: 10, int: 10, wis: 10, cha: 10,
     })
+  })
+
+  it('clamps the applied result at 20 even if called with an over-cap change', () => {
+    const base = { str: 19, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }
+    expect(applyAbilityScoreImprovement(base, { str: 2 }).str).toBe(20)
   })
 })
 

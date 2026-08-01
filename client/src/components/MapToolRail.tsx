@@ -103,7 +103,18 @@ export function MapToolRail({
   }
 
   const toggleNonExclusive = (panel: 'tokens') => {
-    setOpenPanel((prev) => (prev === panel ? null : panel))
+    setOpenPanel((prev) => {
+      const next = prev === panel ? null : panel
+      // Opening the tokens panel must actually deactivate Walls/Lights if
+      // either was selected — otherwise `toolMode` stays 'draw-walls'/
+      // 'place-lights' (this panel never sets it itself, since token
+      // placement is staged via a form rather than being its own
+      // exclusive mode — see the class doc comment) and clicks on the map
+      // keep drawing walls/placing lights instead of doing nothing until a
+      // token placement is actually staged.
+      if (next === 'tokens') onToolModeChange('move')
+      return next
+    })
     setCollapsed(false)
   }
 

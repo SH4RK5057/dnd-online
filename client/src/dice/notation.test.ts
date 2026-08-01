@@ -49,6 +49,16 @@ describe('parseNotation', () => {
     expect(() => parseNotation('2d6 + banana')).toThrow()
     expect(() => parseNotation('hello')).toThrow()
   })
+
+  it('accepts a dice term right at the count/sides ceiling', () => {
+    expect(() => parseNotation('100d1000')).not.toThrow()
+  })
+
+  it('throws on an absurd dice term over the count or sides ceiling', () => {
+    expect(() => parseNotation('101d6')).toThrow()
+    expect(() => parseNotation('1d1001')).toThrow()
+    expect(() => parseNotation('999999d999999')).toThrow()
+  })
 })
 
 describe('rollNotation', () => {

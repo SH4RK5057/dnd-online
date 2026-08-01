@@ -289,6 +289,13 @@ export const POINT_BUY_COSTS: Record<number, number> = {
 
 export const POINT_BUY_BUDGET = 27
 
+/** Reasonable ceiling for a character's speed field (feet) — well above
+ * even the fastest SRD creatures' base walking speed, so it never fights a
+ * legitimate character, but still catches a typo like an extra zero from
+ * producing an absurd, obviously-wrong value. Generous headroom is left
+ * for buffs (Haste, magic items) this app doesn't model mechanically. */
+export const MAX_SPEED_FT = 300
+
 /** Total point-buy cost of a set of base scores — Infinity if any score
  * falls outside the buyable 8-15 range, so it always fails a budget check
  * rather than silently underselling an out-of-range score. */
@@ -322,12 +329,21 @@ export function xpToLevel(xp: number): number {
 }
 
 /** A 5e Ability Score Improvement is either +2 to one ability or +1 to two
- * different abilities — never +2 to two abilities, or split any other way. */
-export function isValidAbilityScoreImprovement(changes: Partial<Record<AbilityKey, number>>): boolean {
+ * different abilities — never +2 to two abilities, or split any other way
+ * — and, since this app doesn't model magic items that would justify
+ * going higher, can never push any ability above the 20 hard cap.
+ * `currentScores` is the character's base scores *before* this
+ * improvement, so each change can be checked against what it would
+ * actually become. */
+export function isValidAbilityScoreImprovement(changes: Partial<Record<AbilityKey, number>>, currentScores: AbilityScores): boolean {
   const values = Object.values(changes).filter((v): v is number => typeof v === 'number' && v !== 0)
   if (values.length === 0) return false
   const total = values.reduce((sum, v) => sum + v, 0)
   if (total !== 2 || values.some((v) => v <= 0 || v > 2)) return false
+  const wouldExceedCap = Object.entries(changes).some(
+    ([key, v]) => typeof v === 'number' && currentScores[key as AbilityKey] + v > 20,
+  )
+  if (wouldExceedCap) return false
   if (values.length === 1) return values[0] === 2
   return values.length === 2 && values.every((v) => v === 1)
 }
@@ -335,7 +351,10 @@ export function isValidAbilityScoreImprovement(changes: Partial<Record<AbilityKe
 export function applyAbilityScoreImprovement(base: AbilityScores, changes: Partial<Record<AbilityKey, number>>): AbilityScores {
   const next = { ...base }
   for (const [k, v] of Object.entries(changes)) {
-    if (typeof v === 'number') next[k as AbilityKey] += v
+    // Math.min(20, ...) here too, not just in the validator above — a
+    // second line of defense against the same 20-point 5e hard cap, same
+    // spirit as this file's other clamp-at-the-write-site patterns.
+    if (typeof v === 'number') next[k as AbilityKey] = Math.min(20, next[k as AbilityKey] + v)
   }
   return next
 }

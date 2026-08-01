@@ -583,6 +583,38 @@ real change in constraints.
       Walls tool, matching this app's existing DM-authoritative editing
       convention for walls/lights — not yet toggleable by players
       themselves.
+- [x] Fix: switching *to* the token tool while Walls or Lights was active
+      didn't disable that tool — clicking the Tokens icon in
+      `components/MapToolRail.tsx` only opened the tokens popout, it never
+      called `onToolModeChange`, so `toolMode` stayed `'draw-walls'`/
+      `'place-lights'` and map clicks kept drawing walls/placing lights
+      right up until a token placement was actually staged. Fixed by
+      having `toggleNonExclusive` call `onToolModeChange('move')` whenever
+      it opens the tokens panel.
+- [x] Ability Score Improvement (level-up) can no longer push a score above
+      the 20 hard cap — `isValidAbilityScoreImprovement` now takes the
+      character's current base scores and rejects a change that would
+      exceed 20 for any ability, and `applyAbilityScoreImprovement` clamps
+      at 20 as a second line of defense. (Manual/point-buy free-text entry
+      was already bounded to [3,18]/[8,15] from an earlier pass — this
+      closes the other route to an over-20 score, via repeated ASIs.)
+- [x] Character speed is now capped (`character/rules.ts`'s `MAX_SPEED_FT`
+      = 300 ft, generous headroom above any SRD creature's base speed) —
+      previously a free-text field with no bound at all.
+- [x] Party loot currency is now capped per denomination
+      (`loot/usePartyLoot.ts`'s `MAX_CURRENCY_PER_DENOMINATION`,
+      999,999) — the "+"/"−" steppers had no other limit before this.
+- [x] Custom weapon damage dice are now bounded — `dice/notation.ts`'s
+      `parseNotation` (used by every dice-rolling path in the app: weapon
+      damage, spell damage, the freeform roller, not just custom weapons)
+      rejects a dice term over 100 dice or 1000 sides, which also closes a
+      real perf/hang risk (an absurd term like "999999d999999" would
+      previously have tried to actually roll and broadcast millions of
+      results to every viewer). `components/CharacterSheet.tsx`'s weapon
+      damage-dice field also shows a red outline + tooltip while its
+      current text doesn't parse, so a player sees the problem while
+      editing rather than discovering it as a silently-no-op damage roll
+      during combat.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---
@@ -602,26 +634,10 @@ too much in these spots):**
 - No feat rules/prerequisites
 - Level is freely editable per-character; no DM-set campaign level cap that
   locks players below/at it
-- Ability scores can be set past 20 by hand
-- Speed can be set to an arbitrary/unbounded value
-- Custom weapons can be given arbitrary (e.g. absurd) damage dice
 - Custom items can be created with the same name as an existing compendium item
-- No gold/currency cap — party loot and personal inventory coin fields accept
-  arbitrary values
 - Darkvision isn't modeled at all (race trait exists but has no mechanical effect)
 
 **DM tooling / UX:**
-- Bug: switching *to* the token tool while Walls or Lights is active
-  doesn't disable that tool — clicking the Tokens icon in
-  `components/MapToolRail.tsx` (`toggleNonExclusive`) only opens the
-  tokens popout, it never calls `onToolModeChange`, so `toolMode` stays
-  `'draw-walls'`/`'place-lights'` and clicks on the map keep drawing
-  walls/placing lights right up until a token placement is actually
-  staged (`pendingPlacement` set) and `effectiveToolMode`'s override
-  kicks in. Confirmed still broken after the partial fix above, which
-  only covers the opposite direction (a stale token placement blocking
-  a switch to Walls/Lights). Likely fix: `toggleNonExclusive` should also
-  call `onToolModeChange('move')` when opening the tokens panel.
 - Import compendium content directly from a repo URL, not just a local file
 - A battle-specific menu mode: quick actions during combat, and monster info
   visible to the DM for everything currently in the encounter
@@ -635,5 +651,11 @@ too much in these spots):**
   just that tool's detail instead of a tall scrolling column
 
 **Map / scene features:**
+- Delete a single token — `deleteToken` already exists in `map/useTokens.ts`
+  but nothing in the UI calls it; the only token-removal control anywhere
+  is the DM's bulk "Erase all tokens" button. Needs a per-token delete
+  action, e.g. in the token HP/condition editor
+  (`components/TokenHpConditionEditor.tsx`) or a delete icon on the token
+  itself.
 - Multiple floors/levels per scene (e.g. a multi-story building or dungeon
   with stacked levels), with a way to switch between or stack them

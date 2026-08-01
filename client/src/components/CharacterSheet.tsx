@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { parseNotation } from '../dice/notation'
 import type { AbilityKey, AbilityScores, CharacterRecord, SkillId, SkillProficiency, WeaponEntry } from '../character/types'
 import { ABILITY_LABELS, SKILL_LABELS } from '../character/types'
 import {
@@ -19,6 +20,7 @@ import {
   isValidAbilityScoreImprovement,
   isValidPointBuy,
   isValidStandardArray,
+  MAX_SPEED_FT,
   mergeClassResourceGrants,
   parseHitDiceCount,
   pointBuyCost,
@@ -43,6 +45,23 @@ type Tab = 'stats' | 'inventory' | 'spells' | 'history'
 
 function fmtMod(mod: number): string {
   return mod >= 0 ? `+${mod}` : `${mod}`
+}
+
+/** Whether a weapon's damage-dice text currently parses — parseNotation
+ * itself already rejects an absurd dice term (see dice/notation.ts's
+ * MAX_DICE_COUNT/MAX_DICE_SIDES), so this doubles as the "not an absurd
+ * value" check too. Purely a UI hint, not a hard save-blocking gate: an
+ * unrollable weapon's damage roll already silently no-ops
+ * (RollLog.tsx's handleRollDamage) rather than crashing, so the worst
+ * case without this is a confusing "nothing happened" during combat —
+ * this just surfaces the problem earlier, while editing. */
+function isValidDamageDice(notation: string): boolean {
+  try {
+    parseNotation(notation)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Which values a Standard Array <select> for `key` may offer: any value not
@@ -155,7 +174,7 @@ export function CharacterSheet({
   const [levelUpSubclass, setLevelUpSubclass] = useState('')
   const needsAsiThisLevelUp = !!selectedClass?.asiLevels.includes(nextLevel) && !character.resolvedAsiLevels.includes(nextLevel)
   const needsSubclassThisLevelUp = !!selectedClass && nextLevel >= selectedClass.subclassLevel && !character.subclassName
-  const asiValid = asiChoice === 'asi' ? isValidAbilityScoreImprovement(asiChanges) : featName.trim().length > 0
+  const asiValid = asiChoice === 'asi' ? isValidAbilityScoreImprovement(asiChanges, character.baseAbilities) : featName.trim().length > 0
   const canConfirmLevelUp = (!needsAsiThisLevelUp || asiValid) && (!needsSubclassThisLevelUp || levelUpSubclass !== '')
 
   function openLevelUp() {
@@ -977,9 +996,11 @@ export function CharacterSheet({
               Speed
               <input
                 type="number"
+                min={0}
+                max={MAX_SPEED_FT}
                 value={character.speed}
                 disabled={!blueprintEditable}
-                onChange={(e) => onUpdate({ speed: Number(e.target.value) })}
+                onChange={(e) => onUpdate({ speed: Math.max(0, Math.min(MAX_SPEED_FT, Number(e.target.value))) })}
               />
             </label>
             <label>
@@ -1039,6 +1060,8 @@ export function CharacterSheet({
                   placeholder="Damage dice (e.g. 1d8)"
                   value={weapon.damageDice}
                   disabled={!canEdit}
+                  style={isValidDamageDice(weapon.damageDice) ? undefined : { borderColor: '#c0392b' }}
+                  title={isValidDamageDice(weapon.damageDice) ? undefined : 'Not a valid dice notation (e.g. "1d8", "2d6+1") or the dice term is out of range.'}
                   onChange={(e) => handleUpdateWeapon(weapon.id, { damageDice: e.target.value })}
                 />
                 <select
