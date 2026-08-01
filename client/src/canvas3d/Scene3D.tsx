@@ -276,6 +276,18 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     let lastHeightCells = 0
     let lastSceneId: string | null = null
     let lastRefreshLogAt = 0
+    // Set after refreshBoard() finishes writing boardCanvas via drawImage;
+    // consumed one animate() tick later (see below) rather than
+    // immediately. On real hardware (unthrottled, properly-focused tabs —
+    // confirmed absent in this project's own throttled test/automation
+    // environments, which is why this only reproduced on a real user's
+    // machine), triggering the CanvasTexture's GPU upload in the very same
+    // tick as the drawImage that just wrote the canvas reproducibly hit a
+    // Chromium GPU-compositor race — "glCopySubTextureCHROMIUM: Offset
+    // overflows texture dimensions" — leaving the plane's texture blank.
+    // Deferring the upload to the next animation frame gives the browser
+    // a full frame boundary to settle the canvas write first.
+    let pendingTextureUpload = false
 
     const applyDims = (widthCells: number, heightCells: number) => {
       plane.scale.set(widthCells, 1, heightCells)
@@ -341,7 +353,9 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
         )
       }
       ctx.drawImage(extracted, 0, 0)
-      boardTexture.needsUpdate = true
+      // Deliberately NOT setting boardTexture.needsUpdate here — see
+      // pendingTextureUpload below.
+      pendingTextureUpload = true
 
       const widthCells = extracted.width / scene2.gridSizePx
       const heightCells = extracted.height / scene2.gridSizePx
@@ -444,6 +458,14 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     let lastBoardRefresh = 0
     const animate = (time: number) => {
       controls.update()
+      // Applying a texture upload queued by the *previous* tick's
+      // refreshBoard() — not the one about to run this tick — is what
+      // gives the canvas write a full frame boundary before the GPU
+      // reads it. See pendingTextureUpload's declaration for why.
+      if (pendingTextureUpload) {
+        pendingTextureUpload = false
+        boardTexture.needsUpdate = true
+      }
       if (time - lastBoardRefresh >= BOARD_REFRESH_INTERVAL_MS) {
         lastBoardRefresh = time
         refreshBoard()
