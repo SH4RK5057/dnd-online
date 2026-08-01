@@ -3,37 +3,63 @@ import { useSession } from '../session/useSession'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
+import { useWalls } from '../map/useWalls'
 import { useCharacters } from '../character/useCharacters'
+import { useCampaignSettings } from '../character/useCampaignSettings'
 import { useCombat } from '../combat/useCombat'
 import { computeInitiativeOrder } from '../combat/rules'
 import { computeInitiativeBonus } from '../character/rules'
 import { useSessionEvents } from '../sessionLog/useSessionEvents'
+import { useRollLog } from '../dice/useRollLog'
 import { useCompendium, findByKey } from '../content/useCompendium'
 import { EncounterBuilder } from './EncounterBuilder'
 import { StatBlockCard } from './StatBlockCard'
+import { AttackRollPanel } from './AttackRollPanel'
+import { SpellCastPanel } from './SpellCastPanel'
 import type { MonsterInitiativeMode } from '../combat/types'
 import type { TokenRecord } from '../map/types'
+import type { MeasureShape } from '../canvas/MeasureLayer'
 
 /** Initiative order + round/turn state are visible to everyone (players
  * want to see the queue and whose turn it is); starting/ending combat,
- * choosing Individual vs. Group Monster Initiative, advancing the turn, and
- * expanding a monster-linked combatant's full stat block (an "Info" toggle,
- * reusing the same StatBlockCard the compendium drawer/token inspector
- * show) are DM-only, same tier as scene/wall/light editing already is —
- * lets the DM check a monster's rules without leaving the initiative list
- * to click its token individually. */
-export function InitiativeTracker() {
+ * choosing Individual vs. Group Monster Initiative, advancing the turn,
+ * expanding a monster-linked combatant's full stat block (an "Info"
+ * toggle, reusing the same StatBlockCard the compendium drawer/token
+ * inspector show), and rolling a quick attack for whoever's turn it
+ * currently is (reusing AttackRollPanel exactly as TokenInspector does for
+ * a DM-run NPC's linked character) are DM-only, same tier as scene/wall/
+ * light editing already is — lets the DM resolve a monster's turn without
+ * leaving the initiative list to click its token individually. Quick
+ * actions only appear for the current-turn combatant (not every row, to
+ * avoid clutter) and only when it has a linked character sheet — a bare
+ * monsterKey-only token has no structured weapon data to roll from. Quick
+ * actions cover both attack rolls (AttackRollPanel) and spellcasting
+ * (SpellCastPanel), the same pair TokenInspector already offers for a
+ * DM-run NPC — this is just a shortcut to the same thing from the
+ * initiative list instead of clicking the token first. */
+export function InitiativeTracker({
+  onArmTemplate,
+}: {
+  /** Threaded through to SpellCastPanel's AoE-template arming — see
+   * MapCanvas's `armedTemplate` prop and SessionScreen's `setArmedTemplate`,
+   * the same callback TokenInspector is already given. */
+  onArmTemplate: (template: { shape: MeasureShape; sizeFt: number }) => void
+}) {
   const { session } = useSession()
   const doc = session?.doc ?? null
   const isDm = session?.role === 'dm'
   const myPlayerId = getOrCreatePlayerId()
   const { activeSceneId, activeScene } = useScenes(doc)
-  const { tokens, setTokenInitiative, setTokenReactionAvailable, setTokenConditions } = useTokens(doc, activeSceneId)
-  const { characters } = useCharacters(doc)
+  const { tokens, setTokenInitiative, setTokenReactionAvailable, setTokenConditions, setTokenHp } = useTokens(doc, activeSceneId)
+  const { walls } = useWalls(doc, activeSceneId)
+  const { characters, updateCharacter } = useCharacters(doc)
+  const { settings: campaignSettings } = useCampaignSettings(doc)
   const { combat, startCombat, endCombat, advanceTurn, setMonsterInitiativeMode } = useCombat(doc, activeSceneId)
   const { logEvent } = useSessionEvents(doc, isDm)
+  const { pushRoll } = useRollLog(doc, isDm)
   const compendium = useCompendium(doc)
   const [infoOpenTokenId, setInfoOpenTokenId] = useState<string | null>(null)
+  const [actionsOpenTokenId, setActionsOpenTokenId] = useState<string | null>(null)
 
   if (!doc || !activeSceneId) return null
 
@@ -136,6 +162,49 @@ export function InitiativeTracker() {
                   {(() => {
                     const entry = findByKey(compendium, token.monsterKey)
                     return entry ? <StatBlockCard entry={entry} /> : <p className="character-sheet__hint">Compendium entry not found.</p>
+                  })()}
+                </div>
+              )}
+              {isDm && combat.active && isCurrent && token.characterId && (
+                <button type="button" onClick={() => setActionsOpenTokenId((prev) => (prev === token.id ? null : token.id))}>
+                  {actionsOpenTokenId === token.id ? 'Hide actions' : 'Quick actions'}
+                </button>
+              )}
+              {isDm && combat.active && isCurrent && actionsOpenTokenId === token.id && token.characterId && (
+                <div className="initiative-tracker__actions">
+                  {(() => {
+                    const character = charactersById.get(token.characterId)
+                    if (!character) return <p className="character-sheet__hint">Linked character not found.</p>
+                    return (
+                      <>
+                        <AttackRollPanel
+                          character={character}
+                          targets={tokens.filter((t) => t.id !== token.id)}
+                          charactersById={charactersById}
+                          actingConditions={token.conditions}
+                          autoResolveEnabled={campaignSettings.autoResolveAttacksEnabled ?? true}
+                          isMyTurn
+                          reactionAvailable={false}
+                          onUseReaction={() => {}}
+                          playerId="npc"
+                          playerName={character.name}
+                          pushRoll={pushRoll}
+                          attackerToken={token}
+                          walls={walls}
+                        />
+                        <SpellCastPanel
+                          character={character}
+                          targets={tokens.filter((t) => t.id !== token.id)}
+                          charactersById={charactersById}
+                          updateCharacter={updateCharacter}
+                          setTokenHp={setTokenHp}
+                          playerId="npc"
+                          playerName={character.name}
+                          pushRoll={pushRoll}
+                          onArmTemplate={onArmTemplate}
+                        />
+                      </>
+                    )
                   })()}
                 </div>
               )}

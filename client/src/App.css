@@ -885,6 +885,14 @@
   opacity: 0.75;
 }
 
+.initiative-tracker__info,
+.initiative-tracker__actions {
+  margin: 4px 0 8px 12px;
+  padding: 8px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 6px;
+}
+
 .party-loot__currency {
   display: flex;
   flex-wrap: wrap;

@@ -676,14 +676,20 @@ real change in constraints.
       DM-only by design (its own panel explicitly warns notes still sync
       to every player's browser even though only the DM's UI shows them) —
       not turned into a third broadcast channel.
-- [x] Monster info visible to the DM during combat — `InitiativeTracker.tsx`
-      gained a DM-only "Info" toggle per monster-linked combatant that
-      expands the same `StatBlockCard` the compendium drawer and token
-      inspector already use, so the DM doesn't have to click each token
-      individually mid-fight to check its stats. The other half of that
-      backlog bullet — a dedicated battle-specific quick-actions menu — is
-      still open; attack/spell actions already live on the character sheet
-      (via each token's inspector), just not surfaced inline in this list.
+- [x] Battle-specific menu mode, both halves — `InitiativeTracker.tsx`
+      gained a DM-only "Info" toggle per monster-linked combatant (expands
+      the same `StatBlockCard` the compendium drawer/token inspector
+      already use) and a DM-only "Quick actions" toggle for whoever's turn
+      it currently is, when that combatant has a linked character sheet
+      (an NPC full sheet, per the earlier NPC-on-token feature). Quick
+      actions embeds `AttackRollPanel` and `SpellCastPanel` exactly as
+      `TokenInspector` already does for a DM-run NPC — same props, same
+      roll pipeline — so the DM can resolve a monster's attack or spell
+      without leaving the initiative list to click its token first. Only
+      shown for the current-turn combatant (not every row) to avoid
+      clutter; a bare monsterKey-only token with no linked sheet still
+      only gets the Info toggle, since it has no structured weapon/spell
+      data to roll from.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---
@@ -703,8 +709,6 @@ too much in these spots):**
   data model to check prerequisites against; would need that built first
 
 **DM tooling / UX:**
-- A battle-specific quick-actions menu during combat (monster info during
-  combat now covered, see Phase 10 above)
 - DM broadcast tool: send a stat block or note to everyone on demand, not
   just a single player (handouts now support per-player targeting, see
   Phase 10 above; a true "send to everyone right now" push — as opposed to

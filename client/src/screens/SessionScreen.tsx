@@ -418,7 +418,7 @@ export function SessionScreen() {
                   </>
                 ),
               },
-              { id: 'initiative-tracker', title: 'Initiative', content: <InitiativeTracker /> },
+              { id: 'initiative-tracker', title: 'Initiative', content: <InitiativeTracker onArmTemplate={setArmedTemplate} /> },
               { id: 'chat', title: 'Chat', content: <ChatPanel /> },
             ]
 
