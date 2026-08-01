@@ -45,6 +45,7 @@ export interface UseTokensResult {
   setTokenAc: (tokenId: string, ac: number | null) => void
   setTokenSpeed: (tokenId: string, speed: number | null) => void
   setTokenDescription: (tokenId: string, description: string) => void
+  setTokenStatBlockShared: (tokenId: string, shared: boolean) => void
   setTokenHidden: (tokenId: string, hidden: boolean) => void
   setTokenPerceptionDc: (tokenId: string, dc: number | null) => void
   setTokenZ: (tokenId: string, z: number) => void
@@ -177,6 +178,10 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     (tokenId: string, description: string) => patchToken(tokenId, { description }),
     [patchToken],
   )
+  const setTokenStatBlockShared = useCallback(
+    (tokenId: string, shared: boolean) => patchToken(tokenId, { statBlockShared: shared }),
+    [patchToken],
+  )
   const setTokenHidden = useCallback((tokenId: string, hidden: boolean) => patchToken(tokenId, { hidden }), [patchToken])
   const setTokenPerceptionDc = useCallback(
     (tokenId: string, dc: number | null) => patchToken(tokenId, { perceptionDc: dc }),
@@ -253,6 +258,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     setTokenAc,
     setTokenSpeed,
     setTokenDescription,
+    setTokenStatBlockShared,
     setTokenHidden,
     setTokenPerceptionDc,
     setTokenZ,

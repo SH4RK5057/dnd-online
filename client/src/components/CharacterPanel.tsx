@@ -48,7 +48,13 @@ export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { 
   const { races, classes, subclasses, backgrounds, spells, items } = useCompendium(doc)
   const { pushRoll } = useRollLog(doc, isDm)
   const inventoryActions = useInventoryActions(doc, isDm)
-  const { settings: campaignSettings, setRestsEnabled, setAutoResolveAttacksEnabled, setPassivePerceptionEnabled } = useCampaignSettings(doc)
+  const {
+    settings: campaignSettings,
+    setRestsEnabled,
+    setAutoResolveAttacksEnabled,
+    setPassivePerceptionEnabled,
+    setLevelCap,
+  } = useCampaignSettings(doc)
 
   const [standaloneList, setStandaloneList] = useState(() => listStandaloneCharacters())
   const [selectedStandaloneId, setSelectedStandaloneId] = useState('')
@@ -258,6 +264,26 @@ export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { 
         </label>
       )}
 
+      {isDm && (
+        <label className="character-panel__rests-toggle" title="Doesn't retroactively lower an already-higher-level character — only blocks the level-up wizard from advancing past this level.">
+          <input
+            type="checkbox"
+            checked={campaignSettings.levelCap !== null}
+            onChange={(e) => setLevelCap(e.target.checked ? 20 : null)}
+          />
+          Cap character level at
+          {campaignSettings.levelCap !== null && (
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={campaignSettings.levelCap}
+              onChange={(e) => setLevelCap(Number(e.target.value))}
+            />
+          )}
+        </label>
+      )}
+
       <div className="character-panel__rest-row">
         <button type="button" onClick={handleLongRest} disabled={!canRest}>
           Long rest
@@ -326,6 +352,7 @@ export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { 
         compendiumSpells={spells}
         compendiumItems={items}
         isDm={isDm}
+        levelCap={campaignSettings.levelCap}
       />
     </div>
   )

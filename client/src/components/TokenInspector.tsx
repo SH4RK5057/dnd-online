@@ -18,8 +18,11 @@ import { SpellCastPanel } from './SpellCastPanel'
  * isDm || isOwner), this is the "what is this thing" panel: the DM gets the
  * full rules/stat-block lookup (pulled from the compendium entry this token
  * was dropped from) plus an editable freeform description; everyone else
- * only ever sees that freeform description, read-only, and only once the DM
- * has written one. */
+ * only ever sees the freeform description (read-only, once the DM has
+ * written one) plus — only if the DM has explicitly opted this specific
+ * token in via `statBlockShared` — the same full stat block the DM sees.
+ * Visibility here is otherwise all-or-nothing per token, deliberately: the
+ * DM picks what to reveal, not a partial/redacted view. */
 export function TokenInspector({
   doc,
   sceneId,
@@ -33,7 +36,7 @@ export function TokenInspector({
   selectedTokenId: string | null
   onArmTemplate: (template: { shape: MeasureShape; sizeFt: number }) => void
 }) {
-  const { tokens, setTokenDescription, setTokenHp } = useTokens(doc, sceneId)
+  const { tokens, setTokenDescription, setTokenStatBlockShared, setTokenHp } = useTokens(doc, sceneId)
   const { walls } = useWalls(doc, sceneId)
   const compendium = useCompendium(doc)
   const { characters, updateCharacter } = useCharacters(doc)
@@ -49,11 +52,13 @@ export function TokenInspector({
   const linkedCharacter = token.characterId ? (characters.find((c) => c.id === token.characterId) ?? null) : null
 
   if (!isDm) {
-    if (!token.description) return null
+    const sharedStatBlock = token.statBlockShared && entry ? entry : null
+    if (!token.description && !sharedStatBlock) return null
     return (
       <div className="token-inspector">
         <h3>{token.name}</h3>
-        <p>{token.description}</p>
+        {sharedStatBlock && <StatBlockCard entry={sharedStatBlock} />}
+        {token.description && <p>{token.description}</p>}
       </div>
     )
   }
@@ -103,7 +108,17 @@ export function TokenInspector({
     <div className="token-inspector">
       <h3>{token.name} — rules</h3>
       {entry ? (
-        <StatBlockCard entry={entry} />
+        <>
+          <StatBlockCard entry={entry} />
+          <label>
+            <input
+              type="checkbox"
+              checked={!!token.statBlockShared}
+              onChange={(e) => setTokenStatBlockShared(token.id, e.target.checked)}
+            />
+            Share this stat block with players (otherwise only the freeform description below is player-facing)
+          </label>
+        </>
       ) : (
         !token.characterId && (
           <p className="compendium-drawer__hint">No compendium entry linked — add this token from the compendium to see its stat block here.</p>

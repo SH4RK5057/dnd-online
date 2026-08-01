@@ -38,6 +38,7 @@ export function TokenHpConditionEditor({
     setTokenZ,
     setTokenModel,
     setTokenModelHeight,
+    deleteToken,
   } = useTokens(doc, sceneId)
   const { characters, updateCharacter, createNpcCharacter } = useCharacters(doc)
 
@@ -58,6 +59,12 @@ export function TokenHpConditionEditor({
       const current = token.hp ?? { current: 0, max: 0, temp: 0 }
       setTokenHp(token.id, { ...current, [field]: value })
     }
+  }
+
+  const handleDeleteToken = () => {
+    if (!window.confirm(`Delete "${token.name}" from the map? This can't be undone.`)) return
+    deleteToken(token.id)
+    onClose()
   }
 
   const toggleCondition = (name: string, active: boolean) => {
@@ -82,6 +89,11 @@ export function TokenHpConditionEditor({
           value={token.name}
           onChange={(e) => renameToken(token.id, e.target.value)}
         />
+        {isDm && (
+          <button type="button" onClick={handleDeleteToken}>
+            Delete token
+          </button>
+        )}
         <button type="button" onClick={onClose}>
           Close
         </button>

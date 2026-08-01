@@ -615,6 +615,36 @@ real change in constraints.
       current text doesn't parse, so a player sees the problem while
       editing rather than discovering it as a silently-no-op damage roll
       during combat.
+- [x] Delete a single token — a "Delete token" button (DM-only, confirm
+      dialog) in `components/TokenHpConditionEditor.tsx`'s header, wired to
+      `deleteToken` (which already existed in `map/useTokens.ts` but had no
+      UI caller) — previously the only token-removal control anywhere was
+      the DM's bulk "Erase all tokens" button.
+- [x] Spell slot totals are now bounded to [0,9] per level when they're
+      freely editable (an unrecognized/non-caster class — a recognized
+      caster's totals are already computed and locked). The input's own
+      min/max were only ever a UI hint; `CharacterSpells.tsx`'s `setSlot`
+      now actually clamps.
+- [x] A custom inventory item name that exactly matches an existing
+      compendium item now gets a red outline + tooltip in
+      `components/CharacterInventory.tsx` — not blocked outright (typing
+      toward a different name that happens to share a prefix shouldn't be
+      fought character-by-character), just flagged so the ambiguity is
+      visible and the player can use "Search compendium items to add"
+      instead, or rename.
+- [x] DM-set campaign level cap — `character/useCampaignSettings.ts`'s new
+      `levelCap` (null = no cap, the default), with a checkbox + number
+      input next to the other campaign toggles in `components/
+      CharacterPanel.tsx`. Gates `CharacterSheet.tsx`'s level-up wizard
+      (`canLevelUp`) without retroactively lowering an already-higher-level
+      character.
+- [x] DM can now explicitly share a specific monster's full stat block with
+      players, not just the freeform description — `TokenRecord
+      .statBlockShared` (per-token, DM opt-in, default false), a checkbox
+      in `components/TokenInspector.tsx` next to the DM's own stat-block
+      view. Player-facing visibility stays otherwise all-or-nothing per
+      token, deliberately: the DM picks what to reveal, not a
+      partial/redacted view.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---
@@ -629,20 +659,14 @@ already be covered by something shipped.
 
 **Rules-enforcement gaps (character sheet currently trusts DM/player input
 too much in these spots):**
-- Spell slots can be edited to arbitrarily large values regardless of race/class
 - No item rules (attunement limits, weight/carry, etc. — see Phase 7 note above)
 - No feat rules/prerequisites
-- Level is freely editable per-character; no DM-set campaign level cap that
-  locks players below/at it
-- Custom items can be created with the same name as an existing compendium item
 - Darkvision isn't modeled at all (race trait exists but has no mechanical effect)
 
 **DM tooling / UX:**
 - Import compendium content directly from a repo URL, not just a local file
 - A battle-specific menu mode: quick actions during combat, and monster info
   visible to the DM for everything currently in the encounter
-- DM should be able to explicitly share a specific monster's stat block with
-  players (right now player-facing description visibility is all-or-nothing)
 - DM broadcast tool: send a stat block, note, or handout to one player or
   to everyone on demand
 - 5etools mirror import performance (large files are slow to ingest)
@@ -651,11 +675,5 @@ too much in these spots):**
   just that tool's detail instead of a tall scrolling column
 
 **Map / scene features:**
-- Delete a single token — `deleteToken` already exists in `map/useTokens.ts`
-  but nothing in the UI calls it; the only token-removal control anywhere
-  is the DM's bulk "Erase all tokens" button. Needs a per-token delete
-  action, e.g. in the token HP/condition editor
-  (`components/TokenHpConditionEditor.tsx`) or a delete icon on the token
-  itself.
 - Multiple floors/levels per scene (e.g. a multi-story building or dungeon
   with stacked levels), with a way to switch between or stack them

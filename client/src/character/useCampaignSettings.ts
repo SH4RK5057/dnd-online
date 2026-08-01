@@ -21,6 +21,11 @@ export interface CampaignSettingsRecord {
    * off — auto-revealing hidden things is a bigger behavior change than the
    * other defaults-on toggles, so this one opts in instead. */
   passivePerceptionEnabled: boolean
+  /** Highest level a character can level up to in this campaign, or null
+   * for no cap (the default). Doesn't retroactively lower an
+   * already-higher-level character — it only gates the level-up wizard
+   * from advancing further (see CharacterSheet.tsx's canLevelUp). */
+  levelCap: number | null
 }
 
 function settingsMap(doc: Y.Doc) {
@@ -28,7 +33,7 @@ function settingsMap(doc: Y.Doc) {
 }
 
 function defaultSettings(): CampaignSettingsRecord {
-  return { restsEnabled: true, autoResolveAttacksEnabled: true, passivePerceptionEnabled: false }
+  return { restsEnabled: true, autoResolveAttacksEnabled: true, passivePerceptionEnabled: false, levelCap: null }
 }
 
 export interface UseCampaignSettingsResult {
@@ -36,6 +41,7 @@ export interface UseCampaignSettingsResult {
   setRestsEnabled: (enabled: boolean) => void
   setAutoResolveAttacksEnabled: (enabled: boolean) => void
   setPassivePerceptionEnabled: (enabled: boolean) => void
+  setLevelCap: (cap: number | null) => void
 }
 
 /** Campaign-wide DM preferences that don't belong to any single scene or
@@ -83,5 +89,15 @@ export function useCampaignSettings(doc: Y.Doc | null): UseCampaignSettingsResul
     [doc],
   )
 
-  return { settings, setRestsEnabled, setAutoResolveAttacksEnabled, setPassivePerceptionEnabled }
+  const setLevelCap = useCallback(
+    (cap: number | null) => {
+      if (!doc) return
+      const m = settingsMap(doc)
+      const clamped = cap === null ? null : Math.max(1, Math.min(20, Math.round(cap)))
+      m.set(SETTINGS_KEY, { ...defaultSettings(), ...m.get(SETTINGS_KEY), levelCap: clamped })
+    },
+    [doc],
+  )
+
+  return { settings, setRestsEnabled, setAutoResolveAttacksEnabled, setPassivePerceptionEnabled, setLevelCap }
 }

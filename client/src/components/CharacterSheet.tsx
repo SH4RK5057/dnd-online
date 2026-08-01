@@ -98,6 +98,7 @@ export function CharacterSheet({
   compendiumSpells,
   compendiumItems,
   isDm,
+  levelCap = null,
 }: {
   character: CharacterRecord
   /** isDm || isOwner — gates every edit control. */
@@ -136,6 +137,10 @@ export function CharacterSheet({
    * shouldn't be able to self-approve their own proposal. False in the
    * standalone (pre-campaign) editors, where there's no DM/campaign yet. */
   isDm: boolean
+  /** CampaignSettingsRecord.levelCap — blocks the level-up wizard from
+   * advancing past this level. Omitted (null) in the standalone
+   * (pre-campaign) editors, where there's no campaign/DM setting yet. */
+  levelCap?: number | null
 }) {
   const [tab, setTab] = useState<Tab>('stats')
   const blueprintEditable = canEdit && !character.locked
@@ -163,7 +168,8 @@ export function CharacterSheet({
   // during play is exactly the kind of change a "locked" character should
   // still be able to do.
   const eligibleLevel = xpToLevel(character.xp)
-  const canLevelUp = canEdit && character.level < 20 && eligibleLevel > character.level
+  const effectiveMaxLevel = levelCap ?? 20
+  const canLevelUp = canEdit && character.level < effectiveMaxLevel && eligibleLevel > character.level
   const nextLevel = character.level + 1
   const [levelUpOpen, setLevelUpOpen] = useState(false)
   const [hpMethod, setHpMethod] = useState<'roll' | 'average'>('average')
@@ -732,6 +738,9 @@ export function CharacterSheet({
               <button type="button" onClick={openLevelUp}>
                 Level Up to {nextLevel}
               </button>
+            )}
+            {levelCap !== null && character.level >= levelCap && eligibleLevel > character.level && (
+              <span className="character-sheet__hint">The DM has capped campaign level at {levelCap}.</span>
             )}
           </div>
 

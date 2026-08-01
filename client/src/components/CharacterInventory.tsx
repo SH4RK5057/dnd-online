@@ -36,6 +36,14 @@ export function CharacterInventory({
   const [transferTargetByItemId, setTransferTargetByItemId] = useState<Record<string, string>>({})
   const [itemQuery, setItemQuery] = useState('')
   const itemMatches = itemQuery.trim() ? filterItems(compendiumItems, itemQuery, 'all').slice(0, MAX_SEARCH_RESULTS) : []
+  const compendiumItemNames = new Set(compendiumItems.map((d) => d.name.trim().toLowerCase()))
+  /** A custom-typed item name that exactly matches an existing compendium
+   * entry is ambiguous (which one is meant when the DM looks it up?) — not
+   * blocked outright (a player might genuinely want an item that shares a
+   * common name, and hard-rejecting mid-typing would fight normal text
+   * entry), just flagged so the player notices and can use "Search
+   * compendium items to add" instead, or rename it. */
+  const isAmbiguousCustomName = (name: string) => name.trim().length > 0 && compendiumItemNames.has(name.trim().toLowerCase())
 
   const updateItemFields = (id: string, patch: Partial<Pick<InventoryItem, 'name' | 'notes'>>) => {
     onUpdate({ inventory: character.inventory.map((item) => (item.id === id ? { ...item, ...patch } : item)) })
@@ -95,6 +103,8 @@ export function CharacterInventory({
               placeholder="Item name"
               value={item.name}
               disabled={!canEdit}
+              style={isAmbiguousCustomName(item.name) ? { borderColor: '#c0392b' } : undefined}
+              title={isAmbiguousCustomName(item.name) ? 'This matches an existing compendium item — consider "Search compendium items to add" below instead, or rename to avoid confusion.' : undefined}
               onChange={(e) => updateItemFields(item.id, { name: e.target.value })}
             />
             <input

@@ -38,9 +38,14 @@ export function CharacterSpells({
   const [query, setQuery] = useState('')
   const matches = query.trim() ? filterSpells(compendiumSpells, query, 'all', 'all').slice(0, MAX_SEARCH_RESULTS) : []
   const setSlot = (levelIndex: number, value: number) => {
+    // Only reachable at all when slots aren't locked (a recognized caster
+    // class computes them instead — see slotsLocked's doc comment above),
+    // i.e. an unrecognized/non-caster class's freely-editable total. The
+    // input's own min/max attributes are just a UI hint, not an enforced
+    // bound, so clamp here too — matches the input's own [0,9] range.
     const next = [...character.spellSlotsByLevel]
     while (next.length <= levelIndex) next.push(0)
-    next[levelIndex] = value
+    next[levelIndex] = Math.max(0, Math.min(9, value))
     onUpdate({ spellSlotsByLevel: next })
   }
 

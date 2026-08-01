@@ -142,6 +142,13 @@ export interface TokenRecord {
    * monsterKey or characterId instead of stored here). Empty string = DM
    * hasn't written one; players see nothing in that case, not a placeholder. */
   description: string
+  /** DM opt-in to reveal this token's full compendium stat block (the same
+   * StatBlockCard the DM sees) to players too, instead of only the
+   * freeform `description` above. Read as `?? false` for tokens created
+   * before this field existed — sharing is per-token and explicit, never
+   * automatic just because a token has a monsterKey. No effect for a token
+   * with no linked compendium entry. */
+  statBlockShared?: boolean
   /** DM-only visibility — a token the DM has placed (a trap, mimic, or
    * stealthy enemy) but not yet revealed. Independent of fog-of-war: even a
    * player who can otherwise see this exact spot won't see a hidden token
