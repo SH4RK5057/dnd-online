@@ -463,7 +463,14 @@ real change in constraints.
       automatic by sizeCategory by default, but each token can override it
       directly (`TokenRecord.modelHeightCells`, grid-cell world units — an
       exact size, not a scale multiplier, so an oddly-proportioned STL
-      doesn't need scale-factor math) via the token editor.
+      doesn't need scale-factor math) via the token editor. Absent an
+      override, a model is also auto-scaled down (never up) to stay within
+      its own token's grid footprint if its natural width/depth would
+      otherwise spill into neighboring cells (`resolveStlScale` in
+      `map/sizeCategory.ts`, takes the smallest of the height target and
+      the two footprint-fit ratios). Token name/image/model can all be
+      edited after creation, not just at placement time
+      (`components/TokenHpConditionEditor.tsx`).
       **v1 limitations, deliberately scoped out:** no fog-of-war/line-of-
       sight masking (every non-hidden token is visible to everyone
       regardless of vision — hidden tokens still stay DM-only); a drag only
@@ -472,6 +479,19 @@ real change in constraints.
       highlight on the mini itself (clicking still opens the same HP/
       condition/inspector side panels as 2D); walls, lights, annotations,
       and measuring have no 3D equivalent — this view is map + tokens only.
+- [x] Reorderable, collapsible side-panel sections — each viewer (DM or
+      player) can collapse any section and move it up/down within their own
+      panel; order and collapsed state persist per-role in `localStorage`
+      (`screens/usePanelOrder.ts`, `components/PanelSection.tsx`), not
+      synced through the Yjs doc since it's a personal display preference,
+      not shared session state.
+- [x] Search-to-add for spells and items on the character sheet — typing in
+      `CharacterSpells`/`CharacterInventory` filters the loaded compendium
+      (SRD + mirror + homebrew, via the existing `content/search.ts`
+      filters) and adds a matching entry with one click, alongside the
+      original freeform "add custom" fallback for anything not in the
+      compendium. Monster search-to-add already existed via
+      `CompendiumDrawer`.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---

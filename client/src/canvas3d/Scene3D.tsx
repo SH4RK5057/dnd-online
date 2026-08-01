@@ -7,7 +7,7 @@ import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useAssetUrl, subscribeAssetUrl } from '../map/assetSync'
 import { BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS } from '../map/constants'
-import { footprintCells, resolveModelHeight, snapToSlot } from '../map/sizeCategory'
+import { footprintCells, resolveModelHeight, resolveStlScale, snapToSlot } from '../map/sizeCategory'
 import { getCachedModelGeometry, loadModelGeometry } from './modelCache'
 import type { TokenRecord } from '../map/types'
 
@@ -60,10 +60,16 @@ function applyPlaceholderTransform(mesh: THREE.Mesh, token: TokenRecord): void {
 }
 
 /** STL geometry is pre-normalized (canvas3d/modelCache.ts) to exactly unit
- * height with feet at y=0, so sizing it is just a uniform scale — unlike
- * the placeholder cone/box, which scale non-uniformly by footprint. */
+ * height with feet at y=0 and its own natural width/depth otherwise, so
+ * sizing it is a uniform scale — but the FACTOR isn't just the target
+ * height like the placeholder cone/box; resolveStlScale also keeps the
+ * model from spilling outside the token's own grid footprint (see its doc
+ * comment in map/sizeCategory.ts). */
 function applyStlTransform(mesh: THREE.Mesh, token: TokenRecord): void {
-  mesh.scale.setScalar(resolveModelHeight(token))
+  const box = mesh.geometry.boundingBox
+  const localWidth = box ? box.max.x - box.min.x : 1
+  const localDepth = box ? box.max.z - box.min.z : 1
+  mesh.scale.setScalar(resolveStlScale(token, localWidth, localDepth))
 }
 
 function ensurePlaceholderChild(group: THREE.Group, token: TokenRecord): void {
@@ -330,31 +336,22 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
   }, [])
 
   // Re-centers the camera when the active scene changes (not on every token
-  // move) — an approximate initial framing using blank-canvas dims; the map
-  // texture effect below refines the plane's actual size once it loads, and
-  // OrbitControls lets the viewer reframe manually regardless.
-  useEffect(() => {
-    const camera = cameraRef.current
-    const controls = controlsRef.current
-    if (!camera || !controls || !activeScene) return
-    const w = activeScene.blankWidthCells ?? BLANK_SCENE_WIDTH_CELLS
-    const h = activeScene.blankHeightCells ?? BLANK_SCENE_HEIGHT_CELLS
-    const cx = w / 2
-    const cz = h / 2
-    const dist = Math.max(w, h)
-    camera.position.set(cx, dist * 0.9, cz + dist * 0.9)
-    controls.target.set(cx, 0, cz)
-    controls.update()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeScene?.id])
-
   // Sizes and textures the plane from the scene's map image (falling back
   // to the blank-canvas dims + a plain color, mirroring MapCanvas.tsx's own
   // mapLayer.size-or-blank-dims fallback) whenever the map or grid size
-  // changes.
+  // changes, and reframes the camera to match every time the plane's
+  // actual dimensions change — first an immediate best-guess from the
+  // blank-canvas dims, then a correction once the real map image loads and
+  // its true size is known (a texture is very often a different aspect
+  // ratio/size than the blank-canvas placeholder, so without this second
+  // pass the camera would keep looking at empty space next to the now
+  // differently-sized/positioned plane). OrbitControls still lets the
+  // viewer reframe manually afterward regardless.
   useEffect(() => {
     const plane = planeRef.current
-    if (!plane || !activeScene) return
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    if (!plane || !camera || !controls || !activeScene) return
     let cancelled = false
     const gridSizePx = activeScene.gridSizePx
     const blankWidthCells = activeScene.blankWidthCells ?? BLANK_SCENE_WIDTH_CELLS
@@ -362,7 +359,13 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
 
     const applyDims = (widthCells: number, heightCells: number) => {
       plane.scale.set(widthCells, 1, heightCells)
-      plane.position.set(widthCells / 2, 0, heightCells / 2)
+      const cx = widthCells / 2
+      const cz = heightCells / 2
+      plane.position.set(cx, 0, cz)
+      const dist = Math.max(widthCells, heightCells)
+      camera.position.set(cx, dist * 0.9, cz + dist * 0.9)
+      controls.target.set(cx, 0, cz)
+      controls.update()
     }
     applyDims(blankWidthCells, blankHeightCells)
 
