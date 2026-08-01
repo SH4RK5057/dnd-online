@@ -544,14 +544,18 @@ real change in constraints.
       instead of only the flat glow already baked into the plane. Toggle
       lives next to the existing 2D/3D switch in `screens/SessionScreen.tsx`,
       same personal/`localStorage`-only convention as `view3d`.
-- [x] Fix: placing a light while a stale staged token placement was still
-      armed silently kept routing map clicks to token placement instead —
-      selecting Walls or Lights in the rail visually looked like it worked
-      (icon lit up, details panel changed) but `SceneBuilderScreen`'s
-      `effectiveToolMode` stayed pinned to `'place-tokens'` because it
-      prioritizes any pending placement over the selected tool. Fixed by
-      cancelling a pending placement the moment an exclusive tool is
-      selected (`components/MapToolRail.tsx`'s `selectMode`).
+- [x] Partial fix: switching *from* Tokens *to* Walls/Lights while a stale
+      staged token placement was still armed silently kept routing map
+      clicks to token placement instead — selecting Walls or Lights in the
+      rail visually looked like it worked (icon lit up, details panel
+      changed) but `SceneBuilderScreen`'s `effectiveToolMode` stayed
+      pinned to `'place-tokens'` because it prioritizes any pending
+      placement over the selected tool. Fixed by cancelling a pending
+      placement the moment an exclusive tool is selected
+      (`components/MapToolRail.tsx`'s `selectMode`). **The reverse
+      direction is still broken** (see the DM tooling/UX backlog entry
+      below) — this fix only covers stale-token-placement-blocks-walls/
+      lights, not walls/lights-blocks-tokens.
 - [x] Fix: a light's placement-radius circle (`canvas/LightLayer.ts`, a
       DM-only editing aid showing where a light is and how far it reaches)
       was rendered completely unmasked for every viewer, so a player could
@@ -607,6 +611,17 @@ too much in these spots):**
 - Darkvision isn't modeled at all (race trait exists but has no mechanical effect)
 
 **DM tooling / UX:**
+- Bug: switching *to* the token tool while Walls or Lights is active
+  doesn't disable that tool — clicking the Tokens icon in
+  `components/MapToolRail.tsx` (`toggleNonExclusive`) only opens the
+  tokens popout, it never calls `onToolModeChange`, so `toolMode` stays
+  `'draw-walls'`/`'place-lights'` and clicks on the map keep drawing
+  walls/placing lights right up until a token placement is actually
+  staged (`pendingPlacement` set) and `effectiveToolMode`'s override
+  kicks in. Confirmed still broken after the partial fix above, which
+  only covers the opposite direction (a stale token placement blocking
+  a switch to Walls/Lights). Likely fix: `toggleNonExclusive` should also
+  call `onToolModeChange('move')` when opening the tokens panel.
 - Import compendium content directly from a repo URL, not just a local file
 - A battle-specific menu mode: quick actions during combat, and monster info
   visible to the DM for everything currently in the encounter
