@@ -32,13 +32,22 @@ const BOARD_REFRESH_INTERVAL_MS = 200
  * canvas/TokenSprite.ts already does for the 2D view. */
 const DRAG_CLICK_THRESHOLD_PX = 6
 /** Grid cells — how tall an extruded wall stands in perspective mode. */
-const WALL_HEIGHT_CELLS = 1.5
+const WALL_HEIGHT_CELLS = 3
 const WALL_COLOR = 0x8a7a5c
-/** Grid cells — camera distance from the followed token in perspective
- * mode, close enough to feel personal rather than a board overview. */
-const PERSPECTIVE_FOLLOW_DISTANCE_CELLS = 3.5
-/** World-space height (cells) light meshes and the followed camera target
- * sit at above the plane — roughly a standing creature's torso/eye level. */
+/** Grid cells — height the perspective-mode camera hovers directly above
+ * the followed token. No horizontal offset from the token's own x/z: this
+ * is a fixed-position "look around from here" camera, not an over-the-
+ * shoulder chase cam — see the animate() loop's perspective-mode block. */
+const PERSPECTIVE_HOVER_HEIGHT_CELLS = 3.5
+/** Grid cells — fixed camera-to-target distance kept while in perspective
+ * mode. The camera's actual position never moves from directly above the
+ * token (re-pinned there every frame), so this doesn't control how far
+ * away anything appears — it only keeps OrbitControls' internal spherical
+ * math well-defined while we use it purely as a look-direction (rotate,
+ * not translate) control. See the animate() loop for the full trick. */
+const PERSPECTIVE_LOOK_DISTANCE_CELLS = 1
+/** World-space height (cells) light meshes sit at above the plane —
+ * roughly a standing creature's torso/eye level. */
 const EYE_HEIGHT_CELLS = 0.8
 
 // Shared, stateless geometry/materials reused across every token's
@@ -251,7 +260,8 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken,
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
-    controls.maxPolarAngle = Math.PI / 2 - 0.02
+    const ORBIT_MAX_POLAR_ANGLE = Math.PI / 2 - 0.02
+    controls.maxPolarAngle = ORBIT_MAX_POLAR_ANGLE
     const ORBIT_MIN_DISTANCE = 2
     const ORBIT_MAX_DISTANCE = 300
     controls.minDistance = ORBIT_MIN_DISTANCE
@@ -505,52 +515,68 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken,
     window.addEventListener('pointerup', onPointerUp)
 
     // Perspective-mode camera-follow state, mutated only inside animate()
-    // below. `lastFollowPos` doubles as the "was following last frame" flag:
-    // null means either perspective mode is off, or it just turned on and
-    // hasn't placed the camera yet — both cases want a snap-in rather than
-    // a delta-translate.
+    // below.
     let wasPerspectiveMode = false
-    let lastFollowPos: THREE.Vector3 | null = null
 
     let animationFrame = 0
     let lastBoardRefresh = 0
     const animate = (time: number) => {
       const { effectivePerspectiveMode: perspNow, viewerId: viewerIdNow, tokens: tokensNow } = latestRef.current
+      let hoverPos: THREE.Vector3 | null = null
       if (perspNow) {
         const ownToken = tokensNow.find((t) => t.ownerId === viewerIdNow)
         if (ownToken) {
           const footprint = footprintOf(ownToken)
-          const targetPos = new THREE.Vector3(ownToken.x + footprint / 2, EYE_HEIGHT_CELLS, ownToken.y + footprint / 2)
-          if (!lastFollowPos) {
-            // Snap-in: either just entered perspective mode, or the
-            // followed token just appeared (e.g. reassigned) — place the
-            // camera at a fixed close-up offset rather than translating
-            // from wherever it happened to be for the board view.
-            camera.position.set(targetPos.x, targetPos.y + EYE_HEIGHT_CELLS * 1.5, targetPos.z + PERSPECTIVE_FOLLOW_DISTANCE_CELLS)
-            controls.target.copy(targetPos)
-            controls.minDistance = 1
-            controls.maxDistance = PERSPECTIVE_FOLLOW_DISTANCE_CELLS * 2
-          } else {
-            // Translate both camera and target by the token's own
-            // frame-over-frame movement delta — this preserves whatever
-            // manual orbit/zoom offset the player has already dragged in,
-            // rather than fighting it by resetting the target outright.
-            const delta = targetPos.clone().sub(lastFollowPos)
-            camera.position.add(delta)
-            controls.target.add(delta)
+          hoverPos = new THREE.Vector3(ownToken.x + footprint / 2, PERSPECTIVE_HOVER_HEIGHT_CELLS, ownToken.y + footprint / 2)
+          if (!wasPerspectiveMode) {
+            // Entering perspective mode: lock OrbitControls down to
+            // rotate-only (no dolly/zoom, no pan, full look-around polar
+            // range instead of the board view's "never dip below the
+            // horizon" clamp) and start looking straight down at the
+            // token, camera pinned directly above it.
+            controls.enablePan = false
+            controls.enableZoom = false
+            controls.minDistance = PERSPECTIVE_LOOK_DISTANCE_CELLS
+            controls.maxDistance = PERSPECTIVE_LOOK_DISTANCE_CELLS
+            controls.minPolarAngle = 0.01
+            controls.maxPolarAngle = Math.PI - 0.01
+            camera.position.copy(hoverPos)
+            controls.target.set(hoverPos.x, hoverPos.y - PERSPECTIVE_LOOK_DISTANCE_CELLS, hoverPos.z)
           }
-          lastFollowPos = targetPos
         }
       } else if (wasPerspectiveMode) {
-        // Exiting perspective mode: restore the standard board framing.
+        // Exiting perspective mode: restore the standard board view's
+        // OrbitControls settings and framing.
+        controls.enablePan = true
+        controls.enableZoom = true
         controls.minDistance = ORBIT_MIN_DISTANCE
         controls.maxDistance = ORBIT_MAX_DISTANCE
+        controls.minPolarAngle = 0
+        controls.maxPolarAngle = ORBIT_MAX_POLAR_ANGLE
         applyDims(lastWidthCells, lastHeightCells)
-        lastFollowPos = null
       }
       wasPerspectiveMode = perspNow
 
       controls.update()
+
+      if (hoverPos) {
+        // OrbitControls just orbited the camera around `controls.target`
+        // based on any drag this frame — normal behavior for the board
+        // view, but here the CAMERA must be the fixed point and the
+        // TARGET the thing that swings around, so the player can rotate
+        // their view without ever actually moving. Re-pin the camera to
+        // this frame's hover spot (which may itself have moved, if the
+        // followed token moved) while preserving the look direction that
+        // drag just produced, by carrying the target along at the same
+        // fixed distance in that direction. See
+        // PERSPECTIVE_LOOK_DISTANCE_CELLS's doc comment.
+        const lookDir = controls.target.clone().sub(camera.position)
+        if (lookDir.lengthSq() < 1e-8) lookDir.set(0, -1, 0)
+        lookDir.normalize().multiplyScalar(PERSPECTIVE_LOOK_DISTANCE_CELLS)
+        camera.position.copy(hoverPos)
+        controls.target.copy(hoverPos).add(lookDir)
+      }
+
       // Applying a texture upload queued by the *previous* tick's
       // refreshBoard() — not the one about to run this tick — is what
       // gives the canvas write a full frame boundary before the GPU

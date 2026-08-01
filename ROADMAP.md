@@ -523,22 +523,27 @@ real change in constraints.
       Personal per-viewer preference, `localStorage`-persisted like the
       panel section order (`screens/useSidebarLayout.ts`), not synced
       through the Yjs doc.
-- [x] First-person "over-the-shoulder" mode in the 3D view — a player-only
-      toggle (`canvas3d/Scene3D.tsx`'s `perspectiveMode` prop, ignored for
-      the DM, who always keeps the free-orbit board view) that follows the
-      viewer's own token close up instead of orbiting the whole board: the
-      camera translates by the token's own frame-to-frame movement delta
-      (preserving whatever manual orbit/zoom the player already dragged in,
-      rather than resetting the view every frame), the viewer's own mini is
-      hidden (nothing to see looking at yourself), walls get real 3D
-      extrusion (`WallRecord` height/thickness) instead of just flat lines
-      baked into the plane texture, and lights become real three.js
-      `PointLight`s with distance falloff (position resolved from the
-      attached token when applicable, mirroring
-      `canvas/LightLayer.ts`'s `resolvePosition`) instead of only the flat
-      glow already baked into the plane. Toggle lives next to the existing
-      2D/3D switch in `screens/SessionScreen.tsx`, same personal/
-      `localStorage`-only convention as `view3d`.
+- [x] First-person mode in the 3D view — a player-only toggle
+      (`canvas3d/Scene3D.tsx`'s `perspectiveMode` prop, ignored for the DM,
+      who always keeps the free-orbit board view) that pins the camera
+      directly above the viewer's own token — no horizontal offset, no
+      chase-cam — and only lets the player rotate their view, never move
+      it: OrbitControls is repurposed with pan/zoom disabled and its
+      camera-to-target distance locked to a small constant, and every
+      frame the camera is re-pinned to the token's current hover spot while
+      the just-dragged look direction is carried over (see the animate()
+      loop's `hoverPos` block for the full trick — effectively inverts
+      OrbitControls' usual "orbit the camera around a fixed target" into
+      "rotate the look direction from a fixed camera"). The viewer's own
+      mini is hidden (nothing to see looking at yourself), walls get real
+      3D extrusion, tall enough to actually read as walls from this
+      close-up view (`WALL_HEIGHT_CELLS`), instead of just flat lines baked
+      into the plane texture, and lights become real three.js `PointLight`s
+      with distance falloff (position resolved from the attached token when
+      applicable, mirroring `canvas/LightLayer.ts`'s `resolvePosition`)
+      instead of only the flat glow already baked into the plane. Toggle
+      lives next to the existing 2D/3D switch in `screens/SessionScreen.tsx`,
+      same personal/`localStorage`-only convention as `view3d`.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---
