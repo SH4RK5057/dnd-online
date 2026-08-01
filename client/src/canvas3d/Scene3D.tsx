@@ -6,129 +6,32 @@ import { useSession } from '../session/useSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useWalls } from '../map/useWalls'
-import { useLights } from '../map/useLights'
-import { useExploration } from '../map/useExploration'
 import { getOrCreatePlayerId } from '../session/lastSession'
-import { useAssetUrl, subscribeAssetUrl } from '../map/assetSync'
-import { resolveCanvasSizeCells, type CellDims } from '../map/canvasSize'
-import { PERSONAL_VISION_RADIUS_CELLS, MAX_VISION_RADIUS_CELLS } from '../map/constants'
+import { subscribeAssetUrl } from '../map/assetSync'
+import { MAX_VISION_RADIUS_CELLS, BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS } from '../map/constants'
 import { hasLineOfSight } from '../map/visibility'
-import { footprintCells, renderScale, resolveModelHeight, resolveStlScale, snapToSlot } from '../map/sizeCategory'
+import { footprintCells, resolveModelHeight, resolveStlScale, snapToSlot } from '../map/sizeCategory'
 import { getCachedModelGeometry, loadModelGeometry } from './modelCache'
-import { getCachedImageTexture, loadImageTexture } from './imageTextureCache'
-import { drawGridLines, drawWalls } from './gridTexture'
-import { drawFogOverlay } from './fogTexture'
-import type { GridType, LightRecord, TokenRecord, WallRecord } from '../map/types'
+import type { TokenRecord } from '../map/types'
 
 const PLACEHOLDER_COLOR = 0x6b6375
 const HAZARD_COLOR = 0xcc5522
 const STL_COLOR = 0xcfc9bd
-const PLANE_BACKGROUND_COLOR = '#3a3226'
-/** Internal texture resolution for the plane, in canvas px per grid cell —
- * independent of the scene's own gridSizePx (which can be arbitrarily small
- * or huge). Capped by PLANE_TEXTURE_MAX_DIMENSION_PX so a very large board
- * doesn't blow the texture budget. */
-const PLANE_TEXTURE_PX_PER_CELL = 64
-const PLANE_TEXTURE_MAX_DIMENSION_PX = 4096
-
-interface PlaneGridConfig {
-  gridSizePx: number
-  gridOffsetX: number
-  gridOffsetY: number
-  gridVisible: boolean
-  gridType: GridType
-}
-
-/** Non-null when this viewer's board should be fogged — omitted entirely
- * for an unmasked DM or a fogEnabled:false scene, same as
- * canvas/MapCanvas.tsx's isDmUnmasked/fogEnabled guard. */
-interface PlaneFogConfig {
-  lights: LightRecord[]
-  tokens: TokenRecord[]
-  ownTokenIds: string[]
-  ambientBrightness: number
-  exploredCells: Set<string>
-  persistentFogEnabled: boolean
-}
-
-function choosePxPerCell(widthCells: number, heightCells: number): number {
-  const largest = Math.max(widthCells, heightCells, 1)
-  return Math.min(PLANE_TEXTURE_PX_PER_CELL, Math.max(1, Math.floor(PLANE_TEXTURE_MAX_DIMENSION_PX / largest)))
-}
-
-/** Builds the plane's full texture as a single flat canvas — background
- * color, the map image (if any) at its own cell-derived footprint, red wall
- * lines, grid lines, and finally a fog-of-war overlay, in that order (walls
- * and grid both stay visible in "remembered" fog areas, same as 2D's
- * masked map+grid+walls container) — since a MeshStandardMaterial only has
- * one `map`, this is the 3D view's answer to 2D's separate MapLayer +
- * GridLayer + WallLayer + FogLayer all layered together. Tokens are NOT
- * part of this texture — they stay real 3D objects positioned above the
- * plane (see updateToken), masked individually by fog visibility instead. */
-function buildPlaneCanvas(image: HTMLImageElement | null, dims: CellDims, grid: PlaneGridConfig, walls: WallRecord[], fog: PlaneFogConfig | null): HTMLCanvasElement {
-  const pxPerCell = choosePxPerCell(dims.widthCells, dims.heightCells)
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, Math.round(dims.widthCells * pxPerCell))
-  canvas.height = Math.max(1, Math.round(dims.heightCells * pxPerCell))
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return canvas
-
-  ctx.fillStyle = PLANE_BACKGROUND_COLOR
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  if (image && grid.gridSizePx > 0) {
-    const imageWidthPx = (image.naturalWidth / grid.gridSizePx) * pxPerCell
-    const imageHeightPx = (image.naturalHeight / grid.gridSizePx) * pxPerCell
-    ctx.drawImage(image, 0, 0, imageWidthPx, imageHeightPx)
-  }
-
-  if (grid.gridSizePx > 0) drawWalls(ctx, walls, pxPerCell, grid.gridSizePx)
-
-  if (grid.gridVisible && grid.gridSizePx > 0) {
-    drawGridLines(ctx, {
-      widthCells: dims.widthCells,
-      heightCells: dims.heightCells,
-      pxPerCell,
-      offsetXCells: grid.gridOffsetX / grid.gridSizePx,
-      offsetYCells: grid.gridOffsetY / grid.gridSizePx,
-      gridType: grid.gridType,
-    })
-  }
-
-  if (fog && grid.gridSizePx > 0) {
-    const fogCanvas = document.createElement('canvas')
-    fogCanvas.width = canvas.width
-    fogCanvas.height = canvas.height
-    const fogCtx = fogCanvas.getContext('2d')
-    if (fogCtx) {
-      drawFogOverlay(fogCtx, canvas.width, canvas.height, {
-        walls,
-        lights: fog.lights,
-        tokens: fog.tokens,
-        gridSizePx: grid.gridSizePx,
-        ownTokenIds: fog.ownTokenIds,
-        personalVisionRadiusCells: PERSONAL_VISION_RADIUS_CELLS,
-        maxVisionRadiusCells: MAX_VISION_RADIUS_CELLS,
-        ambientBrightness: fog.ambientBrightness,
-        exploredCells: fog.exploredCells,
-        persistentFogEnabled: fog.persistentFogEnabled,
-        pxPerCell,
-      })
-      ctx.globalCompositeOperation = 'destination-in'
-      ctx.drawImage(fogCanvas, 0, 0)
-      ctx.globalCompositeOperation = 'source-over'
-    }
-  }
-
-  return canvas
-}
+/** How often (ms) to re-pull a fresh frame from the 2D canvas's live
+ * rendering into the plane's texture — see the component doc comment for
+ * why the plane is textured this way instead of building its own separate
+ * rendering. Not every animation frame: extraction is a real render pass
+ * (Pixi docs call it "relatively expensive"), and this is a personal,
+ * non-twitch-response view where a brief lag behind a token move or a
+ * fog reveal is unnoticeable. */
+const BOARD_REFRESH_INTERVAL_MS = 200
 /** Pointer movement (px) below which a press+release counts as a click
  * (select) rather than a drag — mirrors the click-vs-drag disambiguation
  * canvas/TokenSprite.ts already does for the 2D view. */
 const DRAG_CLICK_THRESHOLD_PX = 6
 
 // Shared, stateless geometry/materials reused across every token's
-// placeholder or STL mesh — never disposed per-token (only per-token Mesh
+// placeholder mesh — never disposed per-token (only per-token Mesh
 // *instances* are created/removed; geometries/materials are cached module-
 // level, same spirit as canvas3d/modelCache.ts caching loaded STL geometry).
 const PLACEHOLDER_GEOMETRY = new THREE.ConeGeometry(1, 1, 12).translate(0, 0.5, 0)
@@ -137,21 +40,15 @@ const PLACEHOLDER_MATERIAL = new THREE.MeshStandardMaterial({ color: PLACEHOLDER
 const HAZARD_MATERIAL = new THREE.MeshStandardMaterial({ color: HAZARD_COLOR })
 const STL_MATERIAL = new THREE.MeshStandardMaterial({ color: STL_COLOR })
 
-type TokenVisualMode = 'stl' | 'image' | 'placeholder'
-
 interface TokenUserData {
-  /** Which (modelAssetId or assetId) the group's current child was resolved
-   * from — `stl:<id>` / `img:<id>` / `'placeholder'` — compared against a
-   * freshly-computed key each update to decide whether to re-resolve. */
-  resolvedKey: string | null
+  /** The modelAssetId currently loaded/loading for this token's mesh. A
+   * group only exists at all for tokens that have one — see the
+   * token-diffing effect — so this is never null for a live group. */
+  modelAssetId: string
   unsubscribe: (() => void) | null
-  mode: TokenVisualMode
-}
-
-function tokenResolveKey(token: TokenRecord): string {
-  if (token.modelAssetId) return `stl:${token.modelAssetId}`
-  if (token.assetId) return `img:${token.assetId}`
-  return 'placeholder'
+  /** Whether the group's current child is the resolved STL mesh (true) or
+   * a placeholder shown while it loads (false). */
+  usingStl: boolean
 }
 
 function footprintOf(token: TokenRecord): number {
@@ -194,152 +91,117 @@ function ensurePlaceholderChild(group: THREE.Group, token: TokenRecord): void {
   applyPlaceholderTransform(mesh, token)
 }
 
-/** A token without an uploaded 3D model shows its ordinary 2D token image
- * instead of the generic placeholder cone — a flat, always-camera-facing
- * billboard (THREE.Sprite), the 3D view's equivalent of the 2D map's token
- * art. Anchored at its bottom edge (`sprite.center.set(0.5, 0)`) so it
- * visually "stands" on the plane rather than floating centered on it. */
-function applyBillboardTransform(sprite: THREE.Sprite, token: TokenRecord): void {
-  sprite.center.set(0.5, 0)
-  const texture = (sprite.material as THREE.SpriteMaterial).map
-  const image = texture?.image as { width: number; height: number } | undefined
-  const aspect = image ? image.height / image.width : 1
-  const footprint = footprintCells(token.sizeCategory) * renderScale(token.sizeCategory)
-  sprite.scale.set(footprint, footprint * aspect, 1)
-}
-
-/** Resolves (or re-resolves, on modelAssetId/assetId change) a token's
- * visual — an uploaded STL model takes priority, then the token's ordinary
- * 2D image as a billboard, then a generic placeholder cone/box as the last
- * resort — and keeps its transform current every call. The real resolved
- * visual is swapped in once its asset loads — async, but never blocks the
- * token from having *something* on the plane in the meantime. */
-function updateToken(doc: Y.Doc, group: THREE.Group, token: TokenRecord): void {
+/** Resolves (or re-resolves, on modelAssetId change) a token's STL mesh and
+ * keeps its transform current every call. A placeholder shows immediately
+ * and is swapped for the real STL mesh once it resolves — async, but never
+ * blocks the token from having *something* standing on the plane in the
+ * meantime. Only ever called for tokens that have a modelAssetId — see the
+ * token-diffing effect, which doesn't even create a group otherwise (a
+ * token with no model is already visible via its ordinary 2D image, baked
+ * into the plane's own texture — see the component doc comment). */
+function updateToken(doc: Y.Doc, group: THREE.Group, token: TokenRecord, modelAssetId: string): void {
   positionGroup(group, token)
   const data = group.userData as TokenUserData
-  const key = tokenResolveKey(token)
 
-  if (data.resolvedKey === key) {
-    const child = group.children[0]
-    if (child && data.mode === 'stl') applyStlTransform(child as THREE.Mesh, token)
-    else if (child && data.mode === 'image') applyBillboardTransform(child as THREE.Sprite, token)
-    else if (child) applyPlaceholderTransform(child as THREE.Mesh, token)
-    return
-  }
-
-  data.unsubscribe?.()
-  data.unsubscribe = null
-  data.resolvedKey = key
-  data.mode = 'placeholder'
-  ensurePlaceholderChild(group, token)
-
-  if (token.modelAssetId) {
-    const assetId = token.modelAssetId
-    data.unsubscribe = subscribeAssetUrl(doc, assetId, (url) => {
-      if (data.resolvedKey !== key) return // superseded by a newer change
+  if (data.modelAssetId !== modelAssetId) {
+    data.unsubscribe?.()
+    data.modelAssetId = modelAssetId
+    data.usingStl = false
+    ensurePlaceholderChild(group, token)
+    data.unsubscribe = subscribeAssetUrl(doc, modelAssetId, (url) => {
+      if (data.modelAssetId !== modelAssetId) return // superseded by a newer change
       const applyGeometry = (geometry: THREE.BufferGeometry) => {
-        if (data.resolvedKey !== key) return
+        if (data.modelAssetId !== modelAssetId) return
         const mesh = new THREE.Mesh(geometry, STL_MATERIAL)
         group.clear()
         group.add(mesh)
-        data.mode = 'stl'
+        data.usingStl = true
         applyStlTransform(mesh, token)
       }
       const cached = getCachedModelGeometry(url)
       if (cached) applyGeometry(cached)
       else void loadModelGeometry(url).then(applyGeometry)
     })
-  } else if (token.assetId) {
-    const assetId = token.assetId
-    data.unsubscribe = subscribeAssetUrl(doc, assetId, (url) => {
-      if (data.resolvedKey !== key) return
-      const applyTexture = (texture: THREE.Texture) => {
-        if (data.resolvedKey !== key) return
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }))
-        const previousChild = group.children[0]
-        group.clear()
-        group.add(sprite)
-        data.mode = 'image'
-        applyBillboardTransform(sprite, token)
-        if (previousChild instanceof THREE.Sprite) previousChild.material.dispose()
-      }
-      const cached = getCachedImageTexture(url)
-      if (cached) applyTexture(cached)
-      else void loadImageTexture(url).then(applyTexture)
-    })
+  } else {
+    const mesh = group.children[0] as THREE.Mesh | undefined
+    if (mesh) (data.usingStl ? applyStlTransform : applyPlaceholderTransform)(mesh, token)
   }
 }
 
 interface Scene3DProps {
+  /** Reads a fresh, flat, native-pixel-scale render of exactly what the 2D
+   * map (canvas/MapCanvas.tsx) currently shows — map image, grid, walls,
+   * fog-of-war, and tokens, already correctly composed and fog-masked —
+   * for use as the plane's own texture. Supplied by screens/SessionScreen.tsx,
+   * which keeps a MapCanvas mounted (just visually hidden) even while this
+   * view is active so there's always something live to read. Null (or a
+   * function returning null) is treated as "nothing to show yet". */
+  getBoardCanvas?: () => HTMLCanvasElement | null
   selectedTokenId?: string | null
   onSelectToken?: (tokenId: string) => void
 }
 
 /**
  * Personal, per-viewer 3D "flat plane" alternative to the 2D map
- * (canvas/MapCanvas.tsx) — meant to show everything the 2D view does: the
- * map image, grid, walls (flat red lines, same as 2D), and fog-of-war are
- * all baked into the plane's own texture (see buildPlaneCanvas), while
- * tokens stay real 3D objects standing on top of it — an uploaded STL
- * (TokenRecord.modelAssetId) stands in as a real 3D mini, a token with no
- * model shows its ordinary 2D image as a flat camera-facing billboard, and
- * a token with neither gets a plain placeholder cone (or a flat box for
- * hazard/trap tokens).
+ * (canvas/MapCanvas.tsx). The plane is textured with a literal, continuously
+ * refreshed render of the 2D map itself (via `getBoardCanvas`) — map image,
+ * grid, walls, fog-of-war, and every token's ordinary 2D image, all exactly
+ * as 2D shows them, since this view intentionally does not reimplement any
+ * of that rendering a second time. The one thing 3D adds on top: a token
+ * with an uploaded STL model (TokenRecord.modelAssetId) also gets a real
+ * standing 3D mini positioned above its own spot on the plane — "the 3D
+ * minis are just on top of the 2D map". A token with no model has no
+ * separate 3D object at all; its ordinary 2D image (already baked into the
+ * plane texture) is its entire 3D representation.
  *
  * v1 scope, deliberately narrower than the 2D view:
- * - Fog-of-war hides a token itself (not just the terrain under it) using a
- *   simple line-of-sight + range check (map/visibility.ts's
- *   hasLineOfSight), same rule as 2D's live token mask — but unlike 2D,
- *   this view doesn't also grow the persisted exploration memory itself
- *   (map/useExploration.ts's revealCells); it reads whatever's already been
- *   explored (via 2D, or another player) rather than independently writing
- *   to it, and there's no DM preview-as-player support here yet either
- *   (isDm is the only masking toggle).
- * - Dragging a token is DM-only, matching 2D's existing convention (token
- *   dragging in the 2D view has always been DM-only).
+ * - Only a token's separate 3D mini (not the flat image baked into the
+ *   plane texture, which 2D's own fog masking already handles correctly)
+ *   needs its own visibility gate here: a simple line-of-sight + range
+ *   check (map/visibility.ts's hasLineOfSight), the same rule as 2D's live
+ *   token mask, so a mini doesn't keep standing there once its token
+ *   scrolls out of live sight. There's no DM preview-as-player support in
+ *   3D yet — isDm is the only masking toggle.
+ * - Dragging a token's mini is DM-only, matching 2D's existing convention
+ *   (token dragging in the 2D view has always been DM-only), and only
+ *   tokens with a mini are draggable in 3D at all — a token with no model
+ *   has nothing here to click on; drag it from the 2D view instead.
  * - A drag only writes the token's final position once released — no
  *   continuous position broadcast mid-drag like 2D's onDragMove throttling.
  * - No selection highlight ring yet (selection still works functionally —
- *   clicking a token calls onSelectToken, opening the same side-panel
+ *   clicking a mini calls onSelectToken, opening the same side-panel
  *   editors the 2D view uses — it just isn't visually marked in 3D).
- * - Lights render only as illumination (baked into the fog texture, same as
- *   2D); annotations/pings/measuring have no 3D equivalent.
  */
-export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps) {
+export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken }: Scene3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const { session } = useSession()
   const doc = session?.doc ?? null
   const isDm = session?.role === 'dm'
   const { activeScene } = useScenes(doc)
-  const mapUrl = useAssetUrl(doc, activeScene?.mapAssetId ?? null)
   const { tokens, moveToken } = useTokens(doc, activeScene?.id ?? null)
   const { walls } = useWalls(doc, activeScene?.id ?? null)
-  const { lights } = useLights(doc, activeScene?.id ?? null)
   // No DM preview-as-player support in 3D yet (see doc comment) — a real
   // player viewer's own stable id, or null for the DM (who's always
   // unmasked) or when there's no session at all.
   const viewerId = isDm ? null : getOrCreatePlayerId()
-  const { exploredCells } = useExploration(doc, activeScene?.id ?? null, viewerId)
 
-  // Mutable "latest" ref so the imperative pointer handlers (created once,
-  // in the mount effect below) always see fresh data without needing to be
-  // recreated — same reasoning as canvas/TokenLayer.ts's update() pattern,
-  // just via a ref instead of a class method.
-  const latestRef = useRef({ tokens, isDm, moveToken, onSelectToken })
-  latestRef.current = { tokens, isDm, moveToken, onSelectToken }
+  // Mutable "latest" ref so the imperative pointer handlers and the RAF
+  // board-refresh loop (both created once, in the mount effect below)
+  // always see fresh data without needing to be recreated — same reasoning
+  // as canvas/TokenLayer.ts's update() pattern, just via a ref instead of a
+  // class method.
+  const latestRef = useRef({ tokens, isDm, moveToken, onSelectToken, getBoardCanvas, activeScene })
+  latestRef.current = { tokens, isDm, moveToken, onSelectToken, getBoardCanvas, activeScene }
 
   const sceneRef = useRef<THREE.Scene | null>(null)
   const planeRef = useRef<THREE.Mesh | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
   const tokenGroupsRef = useRef(new Map<string, THREE.Group>())
-  // Avoids re-fetching/re-decoding the map image (via `new Image()`) every
-  // time an unrelated grid setting changes and re-runs the effect below —
-  // only reloaded when mapUrl itself actually changes.
-  const loadedImageRef = useRef<{ url: string; image: HTMLImageElement } | null>(null)
 
   // Mount: renderer/scene/camera/controls/lights/plane + pointer handlers +
-  // render loop. Runs once for the life of this component instance.
+  // render loop (which also periodically refreshes the plane's texture from
+  // getBoardCanvas). Runs once for the life of this component instance.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -379,6 +241,60 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
     const plane = new THREE.Mesh(planeGeometry, planeMaterial)
     scene.add(plane)
     planeRef.current = plane
+
+    // Persistent texture source: getBoardCanvas() hands back a brand-new
+    // canvas element every call, so instead of recreating the Three.js
+    // texture each refresh, its content is copied into one long-lived
+    // canvas that a single CanvasTexture wraps — cheaper, and avoids
+    // texture/material churn.
+    const boardCanvas = document.createElement('canvas')
+    boardCanvas.width = 1
+    boardCanvas.height = 1
+    const boardTexture = new THREE.CanvasTexture(boardCanvas)
+    boardTexture.colorSpace = THREE.SRGBColorSpace
+    planeMaterial.map = boardTexture
+    planeMaterial.needsUpdate = true
+
+    let lastWidthCells = 0
+    let lastHeightCells = 0
+    let lastSceneId: string | null = null
+
+    const applyDims = (widthCells: number, heightCells: number) => {
+      plane.scale.set(widthCells, 1, heightCells)
+      const cx = widthCells / 2
+      const cz = heightCells / 2
+      plane.position.set(cx, 0, cz)
+      const dist = Math.max(widthCells, heightCells)
+      camera.position.set(cx, dist * 0.9, cz + dist * 0.9)
+      controls.target.set(cx, 0, cz)
+      controls.update()
+    }
+    // A reasonable default framing before the first real board extraction
+    // arrives (MapCanvas needs at least one render pass first).
+    applyDims(BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS)
+
+    const refreshBoard = () => {
+      const { getBoardCanvas: getBoard, activeScene: scene2 } = latestRef.current
+      const extracted = getBoard?.()
+      if (!extracted || extracted.width <= 0 || extracted.height <= 0 || !scene2 || scene2.gridSizePx <= 0) return
+
+      boardCanvas.width = extracted.width
+      boardCanvas.height = extracted.height
+      const ctx = boardCanvas.getContext('2d')
+      if (!ctx) return
+      ctx.clearRect(0, 0, extracted.width, extracted.height)
+      ctx.drawImage(extracted, 0, 0)
+      boardTexture.needsUpdate = true
+
+      const widthCells = extracted.width / scene2.gridSizePx
+      const heightCells = extracted.height / scene2.gridSizePx
+      if (widthCells !== lastWidthCells || heightCells !== lastHeightCells || scene2.id !== lastSceneId) {
+        lastWidthCells = widthCells
+        lastHeightCells = heightCells
+        lastSceneId = scene2.id
+        applyDims(widthCells, heightCells)
+      }
+    }
 
     const resize = () => {
       const { clientWidth, clientHeight } = container
@@ -468,12 +384,17 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
     window.addEventListener('pointerup', onPointerUp)
 
     let animationFrame = 0
-    const animate = () => {
+    let lastBoardRefresh = 0
+    const animate = (time: number) => {
       controls.update()
+      if (time - lastBoardRefresh >= BOARD_REFRESH_INTERVAL_MS) {
+        lastBoardRefresh = time
+        refreshBoard()
+      }
       renderer.render(scene, camera)
       animationFrame = requestAnimationFrame(animate)
     }
-    animate()
+    animationFrame = requestAnimationFrame(animate)
 
     return () => {
       cancelAnimationFrame(animationFrame)
@@ -486,6 +407,7 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
         ;(group.userData as TokenUserData).unsubscribe?.()
       }
       tokenGroups.clear()
+      boardTexture.dispose()
       planeGeometry.dispose()
       planeMaterial.dispose()
       renderer.dispose()
@@ -495,148 +417,28 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
       cameraRef.current = null
       controlsRef.current = null
     }
-    // Mount-once: pointer handlers close over `latestRef` (always current)
-    // rather than the props/state that would otherwise need to be listed
-    // here, so this intentionally never re-runs.
+    // Mount-once: pointer handlers and the board-refresh loop close over
+    // `latestRef` (always current) rather than the props/state that would
+    // otherwise need to be listed here, so this intentionally never re-runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sizes, grids, and textures the plane — the 3D view's equivalent of 2D's
-  // MapLayer + GridLayer combined, since a MeshStandardMaterial only has one
-  // `map` (see buildPlaneCanvas). Reframes the camera to match every time
-  // the plane's actual dimensions change: first an immediate best-guess
-  // from the blank-canvas dims (also the DM's floor for extending the play
-  // area past the map image — see map/canvasSize.ts's resolveCanvasSizeCells,
-  // shared with MapCanvas.tsx so both views always agree on the board size),
-  // then a correction once the real map image loads and its true size is
-  // known. OrbitControls still lets the viewer reframe manually afterward
-  // regardless.
-  useEffect(() => {
-    const plane = planeRef.current
-    const camera = cameraRef.current
-    const controls = controlsRef.current
-    if (!plane || !camera || !controls || !activeScene) return
-    let cancelled = false
-    const grid: PlaneGridConfig = {
-      gridSizePx: activeScene.gridSizePx,
-      gridOffsetX: activeScene.gridOffsetX,
-      gridOffsetY: activeScene.gridOffsetY,
-      gridVisible: activeScene.gridVisible,
-      gridType: activeScene.gridType ?? 'square',
-    }
-    const material = plane.material as THREE.MeshStandardMaterial
-
-    const applyDims = (dims: CellDims) => {
-      plane.scale.set(dims.widthCells, 1, dims.heightCells)
-      const cx = dims.widthCells / 2
-      const cz = dims.heightCells / 2
-      plane.position.set(cx, 0, cz)
-      const dist = Math.max(dims.widthCells, dims.heightCells)
-      camera.position.set(cx, dist * 0.9, cz + dist * 0.9)
-      controls.target.set(cx, 0, cz)
-      controls.update()
-    }
-
-    const fog: PlaneFogConfig | null =
-      !isDm && activeScene.fogEnabled
-        ? {
-            lights,
-            tokens,
-            ownTokenIds: (activeScene.sharedVisionEnabled ?? false ? tokens.filter((t) => t.ownerId !== null) : tokens.filter((t) => t.ownerId === viewerId)).map((t) => t.id),
-            ambientBrightness: activeScene.ambientBrightness,
-            exploredCells,
-            persistentFogEnabled: activeScene.persistentFogEnabled ?? true,
-          }
-        : null
-
-    const applyTexture = (image: HTMLImageElement | null, dims: CellDims) => {
-      const canvas = buildPlaneCanvas(image, dims, grid, walls, fog)
-      const texture = new THREE.CanvasTexture(canvas)
-      texture.colorSpace = THREE.SRGBColorSpace
-      const previousMap = material.map
-      material.map = texture
-      material.color.set(0xffffff)
-      material.transparent = !!fog
-      material.needsUpdate = true
-      previousMap?.dispose()
-    }
-
-    // scene is checked truthy above, and a null imageSizeCells always
-    // resolves to a concrete size — never null here.
-    const blankOnlyDims = resolveCanvasSizeCells(activeScene, null) as CellDims
-    applyDims(blankOnlyDims)
-    applyTexture(null, blankOnlyDims)
-
-    if (!mapUrl) {
-      loadedImageRef.current = null
-    } else {
-      const applyFromImage = (image: HTMLImageElement) => {
-        const imageSizeCells: CellDims = {
-          widthCells: image.naturalWidth / grid.gridSizePx,
-          heightCells: image.naturalHeight / grid.gridSizePx,
-        }
-        const dims = resolveCanvasSizeCells(activeScene, imageSizeCells) as CellDims
-        applyDims(dims)
-        applyTexture(image, dims)
-      }
-
-      const cached = loadedImageRef.current?.url === mapUrl ? loadedImageRef.current.image : null
-      if (cached) {
-        applyFromImage(cached)
-      } else {
-        const image = new Image()
-        image.onload = () => {
-          if (cancelled) return
-          loadedImageRef.current = { url: mapUrl, image }
-          applyFromImage(image)
-        }
-        image.src = mapUrl
-      }
-    }
-
-    return () => {
-      cancelled = true
-    }
-    // Deliberately narrower than "activeScene" as a whole — this should
-    // only re-run when the map image or these specific board-appearance
-    // fields change, not on every unrelated scene-settings edit. `tokens`
-    // is included because fog visibility is computed from each owned
-    // token's current position.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    mapUrl,
-    activeScene?.gridSizePx,
-    activeScene?.gridOffsetX,
-    activeScene?.gridOffsetY,
-    activeScene?.gridVisible,
-    activeScene?.gridType,
-    activeScene?.blankWidthCells,
-    activeScene?.blankHeightCells,
-    activeScene?.fogEnabled,
-    activeScene?.ambientBrightness,
-    activeScene?.persistentFogEnabled,
-    activeScene?.sharedVisionEnabled,
-    walls,
-    lights,
-    tokens,
-    exploredCells,
-    isDm,
-    viewerId,
-  ])
-
   // Diffs the token list against the live Group map — add/remove/update,
-  // mirroring canvas/TokenLayer.ts's update() pattern for the 2D view. Also
-  // gates each non-owned token's visibility by live line-of-sight when fog
-  // is active — the same "dynamic content only shows within current-frame
-  // live sight" rule as 2D's dual fog mask (a creature standing in a
-  // "remembered" room shouldn't stay visible just because the terrain is
-  // remembered), just via a direct hasLineOfSight+range check per token
-  // rather than a rendered mask, since tokens are ordinary 3D objects here.
+  // mirroring canvas/TokenLayer.ts's update() pattern for the 2D view. Only
+  // tokens with an uploaded STL model get a group at all (see the component
+  // doc comment — a token with no model is already shown via its ordinary
+  // 2D image, baked into the plane's own texture). Also gates each mini's
+  // visibility by live line-of-sight when fog is active — the same
+  // "dynamic content only shows within current-frame live sight" rule as
+  // 2D's live token mask (a creature standing in a "remembered" room
+  // shouldn't stay visible just because the terrain is remembered), via a
+  // direct hasLineOfSight+range check per token rather than a rendered
+  // mask, since minis are ordinary 3D objects here.
   useEffect(() => {
     const scene = sceneRef.current
     if (!scene || !doc || !activeScene) return
     const groups = tokenGroupsRef.current
-    const visibleTokens = isDm ? tokens : tokens.filter((t) => !t.hidden)
+    const visibleTokens = (isDm ? tokens : tokens.filter((t) => !t.hidden)).filter((t) => !!t.modelAssetId)
     const seen = new Set<string>()
 
     const fogActive = !isDm && activeScene.fogEnabled
@@ -657,12 +459,13 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
       let group = groups.get(token.id)
       if (!group) {
         group = new THREE.Group()
-        group.userData = { resolvedKey: null, unsubscribe: null, mode: 'placeholder' } satisfies TokenUserData
+        group.userData = { modelAssetId: '', unsubscribe: null, usingStl: false } satisfies TokenUserData
         scene.add(group)
         groups.set(token.id, group)
       }
       group.visible = inLiveSight(token)
-      updateToken(doc, group, token)
+      // token.modelAssetId is guaranteed non-null by the visibleTokens filter above.
+      updateToken(doc, group, token, token.modelAssetId as string)
     }
 
     for (const [id, group] of groups) {

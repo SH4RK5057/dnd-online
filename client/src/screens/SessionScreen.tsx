@@ -75,6 +75,10 @@ export function SessionScreen() {
    * for their own screen independently (see canvas3d/Scene3D.tsx's doc
    * comment for what 3D mode does and doesn't support in v1). */
   const [view3d, setView3d] = useState(false)
+  // Populated by MapCanvas (always mounted, see below) via onBoardCanvasHandle
+  // — Scene3D calls this to render its plane as a live texture of the 2D
+  // canvas's own rendering instead of reimplementing it.
+  const boardCanvasExtractorRef = useRef<(() => HTMLCanvasElement | null) | null>(null)
   // Side-panel section order (see components/PanelSection.tsx) — DM and
   // player see different section sets, so each role's arrangement is saved
   // independently.
@@ -436,12 +440,19 @@ export function SessionScreen() {
               {isUnassignedPlayer && (
                 <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
               )}
-              {view3d ? (
+              {view3d && (
                 <Scene3D
+                  getBoardCanvas={() => boardCanvasExtractorRef.current?.() ?? null}
                   selectedTokenId={selectedTokenId}
                   onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
                 />
-              ) : (
+              )}
+              {/* Stays mounted (just hidden) even in 3D view — its Pixi
+                  renderer keeps computing fog/tokens/walls in the background
+                  so Scene3D can read a live, always-correct extraction of it
+                  (see MapCanvas's onBoardCanvasHandle doc comment) rather than
+                  reimplementing any of that rendering a second time. */}
+              <div style={view3d ? { display: 'none' } : undefined}>
                 <MapCanvas
                   toolMode={effectiveToolMode}
                   snapWalls={false}
@@ -453,8 +464,11 @@ export function SessionScreen() {
                   onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
                   armedTemplate={armedTemplate}
                   onArmedTemplatePlaced={() => setArmedTemplate(null)}
+                  onBoardCanvasHandle={(extract) => {
+                    boardCanvasExtractorRef.current = extract
+                  }}
                 />
-              )}
+              </div>
               <button
                 type="button"
                 className="session-screen__3d-toggle"

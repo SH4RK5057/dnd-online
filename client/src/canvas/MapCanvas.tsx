@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Container, type FederatedPointerEvent } from 'pixi.js'
+import { Container, Rectangle, type FederatedPointerEvent } from 'pixi.js'
 import { useSession } from '../session/useSession'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
@@ -66,6 +66,15 @@ interface MapCanvasProps {
    * override pattern as `onPlaceToken`/`onPlacePoi`. */
   armedTemplate?: { shape: MeasureShape; sizeFt: number } | null
   onArmedTemplatePlaced?: () => void
+  /** Fires whenever a fresh extraction function becomes available (and with
+   * `null` on unmount/teardown) — the 3D flat-plane view (canvas3d/Scene3D.tsx)
+   * uses this to render its plane as a literal texture of this exact 2D
+   * rendering (map, grid, walls, fog-of-war, tokens — everything this
+   * canvas already draws correctly) instead of separately reimplementing
+   * any of it. Requires this component to stay mounted (just visually
+   * hidden) while the viewer is looking at the 3D view — see
+   * screens/SessionScreen.tsx. */
+  onBoardCanvasHandle?: (extract: (() => HTMLCanvasElement | null) | null) => void
 }
 
 export function MapCanvas({
@@ -81,6 +90,7 @@ export function MapCanvas({
   onSelectToken,
   armedTemplate = null,
   onArmedTemplatePlaced,
+  onBoardCanvasHandle,
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const app = usePixiApp(containerRef)
@@ -657,6 +667,44 @@ export function MapCanvas({
     armedTemplate,
     onArmedTemplatePlaced,
   ])
+
+  // Hands the caller a function that renders a fresh, flat, native-pixel-
+  // scale image of exactly what this canvas currently shows on the board
+  // (terrain — map/grid/walls, fog-masked — then tokens on top, live-fog-
+  // masked) via Pixi's extract system, bypassing `world`'s own zoom/pan/
+  // fit-to-viewport transform entirely (a `frame` matching the board's own
+  // native size, rather than the on-screen viewport size, means the
+  // extraction reads each container's content at 1:1 scale regardless of
+  // however the DM currently has the 2D view zoomed/panned). See
+  // MapCanvasProps.onBoardCanvasHandle's doc comment for why this exists.
+  useEffect(() => {
+    if (!onBoardCanvasHandle) return
+    if (!app || !fogTargetRef.current || !tokenTargetRef.current || !mapSize) {
+      onBoardCanvasHandle(null)
+      return
+    }
+    const fogTarget = fogTargetRef.current
+    const tokenTarget = tokenTargetRef.current
+    const { width, height } = mapSize
+
+    const extract = (): HTMLCanvasElement | null => {
+      if (width <= 0 || height <= 0) return null
+      const frame = new Rectangle(0, 0, width, height)
+      const combined = document.createElement('canvas')
+      combined.width = width
+      combined.height = height
+      const ctx = combined.getContext('2d')
+      if (!ctx) return null
+      const terrain = app.renderer.extract.canvas({ target: fogTarget, frame })
+      const tokensCanvas = app.renderer.extract.canvas({ target: tokenTarget, frame })
+      ctx.drawImage(terrain as unknown as CanvasImageSource, 0, 0)
+      ctx.drawImage(tokensCanvas as unknown as CanvasImageSource, 0, 0)
+      return combined
+    }
+
+    onBoardCanvasHandle(extract)
+    return () => onBoardCanvasHandle(null)
+  }, [onBoardCanvasHandle, app, mapSize])
 
   return <div ref={containerRef} className="map-canvas" data-ready={app !== null} />
 }

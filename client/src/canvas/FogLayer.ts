@@ -1,6 +1,18 @@
 import { Container, Graphics, RenderTexture, Sprite, type Renderer } from 'pixi.js'
 import { computeVisibilityPolygon, type Point, type Segment } from '../map/visibility'
+import { footprintCells } from '../map/sizeCategory'
 import type { LightRecord, TokenRecord, WallRecord } from '../map/types'
+
+/** A token's vision/light-attachment origin should be its footprint
+ * *center*, not its `x`/`y` (the footprint's top-left anchor, same
+ * convention as canvas3d's own footprintOf) — using the raw anchor point
+ * visibly offset every vision bubble and attached light toward the
+ * token's top-left corner instead of standing on the token itself. */
+function tokenCenterPx(token: TokenRecord, gridSizePx: number): Point {
+  const widthCells = token.hazardSize ? token.hazardSize.widthCells : footprintCells(token.sizeCategory)
+  const heightCells = token.hazardSize ? token.hazardSize.heightCells : footprintCells(token.sizeCategory)
+  return { x: (token.x + widthCells / 2) * gridSizePx, y: (token.y + heightCells / 2) * gridSizePx }
+}
 
 export interface FogInput {
   walls: WallRecord[]
@@ -141,7 +153,7 @@ export class FogLayer {
     const resolveLightPos = (light: LightRecord): Point => {
       if (light.attachedTokenId) {
         const token = tokensById.get(light.attachedTokenId)
-        if (token) return { x: token.x * gridSizePx, y: token.y * gridSizePx }
+        if (token) return tokenCenterPx(token, gridSizePx)
       }
       return { x: light.x * gridSizePx, y: light.y * gridSizePx }
     }
@@ -159,7 +171,7 @@ export class FogLayer {
       fillPolygon(this.illumGraphics, polygon)
     }
     for (const token of ownTokens) {
-      const pos: Point = { x: token.x * gridSizePx, y: token.y * gridSizePx }
+      const pos = tokenCenterPx(token, gridSizePx)
       const polygon = computeVisibilityPolygon(pos, wallSegmentsPx, personalVisionRadiusCells * gridSizePx)
       fillPolygon(this.illumGraphics, polygon)
     }
@@ -167,7 +179,7 @@ export class FogLayer {
     // LOS mask: union of every owned token's own max-range visibility polygon.
     this.losMaskGraphics.clear()
     for (const token of ownTokens) {
-      const pos: Point = { x: token.x * gridSizePx, y: token.y * gridSizePx }
+      const pos = tokenCenterPx(token, gridSizePx)
       const polygon = computeVisibilityPolygon(pos, wallSegmentsPx, maxVisionRadiusCells * gridSizePx)
       fillPolygon(this.losMaskGraphics, polygon)
     }
