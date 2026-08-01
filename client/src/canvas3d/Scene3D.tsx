@@ -275,6 +275,7 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     let lastWidthCells = 0
     let lastHeightCells = 0
     let lastSceneId: string | null = null
+    let lastRefreshLogAt = 0
 
     const applyDims = (widthCells: number, heightCells: number) => {
       plane.scale.set(widthCells, 1, heightCells)
@@ -321,6 +322,19 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
       // skipping this fill would make every undrawn pixel render pure black.
       ctx.fillStyle = PLANE_BACKGROUND_COLOR
       ctx.fillRect(0, 0, extracted.width, extracted.height)
+      // TEMPORARY diagnostic: see the matching note in MapCanvas.tsx's
+      // extract() — pinpointing a GL_INVALID_VALUE
+      // "glCopySubTextureCHROMIUM: Offset overflows texture dimensions"
+      // error reported on real hardware. Remove once the mismatch is found.
+      const nowLog = performance.now()
+      if (nowLog - lastRefreshLogAt > 1000) {
+        lastRefreshLogAt = nowLog
+        // eslint-disable-next-line no-console
+        console.warn('[refresh-diag]', {
+          extracted: { width: extracted.width, height: extracted.height },
+          boardCanvasBefore: { width: boardCanvas.width, height: boardCanvas.height },
+        })
+      }
       ctx.drawImage(extracted, 0, 0)
       boardTexture.needsUpdate = true
 
