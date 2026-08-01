@@ -1,4 +1,22 @@
-import type { GridType } from '../map/types'
+import type { GridType, WallRecord } from '../map/types'
+
+/** Mirrors canvas/WallLayer.ts's red-line rendering, in the plane texture's
+ * own px-per-cell scale rather than the scene's real gridSizePx. Purely
+ * decorative here too — line-of-sight math (map/visibility.ts) reads
+ * WallRecord's cell coordinates directly, never these pixels. */
+export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallRecord[], pxPerCell: number, gridSizePx: number): void {
+  ctx.save()
+  ctx.strokeStyle = 'rgba(255, 68, 68, 0.9)'
+  for (const wall of walls) {
+    const thicknessPx = (wall.thickness ?? 4) * (pxPerCell / Math.max(gridSizePx, 1))
+    ctx.lineWidth = Math.max(1, thicknessPx)
+    ctx.beginPath()
+    ctx.moveTo(wall.x1 * pxPerCell, wall.y1 * pxPerCell)
+    ctx.lineTo(wall.x2 * pxPerCell, wall.y2 * pxPerCell)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
 
 /** Grid-line drawing for the 3D flat-plane view's baked-in plane texture —
  * Three.js has no live vector-graphics layer to draw into the scene the way
