@@ -238,7 +238,13 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
 
     const planeGeometry = new THREE.PlaneGeometry(1, 1)
     planeGeometry.rotateX(-Math.PI / 2)
-    const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3226 })
+    // White, not a placeholder tint: the plane is always textured (the
+    // board canvas's own background fill plus whatever's drawn on top —
+    // see buildPlaneCanvas/refreshBoard's PLANE_BACKGROUND_COLOR fill), so
+    // material.color only ever multiplies against — and needlessly
+    // darkens — that texture's real colors. A non-white color here was
+    // the actual cause of the plane rendering as if it were black.
+    const planeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff })
     const plane = new THREE.Mesh(planeGeometry, planeMaterial)
     scene.add(plane)
     planeRef.current = plane
@@ -253,6 +259,12 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     boardCanvas.height = 1
     const boardTexture = new THREE.CanvasTexture(boardCanvas)
     boardTexture.colorSpace = THREE.SRGBColorSpace
+    // Mipmaps would be regenerated every refresh for no benefit (the whole
+    // texture gets replaced wholesale, not sampled at a distance-varying
+    // scale) — skip them and the min/mag filter that would require them.
+    boardTexture.generateMipmaps = false
+    boardTexture.minFilter = THREE.LinearFilter
+    boardTexture.magFilter = THREE.LinearFilter
     planeMaterial.map = boardTexture
     planeMaterial.needsUpdate = true
 
@@ -274,22 +286,10 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     // arrives (MapCanvas needs at least one render pass first).
     applyDims(BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS)
 
-    let refreshCallCount = 0
-    let refreshSuccessCount = 0
     const refreshBoard = () => {
-      refreshCallCount++
       const { getBoardCanvas: getBoard, activeScene: scene2 } = latestRef.current
       const extracted = getBoard?.()
-      ;(window as unknown as Record<string, unknown>).__scene3dDiag = {
-        refreshCallCount,
-        refreshSuccessCount,
-        hasGetBoard: !!getBoard,
-        extractedSize: extracted ? [extracted.width, extracted.height] : null,
-        hasScene: !!scene2,
-        gridSizePx: scene2?.gridSizePx,
-      }
       if (!extracted || extracted.width <= 0 || extracted.height <= 0 || !scene2 || scene2.gridSizePx <= 0) return
-      refreshSuccessCount++
 
       boardCanvas.width = extracted.width
       boardCanvas.height = extracted.height
