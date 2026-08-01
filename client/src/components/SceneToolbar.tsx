@@ -235,29 +235,32 @@ export function SceneToolbar() {
               </select>
             </div>
 
-            {!activeScene.mapAssetId && (
-              <div className="scene-toolbar__row">
-                <label htmlFor="blank-width">Canvas size (cells), no background yet</label>
-                <input
-                  id="blank-width"
-                  type="number"
-                  min={5}
-                  max={200}
-                  value={activeScene.blankWidthCells ?? BLANK_SCENE_WIDTH_CELLS}
-                  onChange={(event) => updateGrid(activeScene.id, { blankWidthCells: Number(event.target.value) })}
-                  title="Width (cells)"
-                />
-                <span>×</span>
-                <input
-                  id="blank-height"
-                  type="number"
-                  min={5}
-                  max={200}
-                  value={activeScene.blankHeightCells ?? BLANK_SCENE_HEIGHT_CELLS}
-                  onChange={(event) => updateGrid(activeScene.id, { blankHeightCells: Number(event.target.value) })}
-                  title="Height (cells)"
-                />
-              </div>
+            <div className="scene-toolbar__row">
+              <label htmlFor="blank-width">{activeScene.mapAssetId ? 'Minimum canvas size (cells)' : 'Canvas size (cells), no background yet'}</label>
+              <input
+                id="blank-width"
+                type="number"
+                min={5}
+                max={200}
+                value={activeScene.blankWidthCells ?? BLANK_SCENE_WIDTH_CELLS}
+                onChange={(event) => updateGrid(activeScene.id, { blankWidthCells: Number(event.target.value) })}
+                title="Width (cells)"
+              />
+              <span>×</span>
+              <input
+                id="blank-height"
+                type="number"
+                min={5}
+                max={200}
+                value={activeScene.blankHeightCells ?? BLANK_SCENE_HEIGHT_CELLS}
+                onChange={(event) => updateGrid(activeScene.id, { blankHeightCells: Number(event.target.value) })}
+                title="Height (cells)"
+              />
+            </div>
+            {activeScene.mapAssetId && (
+              <p className="scene-toolbar__hint">
+                Only stretches the play area past the map image's own edges if you set this bigger than the image — never shrinks it.
+              </p>
             )}
           </section>
         </>

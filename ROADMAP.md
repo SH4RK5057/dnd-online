@@ -479,6 +479,20 @@ real change in constraints.
       highlight on the mini itself (clicking still opens the same HP/
       condition/inspector side panels as 2D); walls, lights, annotations,
       and measuring have no 3D equivalent — this view is map + tokens only.
+      The 3D plane also renders the scene's grid lines now (square or hex,
+      matching the 2D view exactly), whether or not a map image is set —
+      previously it only ever showed the raw map texture with no grid at
+      all (`canvas3d/gridTexture.ts`, baked into the plane's texture
+      alongside the map image since a material only has one `map`).
+- [x] Live-resizable play area past a map image's own edges — the DM's
+      existing blank-canvas size control (previously hidden once a map
+      image was set) now always shows, and doubles as a floor: leaving it
+      untouched keeps a scene's play area exactly matching its map image
+      (unchanged default behavior), but setting it larger extends the grid
+      (and, in 3D, the plane) past the image's edges so a fight can spill
+      off a drawn map without the DM needing a bigger source image
+      (`map/canvasSize.ts`'s `resolveCanvasSizeCells`, shared by both the
+      2D and 3D views so they always agree on the board size).
 - [x] Reorderable, collapsible side-panel sections — each viewer (DM or
       player) can collapse any section and move it up/down within their own
       panel; order and collapsed state persist per-role in `localStorage`

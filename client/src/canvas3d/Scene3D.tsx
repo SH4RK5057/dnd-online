@@ -6,14 +6,73 @@ import { useSession } from '../session/useSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useAssetUrl, subscribeAssetUrl } from '../map/assetSync'
-import { BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS } from '../map/constants'
+import { resolveCanvasSizeCells, type CellDims } from '../map/canvasSize'
 import { footprintCells, resolveModelHeight, resolveStlScale, snapToSlot } from '../map/sizeCategory'
 import { getCachedModelGeometry, loadModelGeometry } from './modelCache'
-import type { TokenRecord } from '../map/types'
+import { drawGridLines } from './gridTexture'
+import type { GridType, TokenRecord } from '../map/types'
 
 const PLACEHOLDER_COLOR = 0x6b6375
 const HAZARD_COLOR = 0xcc5522
 const STL_COLOR = 0xcfc9bd
+const PLANE_BACKGROUND_COLOR = '#3a3226'
+/** Internal texture resolution for the plane, in canvas px per grid cell —
+ * independent of the scene's own gridSizePx (which can be arbitrarily small
+ * or huge). Capped by PLANE_TEXTURE_MAX_DIMENSION_PX so a very large board
+ * doesn't blow the texture budget. */
+const PLANE_TEXTURE_PX_PER_CELL = 64
+const PLANE_TEXTURE_MAX_DIMENSION_PX = 4096
+
+interface PlaneGridConfig {
+  gridSizePx: number
+  gridOffsetX: number
+  gridOffsetY: number
+  gridVisible: boolean
+  gridType: GridType
+}
+
+function choosePxPerCell(widthCells: number, heightCells: number): number {
+  const largest = Math.max(widthCells, heightCells, 1)
+  return Math.min(PLANE_TEXTURE_PX_PER_CELL, Math.max(1, Math.floor(PLANE_TEXTURE_MAX_DIMENSION_PX / largest)))
+}
+
+/** Builds the plane's full texture as a single flat canvas — background
+ * color, then the map image (if any) at its own cell-derived footprint
+ * within the shared canvas, then grid lines on top — since a
+ * MeshStandardMaterial only has one `map`, this is the 3D view's answer to
+ * 2D's separate MapLayer + GridLayer: everything the 2D view shows on the
+ * board (short of walls/lights/tokens, which stay real 3D objects) gets
+ * baked into one texture here instead. */
+function buildPlaneCanvas(image: HTMLImageElement | null, dims: CellDims, grid: PlaneGridConfig): HTMLCanvasElement {
+  const pxPerCell = choosePxPerCell(dims.widthCells, dims.heightCells)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(dims.widthCells * pxPerCell))
+  canvas.height = Math.max(1, Math.round(dims.heightCells * pxPerCell))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return canvas
+
+  ctx.fillStyle = PLANE_BACKGROUND_COLOR
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  if (image && grid.gridSizePx > 0) {
+    const imageWidthPx = (image.naturalWidth / grid.gridSizePx) * pxPerCell
+    const imageHeightPx = (image.naturalHeight / grid.gridSizePx) * pxPerCell
+    ctx.drawImage(image, 0, 0, imageWidthPx, imageHeightPx)
+  }
+
+  if (grid.gridVisible && grid.gridSizePx > 0) {
+    drawGridLines(ctx, {
+      widthCells: dims.widthCells,
+      heightCells: dims.heightCells,
+      pxPerCell,
+      offsetXCells: grid.gridOffsetX / grid.gridSizePx,
+      offsetYCells: grid.gridOffsetY / grid.gridSizePx,
+      gridType: grid.gridType,
+    })
+  }
+
+  return canvas
+}
 /** Pointer movement (px) below which a press+release counts as a click
  * (select) rather than a drag — mirrors the click-vs-drag disambiguation
  * canvas/TokenSprite.ts already does for the 2D view. */
@@ -171,6 +230,10 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
   const tokenGroupsRef = useRef(new Map<string, THREE.Group>())
+  // Avoids re-fetching/re-decoding the map image (via `new Image()`) every
+  // time an unrelated grid setting changes and re-runs the effect below —
+  // only reloaded when mapUrl itself actually changes.
+  const loadedImageRef = useRef<{ url: string; image: HTMLImageElement } | null>(null)
 
   // Mount: renderer/scene/camera/controls/lights/plane + pointer handlers +
   // render loop. Runs once for the life of this component instance.
@@ -335,66 +398,103 @@ export function Scene3D({ selectedTokenId = null, onSelectToken }: Scene3DProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Re-centers the camera when the active scene changes (not on every token
-  // Sizes and textures the plane from the scene's map image (falling back
-  // to the blank-canvas dims + a plain color, mirroring MapCanvas.tsx's own
-  // mapLayer.size-or-blank-dims fallback) whenever the map or grid size
-  // changes, and reframes the camera to match every time the plane's
-  // actual dimensions change — first an immediate best-guess from the
-  // blank-canvas dims, then a correction once the real map image loads and
-  // its true size is known (a texture is very often a different aspect
-  // ratio/size than the blank-canvas placeholder, so without this second
-  // pass the camera would keep looking at empty space next to the now
-  // differently-sized/positioned plane). OrbitControls still lets the
-  // viewer reframe manually afterward regardless.
+  // Sizes, grids, and textures the plane — the 3D view's equivalent of 2D's
+  // MapLayer + GridLayer combined, since a MeshStandardMaterial only has one
+  // `map` (see buildPlaneCanvas). Reframes the camera to match every time
+  // the plane's actual dimensions change: first an immediate best-guess
+  // from the blank-canvas dims (also the DM's floor for extending the play
+  // area past the map image — see map/canvasSize.ts's resolveCanvasSizeCells,
+  // shared with MapCanvas.tsx so both views always agree on the board size),
+  // then a correction once the real map image loads and its true size is
+  // known. OrbitControls still lets the viewer reframe manually afterward
+  // regardless.
   useEffect(() => {
     const plane = planeRef.current
     const camera = cameraRef.current
     const controls = controlsRef.current
     if (!plane || !camera || !controls || !activeScene) return
     let cancelled = false
-    const gridSizePx = activeScene.gridSizePx
-    const blankWidthCells = activeScene.blankWidthCells ?? BLANK_SCENE_WIDTH_CELLS
-    const blankHeightCells = activeScene.blankHeightCells ?? BLANK_SCENE_HEIGHT_CELLS
+    const grid: PlaneGridConfig = {
+      gridSizePx: activeScene.gridSizePx,
+      gridOffsetX: activeScene.gridOffsetX,
+      gridOffsetY: activeScene.gridOffsetY,
+      gridVisible: activeScene.gridVisible,
+      gridType: activeScene.gridType ?? 'square',
+    }
+    const material = plane.material as THREE.MeshStandardMaterial
 
-    const applyDims = (widthCells: number, heightCells: number) => {
-      plane.scale.set(widthCells, 1, heightCells)
-      const cx = widthCells / 2
-      const cz = heightCells / 2
+    const applyDims = (dims: CellDims) => {
+      plane.scale.set(dims.widthCells, 1, dims.heightCells)
+      const cx = dims.widthCells / 2
+      const cz = dims.heightCells / 2
       plane.position.set(cx, 0, cz)
-      const dist = Math.max(widthCells, heightCells)
+      const dist = Math.max(dims.widthCells, dims.heightCells)
       camera.position.set(cx, dist * 0.9, cz + dist * 0.9)
       controls.target.set(cx, 0, cz)
       controls.update()
     }
-    applyDims(blankWidthCells, blankHeightCells)
 
-    const material = plane.material as THREE.MeshStandardMaterial
-    if (!mapUrl) {
-      material.map = null
-      material.color.set(0x3a3226)
-      material.needsUpdate = true
-      return
-    }
-
-    const loader = new THREE.TextureLoader()
-    loader.load(mapUrl, (texture) => {
-      if (cancelled) return
+    const applyTexture = (image: HTMLImageElement | null, dims: CellDims) => {
+      const canvas = buildPlaneCanvas(image, dims, grid)
+      const texture = new THREE.CanvasTexture(canvas)
       texture.colorSpace = THREE.SRGBColorSpace
+      const previousMap = material.map
       material.map = texture
       material.color.set(0xffffff)
       material.needsUpdate = true
-      applyDims(texture.image.width / gridSizePx, texture.image.height / gridSizePx)
-    })
+      previousMap?.dispose()
+    }
+
+    // scene is checked truthy above, and a null imageSizeCells always
+    // resolves to a concrete size — never null here.
+    const blankOnlyDims = resolveCanvasSizeCells(activeScene, null) as CellDims
+    applyDims(blankOnlyDims)
+    applyTexture(null, blankOnlyDims)
+
+    if (!mapUrl) {
+      loadedImageRef.current = null
+    } else {
+      const applyFromImage = (image: HTMLImageElement) => {
+        const imageSizeCells: CellDims = {
+          widthCells: image.naturalWidth / grid.gridSizePx,
+          heightCells: image.naturalHeight / grid.gridSizePx,
+        }
+        const dims = resolveCanvasSizeCells(activeScene, imageSizeCells) as CellDims
+        applyDims(dims)
+        applyTexture(image, dims)
+      }
+
+      const cached = loadedImageRef.current?.url === mapUrl ? loadedImageRef.current.image : null
+      if (cached) {
+        applyFromImage(cached)
+      } else {
+        const image = new Image()
+        image.onload = () => {
+          if (cancelled) return
+          loadedImageRef.current = { url: mapUrl, image }
+          applyFromImage(image)
+        }
+        image.src = mapUrl
+      }
+    }
 
     return () => {
       cancelled = true
     }
     // Deliberately narrower than "activeScene" as a whole — this should
-    // only re-run when the map image or these specific dimension fields
-    // change, not on every unrelated scene-settings edit.
+    // only re-run when the map image or these specific board-appearance
+    // fields change, not on every unrelated scene-settings edit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapUrl, activeScene?.gridSizePx, activeScene?.blankWidthCells, activeScene?.blankHeightCells])
+  }, [
+    mapUrl,
+    activeScene?.gridSizePx,
+    activeScene?.gridOffsetX,
+    activeScene?.gridOffsetY,
+    activeScene?.gridVisible,
+    activeScene?.gridType,
+    activeScene?.blankWidthCells,
+    activeScene?.blankHeightCells,
+  ])
 
   // Diffs the token list against the live Group map — add/remove/update,
   // mirroring canvas/TokenLayer.ts's update() pattern for the 2D view.

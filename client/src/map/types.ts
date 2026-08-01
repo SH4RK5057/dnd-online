@@ -74,13 +74,23 @@ export interface SceneRecord {
    * for town/landscape scenes — null if they haven't moved yet, or this is
    * a dungeon scene where the concept doesn't apply. Read as `?? null`. */
   currentPoiId: string | null
-  /** Working-area size (grid cells) used only while this scene has no map
-   * image — once a map is uploaded, MapLayer's actual texture dimensions
-   * take over instead. Read as `?? BLANK_SCENE_WIDTH_CELLS` /
-   * `?? BLANK_SCENE_HEIGHT_CELLS` (map/constants.ts) for scenes created
-   * before these fields existed. */
-  blankWidthCells: number
-  blankHeightCells: number
+  /** DM-set minimum working-area size (grid cells). `null` means "never
+   * customized" — a genuine sentinel, not just a pre-field-existed absence
+   * (see map/useScenes.ts's createScene, which sets both to null on every
+   * new scene). While a scene has no map image, this null-or-not distinction
+   * doesn't matter and the play area is just this value (falling back to
+   * BLANK_SCENE_WIDTH_CELLS/HEIGHT_CELLS, map/constants.ts, when null). Once
+   * a map image is uploaded, it matters a lot: leaving both null means the
+   * play area exactly matches the image's own size (unchanged, historical
+   * behavior); setting either one explicitly floors the play area at that
+   * size, letting it extend past the image's edges without ever shrinking
+   * below what the image itself needs (map/canvasSize.ts's
+   * resolveCanvasSizeCells owns this logic; used by both the 2D and 3D
+   * views). Old scenes predating this field read as `undefined` at runtime
+   * despite the `number | null` type — treated the same as `null` wherever
+   * this is read. */
+  blankWidthCells: number | null
+  blankHeightCells: number | null
   createdAt: number
 }
 

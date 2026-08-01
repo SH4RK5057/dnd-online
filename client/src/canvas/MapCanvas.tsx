@@ -16,12 +16,8 @@ import { useCharacters } from '../character/useCharacters'
 import { useCampaignSettings } from '../character/useCampaignSettings'
 import { resolveTokenHp, computePassiveSkill } from '../character/rules'
 import { footprintCells, rectanglesOverlap, tokenFootprintRect } from '../map/sizeCategory'
-import {
-  PERSONAL_VISION_RADIUS_CELLS,
-  MAX_VISION_RADIUS_CELLS,
-  BLANK_SCENE_WIDTH_CELLS,
-  BLANK_SCENE_HEIGHT_CELLS,
-} from '../map/constants'
+import { PERSONAL_VISION_RADIUS_CELLS, MAX_VISION_RADIUS_CELLS } from '../map/constants'
+import { resolveCanvasSizeCells } from '../map/canvasSize'
 import { usePixiApp } from './usePixiApp'
 import { MapLayer } from './MapLayer'
 import { GridLayer } from './GridLayer'
@@ -233,14 +229,12 @@ export function MapCanvas({
     const world = worldRef.current
 
     const applySize = () => {
-      const size =
-        mapLayer.size ??
-        (activeScene
-          ? {
-              width: (activeScene.blankWidthCells ?? BLANK_SCENE_WIDTH_CELLS) * activeScene.gridSizePx,
-              height: (activeScene.blankHeightCells ?? BLANK_SCENE_HEIGHT_CELLS) * activeScene.gridSizePx,
-            }
-          : null)
+      const imageSizeCells =
+        mapLayer.size && activeScene
+          ? { widthCells: mapLayer.size.width / activeScene.gridSizePx, heightCells: mapLayer.size.height / activeScene.gridSizePx }
+          : null
+      const sizeCells = resolveCanvasSizeCells(activeScene, imageSizeCells)
+      const size = sizeCells && activeScene ? { width: sizeCells.widthCells * activeScene.gridSizePx, height: sizeCells.heightCells * activeScene.gridSizePx } : null
       setMapSize(size)
       gridLayer.update({
         gridSizePx: activeScene?.gridSizePx ?? 0,

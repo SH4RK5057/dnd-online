@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as Y from 'yjs'
 import { isAssetFullyLive, publishAsset, pruneAssetChunks, republishAssetFromCache } from './assetSync'
-import {
-  BLANK_SCENE_HEIGHT_CELLS,
-  BLANK_SCENE_WIDTH_CELLS,
-  DEFAULT_GRID_SIZE_PX,
-  MAP_IMAGE_MAX_DIMENSION,
-  MAP_IMAGE_QUALITY,
-} from './constants'
+import { DEFAULT_GRID_SIZE_PX, MAP_IMAGE_MAX_DIMENSION, MAP_IMAGE_QUALITY } from './constants'
 import { compressImage } from './imageCompress'
 import { purgeExplorationForScene } from './useExploration'
 import type { ConsensusMode, LightRecord, NavigationMode, SceneRecord, SceneScale, TokenRecord, WallRecord } from './types'
@@ -97,8 +91,8 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         consensusMode: 'vote',
         partyLeaderId: null,
         currentPoiId: null,
-        blankWidthCells: BLANK_SCENE_WIDTH_CELLS,
-        blankHeightCells: BLANK_SCENE_HEIGHT_CELLS,
+        blankWidthCells: null,
+        blankHeightCells: null,
         createdAt: Date.now(),
       }
       scenesMap(doc).set(id, record)
