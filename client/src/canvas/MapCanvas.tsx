@@ -713,15 +713,9 @@ export function MapCanvas({
       if (now - lastExtractLogAt > 1000) {
         lastExtractLogAt = now
         // eslint-disable-next-line no-console
-        console.warn('[extract-diag]', {
-          requestedFrame: { width, height },
-          combined: { width: combined.width, height: combined.height },
-          terrain: { width: terrain.width, height: terrain.height },
-          tokensCanvas: { width: tokensCanvas.width, height: tokensCanvas.height },
-          lightsCanvas: { width: lightsCanvas.width, height: lightsCanvas.height },
-          devicePixelRatio: window.devicePixelRatio,
-          rendererResolution: app.renderer.resolution,
-        })
+        console.warn(
+          `[extract-diag] requestedFrame=${width}x${height} combined=${combined.width}x${combined.height} terrain=${terrain.width}x${terrain.height} tokensCanvas=${tokensCanvas.width}x${tokensCanvas.height} lightsCanvas=${lightsCanvas.width}x${lightsCanvas.height} dpr=${window.devicePixelRatio} rendererResolution=${app.renderer.resolution}`,
+        )
       }
       ctx.drawImage(terrain as unknown as CanvasImageSource, 0, 0)
       ctx.drawImage(tokensCanvas as unknown as CanvasImageSource, 0, 0)

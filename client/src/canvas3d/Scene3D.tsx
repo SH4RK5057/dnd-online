@@ -330,10 +330,9 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
       if (nowLog - lastRefreshLogAt > 1000) {
         lastRefreshLogAt = nowLog
         // eslint-disable-next-line no-console
-        console.warn('[refresh-diag]', {
-          extracted: { width: extracted.width, height: extracted.height },
-          boardCanvasBefore: { width: boardCanvas.width, height: boardCanvas.height },
-        })
+        console.warn(
+          `[refresh-diag] extracted=${extracted.width}x${extracted.height} boardCanvasBefore=${boardCanvas.width}x${boardCanvas.height}`,
+        )
       }
       ctx.drawImage(extracted, 0, 0)
       boardTexture.needsUpdate = true
