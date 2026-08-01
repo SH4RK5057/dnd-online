@@ -296,6 +296,30 @@ export const POINT_BUY_BUDGET = 27
  * for buffs (Haste, magic items) this app doesn't model mechanically. */
 export const MAX_SPEED_FT = 300
 
+/** Parses a "Darkvision 60 ft." style race trait string into a foot radius,
+ * or 0 if the race has no darkvision trait — every SRD race that has one
+ * writes it in this exact freeform format (see content/srdData.ts), so a
+ * simple regex is enough without a structured trait data model. Simplified
+ * from real 5e darkvision: this app doesn't distinguish "sees in shades of
+ * gray beyond dim light" from ordinary sight, it just extends how far the
+ * character's personal-vision bubble reaches regardless of ambient
+ * brightness (see FogLayer.ts's per-token vision radius) — full color, not
+ * grayscale. */
+export function darkvisionRadiusFt(traits: string[]): number {
+  let best = 0
+  for (const trait of traits) {
+    const match = /darkvision\s+(\d+)\s*ft/i.exec(trait)
+    if (match) best = Math.max(best, Number(match[1]))
+  }
+  return best
+}
+
+/** 5e's standard cap on simultaneously-attuned magic items — this app
+ * doesn't model attunement *requirements* (which items need it, the
+ * short-rest ritual, etc.), just the numeric limit, checked directly
+ * against InventoryItem.attuned in CharacterInventory.tsx. */
+export const MAX_ATTUNED_ITEMS = 3
+
 /** Total point-buy cost of a set of base scores — Infinity if any score
  * falls outside the buyable 8-15 range, so it always fails a budget check
  * rather than silently underselling an out-of-range score. */

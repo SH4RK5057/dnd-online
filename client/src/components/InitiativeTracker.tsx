@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useSession } from '../session/useSession'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
@@ -7,14 +8,20 @@ import { useCombat } from '../combat/useCombat'
 import { computeInitiativeOrder } from '../combat/rules'
 import { computeInitiativeBonus } from '../character/rules'
 import { useSessionEvents } from '../sessionLog/useSessionEvents'
+import { useCompendium, findByKey } from '../content/useCompendium'
 import { EncounterBuilder } from './EncounterBuilder'
+import { StatBlockCard } from './StatBlockCard'
 import type { MonsterInitiativeMode } from '../combat/types'
 import type { TokenRecord } from '../map/types'
 
 /** Initiative order + round/turn state are visible to everyone (players
  * want to see the queue and whose turn it is); starting/ending combat,
- * choosing Individual vs. Group Monster Initiative, and advancing the turn
- * are DM-only, same tier as scene/wall/light editing already is. */
+ * choosing Individual vs. Group Monster Initiative, advancing the turn, and
+ * expanding a monster-linked combatant's full stat block (an "Info" toggle,
+ * reusing the same StatBlockCard the compendium drawer/token inspector
+ * show) are DM-only, same tier as scene/wall/light editing already is —
+ * lets the DM check a monster's rules without leaving the initiative list
+ * to click its token individually. */
 export function InitiativeTracker() {
   const { session } = useSession()
   const doc = session?.doc ?? null
@@ -25,6 +32,8 @@ export function InitiativeTracker() {
   const { characters } = useCharacters(doc)
   const { combat, startCombat, endCombat, advanceTurn, setMonsterInitiativeMode } = useCombat(doc, activeSceneId)
   const { logEvent } = useSessionEvents(doc, isDm)
+  const compendium = useCompendium(doc)
+  const [infoOpenTokenId, setInfoOpenTokenId] = useState<string | null>(null)
 
   if (!doc || !activeSceneId) return null
 
@@ -116,6 +125,19 @@ export function InitiativeTracker() {
                 >
                   Use reaction
                 </button>
+              )}
+              {isDm && token.monsterKey && (
+                <button type="button" onClick={() => setInfoOpenTokenId((prev) => (prev === token.id ? null : token.id))}>
+                  {infoOpenTokenId === token.id ? 'Hide info' : 'Info'}
+                </button>
+              )}
+              {isDm && infoOpenTokenId === token.id && token.monsterKey && (
+                <div className="initiative-tracker__info">
+                  {(() => {
+                    const entry = findByKey(compendium, token.monsterKey)
+                    return entry ? <StatBlockCard entry={entry} /> : <p className="character-sheet__hint">Compendium entry not found.</p>
+                  })()}
+                </div>
               )}
             </li>
           )

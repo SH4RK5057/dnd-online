@@ -425,7 +425,14 @@ export function SessionScreen() {
             const playerOnlySections: Section[] =
               session.role !== 'player'
                 ? []
-                : [{ id: 'handouts-player', title: 'Handouts', defaultCollapsed: true, content: <PlayerHandoutsView doc={session.doc} /> }]
+                : [
+                    {
+                      id: 'handouts-player',
+                      title: 'Handouts',
+                      defaultCollapsed: true,
+                      content: <PlayerHandoutsView doc={session.doc} myPlayerId={getOrCreatePlayerId()} />,
+                    },
+                  ]
 
             const allSections = session.role === 'dm' ? [...dmOnlySections, ...sharedSections] : [...sharedSections, ...playerOnlySections]
             const sectionsById = new Map(allSections.map((s) => [s.id, s]))

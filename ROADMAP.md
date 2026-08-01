@@ -645,6 +645,45 @@ real change in constraints.
       view. Player-facing visibility stays otherwise all-or-nothing per
       token, deliberately: the DM picks what to reveal, not a
       partial/redacted view.
+- [x] Darkvision now has a real (if simplified) mechanical effect —
+      `character/rules.ts`'s `darkvisionRadiusFt` parses the "Darkvision X
+      ft." race trait string, and `MapCanvas.tsx` extends that specific
+      character-linked token's personal-vision bubble to at least that
+      radius (`canvas/FogLayer.ts`'s new per-token
+      `darkvisionRadiusCellsByTokenId` override). v1 simplification: full
+      brightness within the radius, not 5e's actual "shades of gray beyond
+      dim light" — this app's fog model doesn't track light *color*, only
+      brightness, and adding that distinction would mean a larger FogLayer
+      rework. Feat prerequisites remain unaddressed — `FeatEntry` has no
+      structured data model to check against, and neither does item
+      weight/carry — both still need a bigger data-model pass first.
+- [x] Attunement limit — `character/rules.ts`'s `MAX_ATTUNED_ITEMS` (3, the
+      5e standard), checked in `components/CharacterInventory.tsx` against
+      `InventoryItem.attuned`: a 4th item's checkbox disables itself once
+      the cap is hit, with a tooltip explaining why. Doesn't model *which*
+      items require attunement or the short-rest ritual, just the numeric
+      cap — the rest of "item rules" (weight/carry) stays out of scope,
+      same Phase 7 boundary as before.
+- [x] DM broadcast tool, handouts half — `dmtools/types.ts`'s
+      `HandoutRecord.visibleToPlayerId` (null = everyone, the original
+      behavior) lets the DM narrow an already-shown handout to one
+      connected player instead of broadcasting to the whole party
+      (`components/HandoutsPanel.tsx`'s new "Visible to" dropdown, same
+      peer-list pattern `TokenOwnerAssign`/group-roll-requests already use).
+      A handout with only text and no image already covers the "note"
+      case; a "stat block" broadcast is covered separately by the
+      per-token `statBlockShared` opt-in shipped above. DM Notes stays
+      DM-only by design (its own panel explicitly warns notes still sync
+      to every player's browser even though only the DM's UI shows them) —
+      not turned into a third broadcast channel.
+- [x] Monster info visible to the DM during combat — `InitiativeTracker.tsx`
+      gained a DM-only "Info" toggle per monster-linked combatant that
+      expands the same `StatBlockCard` the compendium drawer and token
+      inspector already use, so the DM doesn't have to click each token
+      individually mid-fight to check its stats. The other half of that
+      backlog bullet — a dedicated battle-specific quick-actions menu — is
+      still open; attack/spell actions already live on the character sheet
+      (via each token's inspector), just not surfaced inline in this list.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---
@@ -659,17 +698,20 @@ already be covered by something shipped.
 
 **Rules-enforcement gaps (character sheet currently trusts DM/player input
 too much in these spots):**
-- No item rules (attunement limits, weight/carry, etc. — see Phase 7 note above)
-- No feat rules/prerequisites
-- Darkvision isn't modeled at all (race trait exists but has no mechanical effect)
+- No item weight/carry rules (attunement limits now enforced, see Phase 10 above)
+- No feat rules/prerequisites — blocked on `FeatEntry` having no structured
+  data model to check prerequisites against; would need that built first
 
 **DM tooling / UX:**
-- Import compendium content directly from a repo URL, not just a local file
-- A battle-specific menu mode: quick actions during combat, and monster info
-  visible to the DM for everything currently in the encounter
-- DM broadcast tool: send a stat block, note, or handout to one player or
-  to everyone on demand
-- 5etools mirror import performance (large files are slow to ingest)
+- A battle-specific quick-actions menu during combat (monster info during
+  combat now covered, see Phase 10 above)
+- DM broadcast tool: send a stat block or note to everyone on demand, not
+  just a single player (handouts now support per-player targeting, see
+  Phase 10 above; a true "send to everyone right now" push — as opposed to
+  a persistently-toggled-visible handout — is still open)
+- 5etools mirror import performance (large files are slow to ingest) — needs
+  profiling to find the actual bottleneck (parse vs. IndexedDB write vs. tag
+  parsing) before it's worth coding a fix
 - Side panel UX: scrolling through the whole stacked section list is
   tedious — consider a tool-select-first layout where picking a tool shows
   just that tool's detail instead of a tall scrolling column

@@ -17,6 +17,7 @@ import {
   computeSkillBonus,
   computeSpellSaveDc,
   computeSpellSlotsByLevel,
+  darkvisionRadiusFt,
   deathSaveResetPatch,
   isValidAbilityScoreImprovement,
   isValidPointBuy,
@@ -686,5 +687,23 @@ describe('computeSpellSlotsByLevel', () => {
   it('clamps out-of-range levels', () => {
     expect(computeSpellSlotsByLevel('Wizard', 0)).toEqual(computeSpellSlotsByLevel('Wizard', 1))
     expect(computeSpellSlotsByLevel('Wizard', 99)).toEqual(computeSpellSlotsByLevel('Wizard', 20))
+  })
+})
+
+describe('darkvisionRadiusFt', () => {
+  it('parses a "Darkvision X ft." trait string', () => {
+    expect(darkvisionRadiusFt(['Darkvision 60 ft.', 'Advantage on saves vs. being charmed'])).toBe(60)
+  })
+
+  it('is case-insensitive and tolerates no trailing period', () => {
+    expect(darkvisionRadiusFt(['darkvision 30 ft'])).toBe(30)
+  })
+
+  it('returns 0 for a race with no darkvision trait', () => {
+    expect(darkvisionRadiusFt(['Extra Language', 'Skill Versatility'])).toBe(0)
+  })
+
+  it('returns the largest radius if multiple darkvision-like traits are present', () => {
+    expect(darkvisionRadiusFt(['Darkvision 60 ft.', 'Superior Darkvision 120 ft.'])).toBe(120)
   })
 })

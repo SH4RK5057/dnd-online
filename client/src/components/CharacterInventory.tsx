@@ -3,6 +3,7 @@ import type { CharacterRecord, FeatEntry, InventoryItem } from '../character/typ
 import type { UseInventoryActionsResult } from '../character/useInventoryActions'
 import type { ItemData } from '../content/types'
 import { filterItems } from '../content/search'
+import { MAX_ATTUNED_ITEMS } from '../character/rules'
 
 const MAX_SEARCH_RESULTS = 8
 
@@ -47,6 +48,11 @@ export function CharacterInventory({
 
   const updateItemFields = (id: string, patch: Partial<Pick<InventoryItem, 'name' | 'notes'>>) => {
     onUpdate({ inventory: character.inventory.map((item) => (item.id === id ? { ...item, ...patch } : item)) })
+  }
+  const attunedCount = character.inventory.filter((i) => i.attuned).length
+  const toggleAttuned = (item: InventoryItem, attuned: boolean) => {
+    if (attuned && attunedCount >= MAX_ATTUNED_ITEMS) return
+    onUpdate({ inventory: character.inventory.map((i) => (i.id === item.id ? { ...i, attuned } : i)) })
   }
   const updateItemQuantity = (item: InventoryItem, quantity: number) => {
     // Quantity edits aren't logged as add/remove — only whole-row
@@ -96,6 +102,9 @@ export function CharacterInventory({
   return (
     <div className="character-sheet__section">
       <h3>Inventory</h3>
+      <p className="character-sheet__hint">
+        Attuned: {attunedCount}/{MAX_ATTUNED_ITEMS}
+      </p>
       <ul className="character-sheet__row-list">
         {character.inventory.map((item) => (
           <li key={item.id} className="character-sheet__row">
@@ -120,6 +129,15 @@ export function CharacterInventory({
               disabled={!canEdit}
               onChange={(e) => updateItemFields(item.id, { notes: e.target.value })}
             />
+            <label title={!item.attuned && attunedCount >= MAX_ATTUNED_ITEMS ? `Already attuned to ${MAX_ATTUNED_ITEMS} items — unattune one first.` : 'Attuned'}>
+              <input
+                type="checkbox"
+                checked={!!item.attuned}
+                disabled={!canEdit || (!item.attuned && attunedCount >= MAX_ATTUNED_ITEMS)}
+                onChange={(e) => toggleAttuned(item, e.target.checked)}
+              />
+              Attuned
+            </label>
             {canEdit && otherCharacters.length > 0 && (
               <>
                 <select

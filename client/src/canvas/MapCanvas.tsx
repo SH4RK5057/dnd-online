@@ -14,7 +14,8 @@ import { usePois } from '../map/usePois'
 import { useAssetUrl } from '../map/assetSync'
 import { useCharacters } from '../character/useCharacters'
 import { useCampaignSettings } from '../character/useCampaignSettings'
-import { resolveTokenHp, computePassiveSkill } from '../character/rules'
+import { useCompendium } from '../content/useCompendium'
+import { resolveTokenHp, computePassiveSkill, darkvisionRadiusFt } from '../character/rules'
 import { footprintCells, rectanglesOverlap, tokenFootprintRect } from '../map/sizeCategory'
 import { PERSONAL_VISION_RADIUS_CELLS, MAX_VISION_RADIUS_CELLS } from '../map/constants'
 import { resolveCanvasSizeCells } from '../map/canvasSize'
@@ -119,6 +120,7 @@ export function MapCanvas({
   const { exploredCells, revealCells } = useExploration(doc, activeScene?.id ?? null, effectiveViewerId)
   const { characters } = useCharacters(doc)
   const { settings: campaignSettings } = useCampaignSettings(doc)
+  const { races } = useCompendium(doc)
   const { pings, createPing } = usePings(doc, activeScene?.id ?? null, isDm)
   const { annotations, createAnnotation } = useAnnotations(doc, activeScene?.id ?? null, isDm)
   const { pois } = usePois(doc, activeScene?.id ?? null)
@@ -410,6 +412,23 @@ export function MapCanvas({
         : tokens.filter((t) => t.ownerId === effectiveViewerId)
     ).map((t) => t.id)
 
+    // Darkvision: a character-linked token whose race has a "Darkvision X
+    // ft." trait gets its personal-vision bubble extended to at least that
+    // radius, regardless of ambient light — see darkvisionRadiusFt's doc
+    // comment for the v1 simplification (full brightness, not grayscale).
+    const charactersById = new Map(characters.map((c) => [c.id, c]))
+    const racesByName = new Map(races.map((r) => [r.name, r]))
+    const darkvisionRadiusCellsByTokenId = new Map<string, number>()
+    for (const tokenId of ownTokenIds) {
+      const token = tokens.find((t) => t.id === tokenId)
+      const character = token?.characterId ? charactersById.get(token.characterId) : null
+      const race = character ? racesByName.get(character.race) : null
+      if (race) {
+        const ft = darkvisionRadiusFt(race.traits)
+        if (ft > 0) darkvisionRadiusCellsByTokenId.set(tokenId, ft / 5)
+      }
+    }
+
     const newlyExplored = fogLayer.update(app.renderer, {
       walls,
       lights,
@@ -418,6 +437,7 @@ export function MapCanvas({
       mapSize,
       ownTokenIds,
       personalVisionRadiusCells: PERSONAL_VISION_RADIUS_CELLS,
+      darkvisionRadiusCellsByTokenId,
       maxVisionRadiusCells: MAX_VISION_RADIUS_CELLS,
       ambientBrightness: activeScene.ambientBrightness ?? 1,
       exploredCells,
@@ -460,6 +480,7 @@ export function MapCanvas({
     walls,
     lights,
     tokens,
+    races,
     exploredCells,
     revealCells,
     campaignSettings.passivePerceptionEnabled,

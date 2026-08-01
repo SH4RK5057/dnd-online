@@ -15,5 +15,10 @@ export interface HandoutRecord {
   /** DM-controlled visibility, same "on demand" idea as SceneRecord.published
    * — created privately, then revealed to players when the DM is ready. */
   shownToPlayers: boolean
+  /** Restricts an otherwise-shown handout to a single player (null = every
+   * connected player, the original behavior). Only checked while
+   * `shownToPlayers` is true — toggling visibility off still hides it from
+   * everyone regardless of this field. */
+  visibleToPlayerId: string | null
   createdAt: number
 }

@@ -36,6 +36,10 @@ export interface InventoryItem {
   name: string
   quantity: number
   notes: string
+  /** Whether this item is currently attuned — see rules.ts's MAX_ATTUNED_ITEMS
+   * for the 5e 3-item cap this is checked against. Optional/undefined reads
+   * as false for items saved before this field existed. */
+  attuned?: boolean
 }
 
 export interface SpellEntry {

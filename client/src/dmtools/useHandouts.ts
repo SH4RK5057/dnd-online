@@ -16,13 +16,15 @@ export interface UseHandoutsResult {
   setHandoutText: (id: string, text: string) => void
   setHandoutImage: (id: string, file: File) => Promise<void>
   setHandoutShown: (id: string, shown: boolean) => void
+  setHandoutVisibleToPlayer: (id: string, playerId: string | null) => void
 }
 
 /** DM shares an image and/or text "on demand" — created privately, revealed
  * to players by flipping `shownToPlayers` (same on/off convention as
- * SceneRecord.published). Images reuse the same chunked-sync asset pipeline
- * as maps/tokens (map/assetSync.ts) — kind 'handout', already threaded
- * through AssetKind. */
+ * SceneRecord.published), optionally narrowed to a single player via
+ * `visibleToPlayerId` instead of broadcasting to everyone. Images reuse the
+ * same chunked-sync asset pipeline as maps/tokens (map/assetSync.ts) — kind
+ * 'handout', already threaded through AssetKind. */
 export function useHandouts(doc: Y.Doc | null): UseHandoutsResult {
   const [handouts, setHandouts] = useState<HandoutRecord[]>([])
 
@@ -53,7 +55,15 @@ export function useHandouts(doc: Y.Doc | null): UseHandoutsResult {
     (name: string): string => {
       if (!doc) throw new Error('No active session.')
       const id = crypto.randomUUID()
-      const record: HandoutRecord = { id, name, assetId: null, text: '', shownToPlayers: false, createdAt: Date.now() }
+      const record: HandoutRecord = {
+        id,
+        name,
+        assetId: null,
+        text: '',
+        shownToPlayers: false,
+        visibleToPlayerId: null,
+        createdAt: Date.now(),
+      }
       handoutsMap(doc).set(id, record)
       return id
     },
@@ -70,6 +80,10 @@ export function useHandouts(doc: Y.Doc | null): UseHandoutsResult {
 
   const setHandoutText = useCallback((id: string, text: string) => patchHandout(id, { text }), [patchHandout])
   const setHandoutShown = useCallback((id: string, shownToPlayers: boolean) => patchHandout(id, { shownToPlayers }), [patchHandout])
+  const setHandoutVisibleToPlayer = useCallback(
+    (id: string, playerId: string | null) => patchHandout(id, { visibleToPlayerId: playerId }),
+    [patchHandout],
+  )
 
   const setHandoutImage = useCallback(
     async (id: string, file: File) => {
@@ -81,5 +95,5 @@ export function useHandouts(doc: Y.Doc | null): UseHandoutsResult {
     [doc, patchHandout],
   )
 
-  return { handouts, createHandout, deleteHandout, setHandoutText, setHandoutImage, setHandoutShown }
+  return { handouts, createHandout, deleteHandout, setHandoutText, setHandoutImage, setHandoutShown, setHandoutVisibleToPlayer }
 }

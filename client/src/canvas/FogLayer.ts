@@ -25,6 +25,11 @@ export interface FogInput {
    * be assigned more than one. */
   ownTokenIds: string[]
   personalVisionRadiusCells: number
+  /** Per-token override, keyed by token id — used for darkvision, which
+   * extends only that specific token's personal-vision bubble past the
+   * scene-wide `personalVisionRadiusCells` baseline. A token with no entry
+   * (or a smaller value) just uses the baseline. */
+  darkvisionRadiusCellsByTokenId?: Map<string, number>
   maxVisionRadiusCells: number
   /** Baseline light level before lights/personal-vision are added in — see
    * SceneRecord.ambientBrightness. 0 = pitch black, 1 = fully lit. */
@@ -118,6 +123,7 @@ export class FogLayer {
       tokens,
       ownTokenIds,
       personalVisionRadiusCells,
+      darkvisionRadiusCellsByTokenId,
       maxVisionRadiusCells,
       ambientBrightness,
       exploredCells,
@@ -173,7 +179,8 @@ export class FogLayer {
     }
     for (const token of ownTokens) {
       const pos = tokenCenterPx(token, gridSizePx)
-      const polygon = computeVisibilityPolygon(pos, wallSegmentsPx, personalVisionRadiusCells * gridSizePx)
+      const radiusCells = Math.max(personalVisionRadiusCells, darkvisionRadiusCellsByTokenId?.get(token.id) ?? 0)
+      const polygon = computeVisibilityPolygon(pos, wallSegmentsPx, radiusCells * gridSizePx)
       fillPolygon(this.illumGraphics, polygon)
     }
 
