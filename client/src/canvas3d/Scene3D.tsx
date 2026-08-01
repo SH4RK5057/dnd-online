@@ -272,7 +272,14 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     const applyBoardTexture = () => {
       const previous = boardTexture
       boardTexture = new THREE.CanvasTexture(boardCanvas)
-      boardTexture.colorSpace = THREE.SRGBColorSpace
+      // NOT SRGBColorSpace: that tells Three.js to linearize the texture
+      // for lighting math, which this unlit MeshBasicMaterial never does —
+      // it just round-trips the values through an extra sRGB<->linear
+      // conversion for no benefit, washing out faint/blended pixels like
+      // anti-aliased grid lines. NoColorSpace passes the extracted 2D
+      // canvas's pixels straight through unchanged, matching the stated
+      // intent of this plane being a literal mirror of the 2D view.
+      boardTexture.colorSpace = THREE.NoColorSpace
       // Mipmaps ARE needed despite the texture being replaced wholesale
       // every refresh: the plane is viewed at varying zoom via
       // OrbitControls, and without mipmaps, minified (zoomed-out) sampling
