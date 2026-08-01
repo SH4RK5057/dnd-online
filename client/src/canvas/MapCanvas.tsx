@@ -40,6 +40,10 @@ interface MapCanvasProps {
   toolMode: ToolMode
   snapWalls: boolean
   wallThickness: number
+  /** Whether the next wall(s) drawn should be created as doors — see
+   * WallRecord.isDoor. Defaults to false (plain walls), same as before
+   * doors existed, for callers that don't offer the option. */
+  wallDoorMode?: boolean
   onPlaceToken?: (x: number, y: number) => void
   onPlacePoi?: (x: number, y: number) => void
   /** Double-click-to-ping and shift-drag annotations are live-session
@@ -81,6 +85,7 @@ export function MapCanvas({
   toolMode,
   snapWalls,
   wallThickness,
+  wallDoorMode = false,
   onPlaceToken,
   onPlacePoi,
   enablePing = true,
@@ -109,7 +114,7 @@ export function MapCanvas({
   const { activeScene } = useScenes(doc)
   const mapUrl = useAssetUrl(doc, activeScene?.mapAssetId ?? null)
   const { tokens, moveToken, setTokenHidden } = useTokens(doc, activeScene?.id ?? null)
-  const { walls, createWall, updateWallEndpoint, deleteWall } = useWalls(doc, activeScene?.id ?? null)
+  const { walls, createWall, updateWallEndpoint, toggleDoor, deleteWall } = useWalls(doc, activeScene?.id ?? null)
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
   const { exploredCells, revealCells } = useExploration(doc, activeScene?.id ?? null, effectiveViewerId)
   const { characters } = useCharacters(doc)
@@ -343,23 +348,46 @@ export function MapCanvas({
       snapWalls,
       activeScene.gridType ?? 'square',
       wallThickness,
+      wallDoorMode,
       {
-        onCreateWall: (x1, y1, x2, y2, thickness) => createWall({ sceneId: activeScene.id, x1, y1, x2, y2, thickness }),
+        onCreateWall: (x1, y1, x2, y2, thickness, isDoor) => createWall({ sceneId: activeScene.id, x1, y1, x2, y2, thickness, isDoor }),
         onUpdateWallEndpoint: updateWallEndpoint,
+        onToggleDoor: toggleDoor,
         onDeleteWall: deleteWall,
       },
     )
-  }, [walls, activeScene, mapSize, isDmUnmasked, toolMode, snapWalls, wallThickness, createWall, updateWallEndpoint, deleteWall])
+  }, [
+    walls,
+    activeScene,
+    mapSize,
+    isDmUnmasked,
+    toolMode,
+    snapWalls,
+    wallThickness,
+    wallDoorMode,
+    createWall,
+    updateWallEndpoint,
+    toggleDoor,
+    deleteWall,
+  ])
 
   // Update lights.
   useEffect(() => {
     if (!lightLayerRef.current || !activeScene) return
-    lightLayerRef.current.update(lights, tokens, activeScene.gridSizePx, mapSize, isDmUnmasked && toolMode === 'place-lights', {
-      onCreateLight: (x, y) => createLight({ sceneId: activeScene.id, x, y }),
-      onMoveLight: moveLight,
-      onDetachLight: detachLight,
-      onDeleteLight: deleteLight,
-    })
+    lightLayerRef.current.update(
+      lights,
+      tokens,
+      activeScene.gridSizePx,
+      mapSize,
+      isDmUnmasked && toolMode === 'place-lights',
+      isDmUnmasked,
+      {
+        onCreateLight: (x, y) => createLight({ sceneId: activeScene.id, x, y }),
+        onMoveLight: moveLight,
+        onDetachLight: detachLight,
+        onDeleteLight: deleteLight,
+      },
+    )
   }, [lights, tokens, activeScene, mapSize, isDmUnmasked, toolMode, createLight, moveLight, detachLight, deleteLight])
 
   // Update fog. DM always sees everything (no mask); players get one only
@@ -715,9 +743,13 @@ export function MapCanvas({
       if (!ctx) return null
       const terrain = app.renderer.extract.canvas({ target: fogTarget, frame })
       const tokensCanvas = app.renderer.extract.canvas({ target: tokenTarget, frame })
-      // lightLayer.container is never fog-masked (a lit torch/lamp is a
-      // visible object, same as 2D shows it to everyone unmasked), so it's
-      // safe to layer in here too — no DM-only info leaks to players.
+      // lightLayer.container is never fog-masked, but it's also now hidden
+      // outright for players (container.visible = isDmUnmasked, set in the
+      // "Update lights" effect above) — it's a DM-only radius/placement
+      // aid, not the actual in-game illumination (FogLayer renders that,
+      // correctly fog-masked), so extracting it here is a no-op for a
+      // player's own board canvas and only ever contributes content to the
+      // DM's.
       const lightsCanvas = app.renderer.extract.canvas({ target: lightLayerContainer, frame })
       const now = performance.now()
       if (now - lastExtractLogAt > 1000) {

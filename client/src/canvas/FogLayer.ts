@@ -1,6 +1,7 @@
 import { Container, Graphics, RenderTexture, Sprite, type Renderer } from 'pixi.js'
 import { computeVisibilityPolygon, type Point, type Segment } from '../map/visibility'
 import { footprintCells } from '../map/sizeCategory'
+import { blockingWalls } from '../map/wallBlocking'
 import type { LightRecord, TokenRecord, WallRecord } from '../map/types'
 
 /** A token's vision/light-attachment origin should be its footprint
@@ -129,7 +130,7 @@ export class FogLayer {
     const ambientGray = Math.round(Math.min(1, Math.max(0, ambientBrightness)) * 255)
     const ambientColor = (ambientGray << 16) | (ambientGray << 8) | ambientGray
 
-    const wallSegmentsPx: Segment[] = walls.map((w) => ({
+    const wallSegmentsPx: Segment[] = blockingWalls(walls).map((w) => ({
       x1: w.x1 * gridSizePx,
       y1: w.y1 * gridSizePx,
       x2: w.x2 * gridSizePx,

@@ -11,6 +11,7 @@ import { getOrCreatePlayerId } from '../session/lastSession'
 import { subscribeAssetUrl } from '../map/assetSync'
 import { MAX_VISION_RADIUS_CELLS, BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS } from '../map/constants'
 import { hasLineOfSight } from '../map/visibility'
+import { blockingWalls } from '../map/wallBlocking'
 import { footprintCells, resolveModelHeight, resolveStlScale, snapToSlot } from '../map/sizeCategory'
 import { getCachedModelGeometry, loadModelGeometry } from './modelCache'
 import type { TokenRecord } from '../map/types'
@@ -60,6 +61,11 @@ const PLACEHOLDER_MATERIAL = new THREE.MeshStandardMaterial({ color: PLACEHOLDER
 const HAZARD_MATERIAL = new THREE.MeshStandardMaterial({ color: HAZARD_COLOR })
 const STL_MATERIAL = new THREE.MeshStandardMaterial({ color: STL_COLOR })
 const WALL_MATERIAL = new THREE.MeshStandardMaterial({ color: WALL_COLOR })
+/** A closed door still renders as a box (see the wall-extrusion effect),
+ * just in a distinct warmer tone so it reads as a different kind of thing
+ * from a plain wall — mirrors canvas/WallLayer.ts's 2D door color choice. */
+const DOOR_COLOR = 0x8a5a2b
+const DOOR_MATERIAL = new THREE.MeshStandardMaterial({ color: DOOR_COLOR })
 
 interface TokenUserData {
   /** The modelAssetId currently loaded/loading for this token's mesh. A
@@ -648,7 +654,7 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken,
     const ownTokenIds = new Set(
       (activeScene.sharedVisionEnabled ?? false ? tokens.filter((t) => t.ownerId !== null) : tokens.filter((t) => t.ownerId === viewerId)).map((t) => t.id),
     )
-    const wallSegments = walls.map((w) => ({ x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2 }))
+    const wallSegments = blockingWalls(walls).map((w) => ({ x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2 }))
     const ownPositions = tokens.filter((t) => ownTokenIds.has(t.id)).map((t) => ({ x: t.x + footprintOf(t) / 2, y: t.y + footprintOf(t) / 2 }))
 
     const inLiveSight = (token: TokenRecord): boolean => {
@@ -705,13 +711,18 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken,
     const gridSizePx = activeScene?.gridSizePx ?? 0
     if (gridSizePx > 0) {
       for (const wall of walls) {
+        // An open door blocks nothing, visually or otherwise — skip its
+        // mesh entirely so perspective mode's camera can actually see (and
+        // pass through) the opening, matching the LOS/fog math which
+        // already ignores it (see map/wallBlocking.ts).
+        if (wall.isDoor && wall.open) continue
         const dx = wall.x2 - wall.x1
         const dy = wall.y2 - wall.y1
         const length = Math.hypot(dx, dy)
         if (length <= 0) continue
         const thicknessCells = Math.max((wall.thickness ?? 4) / gridSizePx, 0.05)
         const geometry = new THREE.BoxGeometry(length, WALL_HEIGHT_CELLS, thicknessCells)
-        const mesh = new THREE.Mesh(geometry, WALL_MATERIAL)
+        const mesh = new THREE.Mesh(geometry, wall.isDoor ? DOOR_MATERIAL : WALL_MATERIAL)
         mesh.position.set((wall.x1 + wall.x2) / 2, WALL_HEIGHT_CELLS / 2, (wall.y1 + wall.y2) / 2)
         mesh.rotation.y = -Math.atan2(dy, dx)
         group.add(mesh)

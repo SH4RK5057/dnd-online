@@ -220,6 +220,19 @@ export interface WallRecord {
    * like a brush size. Read as `?? 4` for walls created before this field
    * existed. Purely cosmetic; doesn't affect line-of-sight math. */
   thickness: number
+  /** Whether this segment is a door — a wall that can be toggled open and
+   * closed instead of only drawn/deleted. Read as `?? false` for walls
+   * created before this field existed, which keeps them acting exactly as
+   * plain walls always have. */
+  isDoor?: boolean
+  /** Only meaningful when isDoor is true. An open door blocks nothing —
+   * line-of-sight, fog-of-war, and attack targeting all skip it exactly
+   * like it isn't there — while a closed one blocks like an ordinary wall.
+   * Read as `?? false` (starts closed, i.e. blocking) for doors created
+   * before this field existed. Always rendered regardless of state (open
+   * or closed) so its location stays visible — only the blocking behavior
+   * changes with `open`. */
+  open?: boolean
   createdAt: number
 }
 

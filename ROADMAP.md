@@ -544,6 +544,41 @@ real change in constraints.
       instead of only the flat glow already baked into the plane. Toggle
       lives next to the existing 2D/3D switch in `screens/SessionScreen.tsx`,
       same personal/`localStorage`-only convention as `view3d`.
+- [x] Fix: placing a light while a stale staged token placement was still
+      armed silently kept routing map clicks to token placement instead —
+      selecting Walls or Lights in the rail visually looked like it worked
+      (icon lit up, details panel changed) but `SceneBuilderScreen`'s
+      `effectiveToolMode` stayed pinned to `'place-tokens'` because it
+      prioritizes any pending placement over the selected tool. Fixed by
+      cancelling a pending placement the moment an exclusive tool is
+      selected (`components/MapToolRail.tsx`'s `selectMode`).
+- [x] Fix: a light's placement-radius circle (`canvas/LightLayer.ts`, a
+      DM-only editing aid showing where a light is and how far it reaches)
+      was rendered completely unmasked for every viewer, so a player could
+      see a light's full radius regardless of their own fog-of-war/line-
+      of-sight — the *actual* in-game illumination (`FogLayer`) was always
+      correctly masked; only this schematic overlay leaked. Fixed by
+      hiding `LightLayer.container` outright for anyone who isn't the
+      unmasked DM (`container.visible = isDmUnmasked`, threaded through
+      `update()`).
+- [x] Doors — a wall segment that can be toggled open/closed instead of
+      only drawn or deleted (`WallRecord.isDoor`/`open`), blocking line-of-
+      sight, fog, and attack targeting only while closed
+      (`map/wallBlocking.ts`'s `blockingWalls` filters them out of every
+      caller that feeds wall segments into `map/visibility.ts`'s generic,
+      door-agnostic geometry). Drawn via a "Draw as door" checkbox in the
+      Walls panel (a brush setting applied to whatever gets drawn next,
+      same as thickness/snap-to-grid) and rendered in a distinct brown, at
+      reduced alpha while open as a visual "not blocking" cue
+      (`canvas/WallLayer.ts`); a stationary click directly on an existing
+      door toggles it instead of starting a new wall chain there. The 3D
+      flat-plane view's wall extrusion (`canvas3d/Scene3D.tsx`) skips the
+      mesh entirely for an open door so perspective mode's camera can
+      actually see/pass through the opening, and renders a closed one in
+      the same distinct color as the 2D view. v1 is DM-toggle-only via the
+      Walls tool, matching this app's existing DM-authoritative editing
+      convention for walls/lights — not yet toggleable by players
+      themselves.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---
@@ -573,8 +608,6 @@ too much in these spots):**
 
 **DM tooling / UX:**
 - Import compendium content directly from a repo URL, not just a local file
-- Placing a light while the token tool is active doesn't work (tool-mode gating bug)
-- Players can see a light's illumination outside their own fog-of-war/FOV
 - A battle-specific menu mode: quick actions during combat, and monster info
   visible to the DM for everything currently in the encounter
 - DM should be able to explicitly share a specific monster's stat block with
@@ -587,8 +620,5 @@ too much in these spots):**
   just that tool's detail instead of a tall scrolling column
 
 **Map / scene features:**
-- Doors: a placeable wall-like object that can be toggled open/closed
-  (blocking LOS/fog only while closed), instead of walls being the only
-  vision-blocking primitive
 - Multiple floors/levels per scene (e.g. a multi-story building or dungeon
   with stacked levels), with a way to switch between or stack them

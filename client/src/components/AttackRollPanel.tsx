@@ -7,6 +7,7 @@ import { computeModifier, computeProficiencyBonus, resolveTokenAc } from '../cha
 import { parseNotation, rollNotation } from '../dice/notation'
 import { resolveAttackMode } from '../dice/conditions'
 import { hasLineOfSight } from '../map/visibility'
+import { blockingWalls } from '../map/wallBlocking'
 import { tokenFootprintCenter } from '../map/sizeCategory'
 
 /** Weapon-select + target-select + roll-mode attack flow, shared by
@@ -73,7 +74,7 @@ export function AttackRollPanel({
     !hasLineOfSight(
       tokenFootprintCenter(attackerToken.x, attackerToken.y, attackerToken.sizeCategory),
       tokenFootprintCenter(target.x, target.y, target.sizeCategory),
-      walls,
+      blockingWalls(walls),
     )
 
   const handleRollAttack = () => {

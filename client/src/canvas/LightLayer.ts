@@ -14,7 +14,16 @@ export interface LightLayerCallbacks {
 
 /**
  * DM-only: renders lights as a small dot plus a translucent ring showing
- * their radius. When active, click empty space to place a new light,
+ * their radius, so the DM can see where lights are and how far they reach
+ * while editing — a placement aid, not the actual in-game illumination
+ * (that's FogLayer's job, correctly masked by each player's own fog-of-
+ * war). `container.visible` is gated by `isDmUnmasked` in `update()` for
+ * exactly that reason: unlike walls/tokens (real map content every viewer
+ * should see, fog permitting), these circles are purely a DM-facing
+ * overlay and must never render for players at all — rendering them
+ * unconditionally would let a player see every light's full radius
+ * regardless of whether that area is actually within their own fog-of-
+ * war/line-of-sight. When active, click empty space to place a new light,
  * drag an existing one to move it (dragging an attached light detaches it
  * first, since its position would otherwise keep following the token and
  * ignore the drag), shift-click to delete.
@@ -56,6 +65,7 @@ export class LightLayer {
     gridSizePx: number,
     mapSize: { width: number; height: number } | null,
     active: boolean,
+    isDmUnmasked: boolean,
     callbacks: LightLayerCallbacks,
   ): void {
     this.lights = lights
@@ -63,6 +73,7 @@ export class LightLayer {
     this.gridSizePx = gridSizePx
     this.callbacks = callbacks
     this.active = active
+    this.container.visible = isDmUnmasked
 
     this.hitPlane.clear()
     this.hitPlane.eventMode = active && mapSize ? 'static' : 'none'

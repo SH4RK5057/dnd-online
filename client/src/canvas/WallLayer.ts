@@ -34,8 +34,9 @@ const DRAG_WRITE_INTERVAL_MS = 75
 export const DEFAULT_WALL_THICKNESS_PX = 4
 
 export interface WallLayerCallbacks {
-  onCreateWall: (x1: number, y1: number, x2: number, y2: number, thickness: number) => void
+  onCreateWall: (x1: number, y1: number, x2: number, y2: number, thickness: number, isDoor: boolean) => void
   onUpdateWallEndpoint: (wallId: string, which: 'start' | 'end', x: number, y: number) => void
+  onToggleDoor: (wallId: string, open: boolean) => void
   onDeleteWall: (wallId: string) => void
 }
 
@@ -55,6 +56,14 @@ interface EndpointHit {
  * starts a new chain from it instead (magnet-snapped exactly onto it) —
  * connecting a new wall to an existing corner is normal DM behavior and
  * must not be swallowed as a no-op "drag" that silently does nothing.
+ *
+ * Doors: `setDoorMode` toggles whether newly-drawn walls are created as
+ * doors (see WallRecord.isDoor) — a brush setting, same spirit as
+ * thickness/snapToGrid, applying to whatever gets drawn next rather than
+ * needing its own separate tool. A stationary (non-drag) click directly on
+ * an *existing* door instead toggles it open/closed — doors are common
+ * enough to interact with that this takes priority over that click's usual
+ * "start a new chain here" meaning.
  */
 export class WallLayer {
   readonly container = new Container()
@@ -71,6 +80,7 @@ export class WallLayer {
   private gridType: GridType = 'square'
   private viewScale = 1
   private thickness = DEFAULT_WALL_THICKNESS_PX
+  private doorMode = false
   private walls: WallRecord[] = []
   private callbacks: WallLayerCallbacks | null = null
   private pendingStart: { x: number; y: number } | null = null
@@ -116,6 +126,7 @@ export class WallLayer {
     snapToGrid: boolean,
     gridType: GridType,
     thickness: number,
+    doorMode: boolean,
     callbacks: WallLayerCallbacks,
   ): void {
     this.walls = walls
@@ -123,6 +134,7 @@ export class WallLayer {
     this.snapToGrid = snapToGrid
     this.gridType = gridType
     this.thickness = thickness
+    this.doorMode = doorMode
     this.callbacks = callbacks
 
     if (this.active !== active) {
@@ -161,15 +173,24 @@ export class WallLayer {
     // since the last stroke/clear, so a single shared call (as before
     // per-wall thickness existed) would force one width for every segment.
     for (const wall of this.walls) {
+      const isOpenDoor = !!wall.isDoor && !!wall.open
+      // Doors get a distinct brown (vs. plain walls' red) so they read as
+      // a different kind of thing at a glance; an open one is drawn at
+      // reduced alpha as a visual cue that it isn't currently blocking
+      // anything, even though — unlike a plain wall — it's still drawn at
+      // all times so its location stays visible either way.
+      const color = wall.isDoor ? 0x8a5a2b : 0xff4444
+      const alpha = isOpenDoor ? 0.35 : 0.9
       this.wallsGraphics
         .moveTo(wall.x1 * this.gridSizePx, wall.y1 * this.gridSizePx)
         .lineTo(wall.x2 * this.gridSizePx, wall.y2 * this.gridSizePx)
-        .stroke({ width: wall.thickness ?? DEFAULT_WALL_THICKNESS_PX, color: 0xff4444, alpha: 0.9 })
+        .stroke({ width: wall.thickness ?? DEFAULT_WALL_THICKNESS_PX, color, alpha })
     }
     // Endpoint dots as a second pass so they sit on top of the lines.
     for (const wall of this.walls) {
-      this.wallsGraphics.circle(wall.x1 * this.gridSizePx, wall.y1 * this.gridSizePx, 4).fill({ color: 0xff4444 })
-      this.wallsGraphics.circle(wall.x2 * this.gridSizePx, wall.y2 * this.gridSizePx, 4).fill({ color: 0xff4444 })
+      const color = wall.isDoor ? 0x8a5a2b : 0xff4444
+      this.wallsGraphics.circle(wall.x1 * this.gridSizePx, wall.y1 * this.gridSizePx, 4).fill({ color })
+      this.wallsGraphics.circle(wall.x2 * this.gridSizePx, wall.y2 * this.gridSizePx, 4).fill({ color })
     }
   }
 
@@ -352,21 +373,28 @@ export class WallLayer {
       // its own down and up — unlike the chain's first point (below),
       // there's no "was this a click or a drag" ambiguity once a chain is
       // already open.
-      this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y, this.thickness)
+      this.callbacks.onCreateWall(this.pendingStart.x, this.pendingStart.y, point.x, point.y, this.thickness, this.doorMode)
       this.pendingStart = point
       this.previewGraphics.clear()
       return
     }
 
     // No chain yet. A stationary click just starts one (leaves pendingStart
-    // open for the next click); a click-and-drag draws one wall immediately
-    // and ends there, since real mouse use rarely lands perfectly still.
+    // open for the next click) — unless it landed on an existing door, in
+    // which case it toggles that door open/closed instead; a click-and-drag
+    // draws one wall immediately and ends there, since real mouse use
+    // rarely lands perfectly still.
     const dragDistancePx = Math.hypot(point.x - downPoint.x, point.y - downPoint.y) * this.gridSizePx * this.viewScale
     if (dragDistancePx < DRAG_COMMIT_THRESHOLD_PX) {
+      const doorHit = this.findWallNear(downPoint)
+      if (doorHit?.isDoor) {
+        this.callbacks.onToggleDoor(doorHit.id, !doorHit.open)
+        return
+      }
       this.pendingStart = downPoint
       return
     }
-    this.callbacks.onCreateWall(downPoint.x, downPoint.y, point.x, point.y, this.thickness)
+    this.callbacks.onCreateWall(downPoint.x, downPoint.y, point.x, point.y, this.thickness, this.doorMode)
     this.previewGraphics.clear()
   }
 

@@ -31,8 +31,9 @@ function makeWall(overrides: Partial<WallRecord> = {}): WallRecord {
 function makeCallbacks() {
   const onCreateWall = vi.fn<WallLayerCallbacks['onCreateWall']>()
   const onUpdateWallEndpoint = vi.fn<WallLayerCallbacks['onUpdateWallEndpoint']>()
+  const onToggleDoor = vi.fn<WallLayerCallbacks['onToggleDoor']>()
   const onDeleteWall = vi.fn<WallLayerCallbacks['onDeleteWall']>()
-  return { onCreateWall, onUpdateWallEndpoint, onDeleteWall }
+  return { onCreateWall, onUpdateWallEndpoint, onToggleDoor, onDeleteWall }
 }
 
 describe('WallLayer endpoint vs new-chain ambiguity', () => {
@@ -40,7 +41,7 @@ describe('WallLayer endpoint vs new-chain ambiguity', () => {
     const layer = new WallLayer()
     const wall = makeWall()
     const callbacks = makeCallbacks()
-    layer.update([wall], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, callbacks)
+    layer.update([wall], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, false, callbacks)
     layer.setViewScale(1)
 
     const endpointLocalX = wall.x2 * GRID_SIZE
@@ -63,14 +64,14 @@ describe('WallLayer endpoint vs new-chain ambiguity', () => {
     ;(layer as any).handlePointerUp(fakeEvent(secondLocalX, secondLocalY))
 
     expect(callbacks.onCreateWall).toHaveBeenCalledTimes(1)
-    expect(callbacks.onCreateWall).toHaveBeenCalledWith(wall.x2, wall.y2, 20, 5, 4)
+    expect(callbacks.onCreateWall).toHaveBeenCalledWith(wall.x2, wall.y2, 20, 5, 4, false)
   })
 
   it('an actual drag starting near an existing endpoint still moves it, not a chain', () => {
     const layer = new WallLayer()
     const wall = makeWall()
     const callbacks = makeCallbacks()
-    layer.update([wall], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, callbacks)
+    layer.update([wall], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, false, callbacks)
     layer.setViewScale(1)
 
     const startLocalX = wall.x2 * GRID_SIZE
@@ -90,7 +91,7 @@ describe('WallLayer endpoint vs new-chain ambiguity', () => {
   it('a normal click-chain with no endpoints nearby is unaffected', () => {
     const layer = new WallLayer()
     const callbacks = makeCallbacks()
-    layer.update([], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, callbacks)
+    layer.update([], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, false, callbacks)
     layer.setViewScale(1)
 
     const p1x = 2 * GRID_SIZE
@@ -105,6 +106,60 @@ describe('WallLayer endpoint vs new-chain ambiguity', () => {
     ;(layer as any).handlePointerDown(fakeEvent(p2x, p2y))
     ;(layer as any).handlePointerUp(fakeEvent(p2x, p2y))
     expect(callbacks.onCreateWall).toHaveBeenCalledTimes(1)
-    expect(callbacks.onCreateWall).toHaveBeenCalledWith(2, 2, 8, 6, 4)
+    expect(callbacks.onCreateWall).toHaveBeenCalledWith(2, 2, 8, 6, 4, false)
+  })
+})
+
+describe('WallLayer doors', () => {
+  it('a stationary click on the middle of an existing door toggles it instead of starting a new chain', () => {
+    const layer = new WallLayer()
+    const door = makeWall({ id: 'door-1', isDoor: true, open: false })
+    const callbacks = makeCallbacks()
+    layer.update([door], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, false, callbacks)
+    layer.setViewScale(1)
+
+    // Midpoint of the door segment, away from either endpoint.
+    const midLocalX = ((door.x1 + door.x2) / 2) * GRID_SIZE
+    const midLocalY = ((door.y1 + door.y2) / 2) * GRID_SIZE
+    ;(layer as any).handlePointerDown(fakeEvent(midLocalX, midLocalY))
+    ;(layer as any).handlePointerUp(fakeEvent(midLocalX, midLocalY))
+
+    expect(callbacks.onToggleDoor).toHaveBeenCalledWith('door-1', true)
+    expect(callbacks.onCreateWall).not.toHaveBeenCalled()
+    expect((layer as any).pendingStart).toBeNull()
+  })
+
+  it('a stationary click on the middle of a plain (non-door) wall still starts a new chain, unaffected', () => {
+    const layer = new WallLayer()
+    const wall = makeWall()
+    const callbacks = makeCallbacks()
+    layer.update([wall], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, false, callbacks)
+    layer.setViewScale(1)
+
+    const midLocalX = ((wall.x1 + wall.x2) / 2) * GRID_SIZE
+    const midLocalY = ((wall.y1 + wall.y2) / 2) * GRID_SIZE
+    ;(layer as any).handlePointerDown(fakeEvent(midLocalX, midLocalY))
+    ;(layer as any).handlePointerUp(fakeEvent(midLocalX, midLocalY))
+
+    expect(callbacks.onToggleDoor).not.toHaveBeenCalled()
+    expect((layer as any).pendingStart).toEqual({ x: (wall.x1 + wall.x2) / 2, y: (wall.y1 + wall.y2) / 2 })
+  })
+
+  it('newly-drawn walls are created as doors when doorMode is on', () => {
+    const layer = new WallLayer()
+    const callbacks = makeCallbacks()
+    layer.update([], GRID_SIZE, { width: 2000, height: 2000 }, true, false, 'square', 4, true, callbacks)
+    layer.setViewScale(1)
+
+    const p1x = 2 * GRID_SIZE
+    const p1y = 2 * GRID_SIZE
+    const p2x = 8 * GRID_SIZE
+    const p2y = 6 * GRID_SIZE
+    ;(layer as any).handlePointerDown(fakeEvent(p1x, p1y))
+    ;(layer as any).handlePointerUp(fakeEvent(p1x, p1y))
+    ;(layer as any).handlePointerDown(fakeEvent(p2x, p2y))
+    ;(layer as any).handlePointerUp(fakeEvent(p2x, p2y))
+
+    expect(callbacks.onCreateWall).toHaveBeenCalledWith(2, 2, 8, 6, 4, true)
   })
 })

@@ -41,6 +41,8 @@ export function MapToolRail({
   onSnapWallsChange,
   wallThickness,
   onWallThicknessChange,
+  wallDoorMode,
+  onWallDoorModeChange,
   pendingPlacement,
   onRequestPlacement,
   onCancelPlacement,
@@ -52,6 +54,8 @@ export function MapToolRail({
   onSnapWallsChange: (snap: boolean) => void
   wallThickness: number
   onWallThicknessChange: (thickness: number) => void
+  wallDoorMode: boolean
+  onWallDoorModeChange: (doorMode: boolean) => void
   pendingPlacement: PendingTokenPlacement | null
   onRequestPlacement: (placement: PendingTokenPlacement) => void
   onCancelPlacement: () => void
@@ -85,6 +89,14 @@ export function MapToolRail({
   }, [pendingPlacement])
 
   const selectMode = (mode: ToolMode, panel: OpenPanel) => {
+    // A still-staged token placement takes priority over `toolMode` in the
+    // parent's `effectiveToolMode` (so the map keeps waiting for a click to
+    // place it even if the rail's tokens panel isn't open) — which meant
+    // switching to Walls/Lights here visually looked like it worked (the
+    // icon lit up, the details panel changed) while clicks on the map kept
+    // being routed to token placement instead. Selecting an exclusive tool
+    // abandons any pending placement so the switch actually takes effect.
+    if (pendingPlacement) onCancelPlacement()
     onToolModeChange(mode)
     setOpenPanel(panel)
     setCollapsed(false)
@@ -169,11 +181,16 @@ export function MapToolRail({
                 <div className="map-tool-rail__popout-body">
                   <p className="map-tool-rail__hint">
                     Click to start a wall, click again to add a segment and keep going. Right-click to finish.
-                    Shift-click a wall to delete it. Drag an existing endpoint to move it.
+                    Shift-click a wall to delete it. Drag an existing endpoint to move it. Click an existing door to
+                    toggle it open/closed.
                   </p>
                   <label>
                     <input type="checkbox" checked={snapWalls} onChange={(event) => onSnapWallsChange(event.target.checked)} />
                     Snap to grid
+                  </label>
+                  <label>
+                    <input type="checkbox" checked={wallDoorMode} onChange={(event) => onWallDoorModeChange(event.target.checked)} />
+                    Draw as door (blocks vision only while closed)
                   </label>
                   <label className="map-tool-rail__thickness">
                     Thickness

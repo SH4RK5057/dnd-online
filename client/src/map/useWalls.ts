@@ -14,12 +14,15 @@ export interface CreateWallInput {
   y2: number
   /** Screen-pixel render thickness at 1x grid scale — see WallRecord. */
   thickness: number
+  /** See WallRecord.isDoor. Defaults to false (an ordinary wall). */
+  isDoor?: boolean
 }
 
 export interface UseWallsResult {
   walls: WallRecord[]
   createWall: (input: CreateWallInput) => string
   updateWallEndpoint: (wallId: string, which: 'start' | 'end', x: number, y: number) => void
+  toggleDoor: (wallId: string, open: boolean) => void
   deleteWall: (wallId: string) => void
 }
 
@@ -52,6 +55,8 @@ export function useWalls(doc: Y.Doc | null, sceneId: string | null): UseWallsRes
         x2: input.x2,
         y2: input.y2,
         thickness: input.thickness,
+        isDoor: input.isDoor ?? false,
+        open: false,
         createdAt: Date.now(),
       }
       wallsMap(doc).set(id, record)
@@ -71,6 +76,17 @@ export function useWalls(doc: Y.Doc | null, sceneId: string | null): UseWallsRes
     [doc],
   )
 
+  const toggleDoor = useCallback(
+    (wallId: string, open: boolean) => {
+      if (!doc) return
+      const wallsM = wallsMap(doc)
+      const wall = wallsM.get(wallId)
+      if (!wall?.isDoor) return
+      wallsM.set(wallId, { ...wall, open })
+    },
+    [doc],
+  )
+
   const deleteWall = useCallback(
     (wallId: string) => {
       if (!doc) return
@@ -81,5 +97,5 @@ export function useWalls(doc: Y.Doc | null, sceneId: string | null): UseWallsRes
 
   const walls = sceneId ? allWalls.filter((w) => w.sceneId === sceneId) : []
 
-  return { walls, createWall, updateWallEndpoint, deleteWall }
+  return { walls, createWall, updateWallEndpoint, toggleDoor, deleteWall }
 }
