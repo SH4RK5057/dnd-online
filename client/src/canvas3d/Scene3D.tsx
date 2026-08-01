@@ -309,7 +309,13 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
         boardCanvas.width = extracted.width
         boardCanvas.height = extracted.height
       }
-      const ctx = boardCanvas.getContext('2d')
+      // willReadFrequently forces software (CPU) 2D canvas rendering
+      // instead of Chrome's GPU-accelerated backend — see the matching
+      // note in MapCanvas.tsx's extract(). This canvas is also rewritten
+      // via drawImage every ~200ms and is then read by Three.js as a
+      // CanvasTexture source, so it's exposed to the same GPU-compositor
+      // bug from both directions.
+      const ctx = boardCanvas.getContext('2d', { willReadFrequently: true })
       if (!ctx) return
       // The extracted 2D render is mostly transparent outside whatever's
       // actually drawn (map/grid/walls/tokens) — e.g. a blank scene is

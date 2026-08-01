@@ -701,7 +701,17 @@ export function MapCanvas({
       const combined = document.createElement('canvas')
       combined.width = width
       combined.height = height
-      const ctx = combined.getContext('2d')
+      // willReadFrequently forces software (CPU) 2D canvas rendering
+      // instead of Chrome's GPU-accelerated backend. This canvas is
+      // rewritten via drawImage from Pixi's extracted layers on every
+      // ~200ms refresh — under GPU acceleration at a fractional display
+      // scale factor (e.g. 125%), that repeated drawImage compositing
+      // reproducibly triggered Chrome's
+      // "glCopySubTextureCHROMIUM: Offset overflows texture dimensions"
+      // WebGL error and corrupted the resulting texture on real hardware
+      // (never reproduced in this project's own software-rendered test
+      // browser, consistent with a GPU-compositor rounding bug).
+      const ctx = combined.getContext('2d', { willReadFrequently: true })
       if (!ctx) return null
       const terrain = app.renderer.extract.canvas({ target: fogTarget, frame })
       const tokensCanvas = app.renderer.extract.canvas({ target: tokenTarget, frame })
