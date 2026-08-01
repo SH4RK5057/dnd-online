@@ -238,13 +238,17 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
 
     const planeGeometry = new THREE.PlaneGeometry(1, 1)
     planeGeometry.rotateX(-Math.PI / 2)
-    // White, not a placeholder tint: the plane is always textured (the
-    // board canvas's own background fill plus whatever's drawn on top —
-    // see buildPlaneCanvas/refreshBoard's PLANE_BACKGROUND_COLOR fill), so
-    // material.color only ever multiplies against — and needlessly
-    // darkens — that texture's real colors. A non-white color here was
-    // the actual cause of the plane rendering as if it were black.
-    const planeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff })
+    // MeshBasicMaterial, deliberately unlit: the plane is a flat display of
+    // the 2D canvas's own rendering (see buildPlaneCanvas/refreshBoard), not
+    // a physically-lit surface — it should show those pixels exactly as
+    // bright and colored as the 2D view does, uniformly across the whole
+    // plane. A PBR material (MeshStandardMaterial) responds to the scene's
+    // ambient/directional lights, which (a) darkens everything well below
+    // the texture's real brightness and (b) falls off with the directional
+    // light's angle, making one side of the plane visibly dimmer than the
+    // other — neither is desired for what's meant to be a literal mirror of
+    // the 2D map, not a lit 3D surface.
+    const planeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
     const plane = new THREE.Mesh(planeGeometry, planeMaterial)
     scene.add(plane)
     planeRef.current = plane

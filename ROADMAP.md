@@ -547,3 +547,10 @@ too much in these spots):**
 - Side panel UX: scrolling through the whole stacked section list is
   tedious — consider a tool-select-first layout where picking a tool shows
   just that tool's detail instead of a tall scrolling column
+
+**Map / scene features:**
+- Doors: a placeable wall-like object that can be toggled open/closed
+  (blocking LOS/fog only while closed), instead of walls being the only
+  vision-blocking primitive
+- Multiple floors/levels per scene (e.g. a multi-story building or dungeon
+  with stacked levels), with a way to switch between or stack them
