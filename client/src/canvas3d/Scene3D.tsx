@@ -253,24 +253,38 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     scene.add(plane)
     planeRef.current = plane
 
-    // Persistent texture source: getBoardCanvas() hands back a brand-new
-    // canvas element every call, so instead of recreating the Three.js
-    // texture each refresh, its content is copied into one long-lived
-    // canvas that a single CanvasTexture wraps — cheaper, and avoids
-    // texture/material churn.
+    // Persistent canvas source: getBoardCanvas() hands back a brand-new
+    // canvas element every call, so its content is copied into one
+    // long-lived canvas here rather than swapping canvases every refresh.
     const boardCanvas = document.createElement('canvas')
     boardCanvas.width = 1
     boardCanvas.height = 1
-    const boardTexture = new THREE.CanvasTexture(boardCanvas)
-    boardTexture.colorSpace = THREE.SRGBColorSpace
-    // Mipmaps would be regenerated every refresh for no benefit (the whole
-    // texture gets replaced wholesale, not sampled at a distance-varying
-    // scale) — skip them and the min/mag filter that would require them.
-    boardTexture.generateMipmaps = false
-    boardTexture.minFilter = THREE.LinearFilter
-    boardTexture.magFilter = THREE.LinearFilter
-    planeMaterial.map = boardTexture
-    planeMaterial.needsUpdate = true
+
+    // The CanvasTexture object itself, however, IS recreated on every
+    // update (see applyBoardTexture below) rather than reused — even with
+    // the one-frame upload deferral above, a single failed GPU-compositor
+    // copy against a given WebGLTexture can leave that texture's GPU-side
+    // state permanently corrupted, so later successful needsUpdate calls
+    // against the SAME texture object kept rendering black. A fresh
+    // CanvasTexture forces a brand new GPU allocation with no prior state
+    // to inherit, so one bad frame can no longer have a lasting effect.
+    let boardTexture: THREE.CanvasTexture
+    const applyBoardTexture = () => {
+      const previous = boardTexture
+      boardTexture = new THREE.CanvasTexture(boardCanvas)
+      boardTexture.colorSpace = THREE.SRGBColorSpace
+      // Mipmaps would be regenerated every refresh for no benefit (the
+      // whole texture gets replaced wholesale, not sampled at a
+      // distance-varying scale) — skip them and the min/mag filter that
+      // would require them.
+      boardTexture.generateMipmaps = false
+      boardTexture.minFilter = THREE.LinearFilter
+      boardTexture.magFilter = THREE.LinearFilter
+      planeMaterial.map = boardTexture
+      planeMaterial.needsUpdate = true
+      previous?.dispose()
+    }
+    applyBoardTexture()
 
     let lastWidthCells = 0
     let lastHeightCells = 0
@@ -464,7 +478,7 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
       // reads it. See pendingTextureUpload's declaration for why.
       if (pendingTextureUpload) {
         pendingTextureUpload = false
-        boardTexture.needsUpdate = true
+        applyBoardTexture()
       }
       if (time - lastBoardRefresh >= BOARD_REFRESH_INTERVAL_MS) {
         lastBoardRefresh = time
