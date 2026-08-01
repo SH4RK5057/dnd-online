@@ -21,7 +21,6 @@ import { DiceRollerPanel } from '../components/DiceRollerPanel'
 import { RollLog } from '../components/RollLog'
 import { InitiativeTracker } from '../components/InitiativeTracker'
 import { TokenHpConditionEditor } from '../components/TokenHpConditionEditor'
-import { CompendiumDrawer } from '../components/CompendiumDrawer'
 import { TokenInspector } from '../components/TokenInspector'
 import { DmNotesPanel } from '../components/DmNotesPanel'
 import { HandoutsPanel, PlayerHandoutsView } from '../components/HandoutsPanel'
@@ -32,12 +31,15 @@ import { ChatPanel } from '../components/ChatPanel'
 import { SceneNavigationPanel } from '../components/SceneNavigationPanel'
 import { CharacterManagerScreen } from './CharacterManagerScreen'
 import { SceneBuilderScreen } from './SceneBuilderScreen'
+import { CompendiumScreen } from './CompendiumScreen'
 import { EncounterNotificationBanner } from '../components/EncounterNotificationBanner'
 import { PendingOverridesBanner } from '../components/PendingOverridesBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { useUndoManager } from '../undo/useUndoManager'
 import { usePanelOrder } from './usePanelOrder'
+import { useSidebarLayout, type SidebarPosition } from './useSidebarLayout'
 import { PanelSection } from '../components/PanelSection'
+import { SidebarResizeHandle } from '../components/SidebarResizeHandle'
 import { DiceOverlay } from '../components/DiceOverlay'
 import { MapCanvas } from '../canvas/MapCanvas'
 import { Scene3D } from '../canvas3d/Scene3D'
@@ -59,6 +61,7 @@ export function SessionScreen() {
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
   const [showCharacterManager, setShowCharacterManager] = useState(false)
   const [showSceneBuilder, setShowSceneBuilder] = useState(false)
+  const [showCompendium, setShowCompendium] = useState(false)
   const [isMapFullscreen, setIsMapFullscreen] = useState(false)
   const [showJoinCode, setShowJoinCode] = useState(true)
   const [pendingPoiPlacement, setPendingPoiPlacement] = useState<PendingPoiPlacement | null>(null)
@@ -75,6 +78,10 @@ export function SessionScreen() {
    * for their own screen independently (see canvas3d/Scene3D.tsx's doc
    * comment for what 3D mode does and doesn't support in v1). */
   const [view3d, setView3d] = useState(false)
+  /** Player-only "over-the-shoulder" first-person mode within the 3D view —
+   * see canvas3d/Scene3D.tsx's Scene3DProps.perspectiveMode doc comment.
+   * Personal, not synced, same as view3d. */
+  const [perspectiveMode, setPerspectiveMode] = useState(false)
   // Populated by MapCanvas (always mounted, see below) via onBoardCanvasHandle
   // — Scene3D calls this to render its plane as a live texture of the 2D
   // canvas's own rendering instead of reimplementing it.
@@ -83,6 +90,7 @@ export function SessionScreen() {
   // player see different section sets, so each role's arrangement is saved
   // independently.
   const panelOrder = usePanelOrder(`session:${session?.role ?? 'unknown'}`)
+  const sidebarLayout = useSidebarLayout()
 
   useEffect(() => {
     if (!notification) return
@@ -167,6 +175,9 @@ export function SessionScreen() {
   }
   if (showSceneBuilder) {
     return <SceneBuilderScreen onBack={() => setShowSceneBuilder(false)} />
+  }
+  if (showCompendium) {
+    return <CompendiumScreen onBack={() => setShowCompendium(false)} />
   }
   if (showCharacterSheetFullscreen) {
     return (
@@ -278,8 +289,28 @@ export function SessionScreen() {
 
       {session.role === 'dm' && <PendingOverridesBanner doc={session.doc} />}
 
-      <div className="session-screen__body">
-        <div className="session-screen__panel">
+      <div className="session-screen__body" data-position={sidebarLayout.position}>
+        <div
+          className="session-screen__panel"
+          style={
+            sidebarLayout.position === 'left' || sidebarLayout.position === 'right'
+              ? { flexBasis: sidebarLayout.size, width: sidebarLayout.size, order: sidebarLayout.position === 'right' ? 3 : 1 }
+              : { flexBasis: sidebarLayout.size, height: sidebarLayout.size, order: sidebarLayout.position === 'bottom' ? 3 : 1 }
+          }
+        >
+          <label className="session-screen__sidebar-position">
+            Sidebar
+            <select
+              value={sidebarLayout.position}
+              onChange={(e) => sidebarLayout.setPosition(e.target.value as SidebarPosition)}
+            >
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+            </select>
+          </label>
+
           {session.role === 'dm' && (
             <div className="session-screen__mode-switcher">
               <button type="button" onClick={() => setShowSceneBuilder(true)}>
@@ -298,6 +329,9 @@ export function SessionScreen() {
               rather than cramming into this narrow sidebar. */}
           <button type="button" onClick={() => setShowCharacterSheetFullscreen(true)}>
             Open character sheet
+          </button>
+          <button type="button" onClick={() => setShowCompendium(true)}>
+            Compendium
           </button>
 
           {(() => {
@@ -386,12 +420,6 @@ export function SessionScreen() {
               },
               { id: 'initiative-tracker', title: 'Initiative', content: <InitiativeTracker /> },
               { id: 'chat', title: 'Chat', content: <ChatPanel /> },
-              {
-                id: 'compendium',
-                title: 'Compendium',
-                defaultCollapsed: true,
-                content: <CompendiumDrawer doc={session.doc} isDm={session.role === 'dm'} />,
-              },
             ]
 
             const playerOnlySections: Section[] =
@@ -441,7 +469,17 @@ export function SessionScreen() {
           )}
         </div>
 
-        <div className={`session-screen__main${isMapFullscreen ? ' session-screen__main--fullscreen' : ''}`}>
+        <SidebarResizeHandle
+          axis={sidebarLayout.position === 'left' || sidebarLayout.position === 'right' ? 'x' : 'y'}
+          reverse={sidebarLayout.position === 'right' || sidebarLayout.position === 'bottom'}
+          size={sidebarLayout.size}
+          onResize={sidebarLayout.setSize}
+        />
+
+        <div
+          className={`session-screen__main${isMapFullscreen ? ' session-screen__main--fullscreen' : ''}`}
+          style={{ order: sidebarLayout.position === 'right' || sidebarLayout.position === 'bottom' ? 1 : 3 }}
+        >
           {isUnpublishedForPlayer ? (
             <p className="session-screen__notice">Your DM is still setting up this scene. Hang tight!</p>
           ) : (
@@ -454,6 +492,7 @@ export function SessionScreen() {
                   getBoardCanvas={() => boardCanvasExtractorRef.current?.() ?? null}
                   selectedTokenId={selectedTokenId}
                   onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
+                  perspectiveMode={perspectiveMode}
                 />
               )}
               {/* Stays mounted (just hidden) even in 3D view — its Pixi
@@ -486,6 +525,20 @@ export function SessionScreen() {
               >
                 {view3d ? '2D map' : '3D view'}
               </button>
+              {view3d && session.role !== 'dm' && (
+                <button
+                  type="button"
+                  className="session-screen__perspective-toggle"
+                  onClick={() => setPerspectiveMode((v) => !v)}
+                  title={
+                    perspectiveMode
+                      ? 'Switch back to the free-orbit board view'
+                      : 'Switch to first-person view, following your own token'
+                  }
+                >
+                  {perspectiveMode ? 'Board view' : 'First-person'}
+                </button>
+              )}
               <button
                 type="button"
                 className="session-screen__fullscreen-toggle"

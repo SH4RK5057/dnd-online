@@ -506,6 +506,39 @@ real change in constraints.
       original freeform "add custom" fallback for anything not in the
       compendium. Monster search-to-add already existed via
       `CompendiumDrawer`.
+- [x] Compendium as its own full-screen view — split out of the side panel
+      the same way Scene Builder/Character Manager already swap the whole
+      screen (`screens/CompendiumScreen.tsx`), so looking something up
+      doesn't mean scrolling past every other DM tool panel to reach it.
+      Audited the rest of the sidebar for the same treatment: everything
+      else (Fog & Lighting, Token Placement, Dice Roller, Chat, etc.) is
+      short enough or used often enough alongside the map that a full-
+      screen swap would cost more (losing the map/chat context) than it
+      saves — Compendium was the one section long enough, and looked-up
+      independently enough of the current map state, to be worth it.
+- [x] Drag-resizable, repositionable side panel — the DM/player panel can
+      be dragged to grow/shrink (`components/SidebarResizeHandle.tsx`) and
+      moved to any of the four sides of the map (left/right/top/bottom, via
+      a `<select>` in the header), not just a fixed-width left column.
+      Personal per-viewer preference, `localStorage`-persisted like the
+      panel section order (`screens/useSidebarLayout.ts`), not synced
+      through the Yjs doc.
+- [x] First-person "over-the-shoulder" mode in the 3D view — a player-only
+      toggle (`canvas3d/Scene3D.tsx`'s `perspectiveMode` prop, ignored for
+      the DM, who always keeps the free-orbit board view) that follows the
+      viewer's own token close up instead of orbiting the whole board: the
+      camera translates by the token's own frame-to-frame movement delta
+      (preserving whatever manual orbit/zoom the player already dragged in,
+      rather than resetting the view every frame), the viewer's own mini is
+      hidden (nothing to see looking at yourself), walls get real 3D
+      extrusion (`WallRecord` height/thickness) instead of just flat lines
+      baked into the plane texture, and lights become real three.js
+      `PointLight`s with distance falloff (position resolved from the
+      attached token when applicable, mirroring
+      `canvas/LightLayer.ts`'s `resolvePosition`) instead of only the flat
+      glow already baked into the plane. Toggle lives next to the existing
+      2D/3D switch in `screens/SessionScreen.tsx`, same personal/
+      `localStorage`-only convention as `view3d`.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---

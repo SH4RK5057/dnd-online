@@ -25,6 +25,8 @@ export function CompendiumDrawer({
   onAddMonsterToScene?: (monster: MonsterData) => void
 }) {
   const compendium = useCompendium(doc)
+  // Monster stat blocks are DM-only reference material (encounter prep,
+  // hidden creature stats) — players only ever get the spells/items tabs.
   const [tab, setTab] = useState<Tab>('spells')
   const [query, setQuery] = useState('')
   const [spellLevel, setSpellLevel] = useState<number | 'all'>('all')
@@ -120,9 +122,11 @@ export function CompendiumDrawer({
         <button type="button" aria-pressed={tab === 'spells'} onClick={() => { setTab('spells'); setSelectedKey(null) }}>
           Spells ({spells.length})
         </button>
-        <button type="button" aria-pressed={tab === 'monsters'} onClick={() => { setTab('monsters'); setSelectedKey(null) }}>
-          Monsters ({monsters.length})
-        </button>
+        {isDm && (
+          <button type="button" aria-pressed={tab === 'monsters'} onClick={() => { setTab('monsters'); setSelectedKey(null) }}>
+            Monsters ({monsters.length})
+          </button>
+        )}
         <button type="button" aria-pressed={tab === 'items'} onClick={() => { setTab('items'); setSelectedKey(null) }}>
           Items ({items.length})
         </button>

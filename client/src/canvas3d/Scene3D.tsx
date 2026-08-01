@@ -6,6 +6,7 @@ import { useSession } from '../session/useSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useWalls } from '../map/useWalls'
+import { useLights } from '../map/useLights'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { subscribeAssetUrl } from '../map/assetSync'
 import { MAX_VISION_RADIUS_CELLS, BLANK_SCENE_WIDTH_CELLS, BLANK_SCENE_HEIGHT_CELLS } from '../map/constants'
@@ -30,6 +31,15 @@ const BOARD_REFRESH_INTERVAL_MS = 200
  * (select) rather than a drag — mirrors the click-vs-drag disambiguation
  * canvas/TokenSprite.ts already does for the 2D view. */
 const DRAG_CLICK_THRESHOLD_PX = 6
+/** Grid cells — how tall an extruded wall stands in perspective mode. */
+const WALL_HEIGHT_CELLS = 1.5
+const WALL_COLOR = 0x8a7a5c
+/** Grid cells — camera distance from the followed token in perspective
+ * mode, close enough to feel personal rather than a board overview. */
+const PERSPECTIVE_FOLLOW_DISTANCE_CELLS = 3.5
+/** World-space height (cells) light meshes and the followed camera target
+ * sit at above the plane — roughly a standing creature's torso/eye level. */
+const EYE_HEIGHT_CELLS = 0.8
 
 // Shared, stateless geometry/materials reused across every token's
 // placeholder mesh — never disposed per-token (only per-token Mesh
@@ -40,6 +50,7 @@ const HAZARD_GEOMETRY = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0)
 const PLACEHOLDER_MATERIAL = new THREE.MeshStandardMaterial({ color: PLACEHOLDER_COLOR })
 const HAZARD_MATERIAL = new THREE.MeshStandardMaterial({ color: HAZARD_COLOR })
 const STL_MATERIAL = new THREE.MeshStandardMaterial({ color: STL_COLOR })
+const WALL_MATERIAL = new THREE.MeshStandardMaterial({ color: WALL_COLOR })
 
 interface TokenUserData {
   /** The modelAssetId currently loaded/loading for this token's mesh. A
@@ -140,6 +151,14 @@ interface Scene3DProps {
   getBoardCanvas?: () => HTMLCanvasElement | null
   selectedTokenId?: string | null
   onSelectToken?: (tokenId: string) => void
+  /** Player-only "over-the-shoulder" mode: the camera stays close above and
+   * follows the viewer's own token instead of freely orbiting the whole
+   * board, their own mini is hidden (nothing to see looking at yourself),
+   * walls get real 3D extrusion instead of just being flat lines on the
+   * plane texture, and lights become real point lights with distance
+   * falloff instead of only the flat glow baked into the texture. Ignored
+   * for the DM, who always gets the standard free-orbit board view. */
+  perspectiveMode?: boolean
 }
 
 /**
@@ -173,7 +192,7 @@ interface Scene3DProps {
  *   clicking a mini calls onSelectToken, opening the same side-panel
  *   editors the 2D view uses — it just isn't visually marked in 3D).
  */
-export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken }: Scene3DProps) {
+export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken, perspectiveMode = false }: Scene3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const { session } = useSession()
   const doc = session?.doc ?? null
@@ -181,24 +200,30 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
   const { activeScene } = useScenes(doc)
   const { tokens, moveToken } = useTokens(doc, activeScene?.id ?? null)
   const { walls } = useWalls(doc, activeScene?.id ?? null)
+  const { lights } = useLights(doc, activeScene?.id ?? null)
   // No DM preview-as-player support in 3D yet (see doc comment) — a real
   // player viewer's own stable id, or null for the DM (who's always
   // unmasked) or when there's no session at all.
   const viewerId = isDm ? null : getOrCreatePlayerId()
+  // DM always gets the standard free-orbit view — see Scene3DProps' doc
+  // comment on perspectiveMode.
+  const effectivePerspectiveMode = perspectiveMode && !isDm
 
   // Mutable "latest" ref so the imperative pointer handlers and the RAF
   // board-refresh loop (both created once, in the mount effect below)
   // always see fresh data without needing to be recreated — same reasoning
   // as canvas/TokenLayer.ts's update() pattern, just via a ref instead of a
   // class method.
-  const latestRef = useRef({ tokens, isDm, moveToken, onSelectToken, getBoardCanvas, activeScene })
-  latestRef.current = { tokens, isDm, moveToken, onSelectToken, getBoardCanvas, activeScene }
+  const latestRef = useRef({ tokens, isDm, moveToken, onSelectToken, getBoardCanvas, activeScene, effectivePerspectiveMode, viewerId })
+  latestRef.current = { tokens, isDm, moveToken, onSelectToken, getBoardCanvas, activeScene, effectivePerspectiveMode, viewerId }
 
   const sceneRef = useRef<THREE.Scene | null>(null)
   const planeRef = useRef<THREE.Mesh | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
   const tokenGroupsRef = useRef(new Map<string, THREE.Group>())
+  const wallGroupRef = useRef<THREE.Group | null>(null)
+  const lightGroupRef = useRef<THREE.Group | null>(null)
 
   // Mount: renderer/scene/camera/controls/lights/plane + pointer handlers +
   // render loop (which also periodically refreshes the plane's texture from
@@ -227,8 +252,10 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.maxPolarAngle = Math.PI / 2 - 0.02
-    controls.minDistance = 2
-    controls.maxDistance = 300
+    const ORBIT_MIN_DISTANCE = 2
+    const ORBIT_MAX_DISTANCE = 300
+    controls.minDistance = ORBIT_MIN_DISTANCE
+    controls.maxDistance = ORBIT_MAX_DISTANCE
     controlsRef.current = controls
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7))
@@ -295,8 +322,8 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     }
     applyBoardTexture()
 
-    let lastWidthCells = 0
-    let lastHeightCells = 0
+    let lastWidthCells = BLANK_SCENE_WIDTH_CELLS
+    let lastHeightCells = BLANK_SCENE_HEIGHT_CELLS
     let lastSceneId: string | null = null
     let lastRefreshLogAt = 0
     // Set after refreshBoard() finishes writing boardCanvas via drawImage;
@@ -477,9 +504,52 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
 
+    // Perspective-mode camera-follow state, mutated only inside animate()
+    // below. `lastFollowPos` doubles as the "was following last frame" flag:
+    // null means either perspective mode is off, or it just turned on and
+    // hasn't placed the camera yet — both cases want a snap-in rather than
+    // a delta-translate.
+    let wasPerspectiveMode = false
+    let lastFollowPos: THREE.Vector3 | null = null
+
     let animationFrame = 0
     let lastBoardRefresh = 0
     const animate = (time: number) => {
+      const { effectivePerspectiveMode: perspNow, viewerId: viewerIdNow, tokens: tokensNow } = latestRef.current
+      if (perspNow) {
+        const ownToken = tokensNow.find((t) => t.ownerId === viewerIdNow)
+        if (ownToken) {
+          const footprint = footprintOf(ownToken)
+          const targetPos = new THREE.Vector3(ownToken.x + footprint / 2, EYE_HEIGHT_CELLS, ownToken.y + footprint / 2)
+          if (!lastFollowPos) {
+            // Snap-in: either just entered perspective mode, or the
+            // followed token just appeared (e.g. reassigned) — place the
+            // camera at a fixed close-up offset rather than translating
+            // from wherever it happened to be for the board view.
+            camera.position.set(targetPos.x, targetPos.y + EYE_HEIGHT_CELLS * 1.5, targetPos.z + PERSPECTIVE_FOLLOW_DISTANCE_CELLS)
+            controls.target.copy(targetPos)
+            controls.minDistance = 1
+            controls.maxDistance = PERSPECTIVE_FOLLOW_DISTANCE_CELLS * 2
+          } else {
+            // Translate both camera and target by the token's own
+            // frame-over-frame movement delta — this preserves whatever
+            // manual orbit/zoom offset the player has already dragged in,
+            // rather than fighting it by resetting the target outright.
+            const delta = targetPos.clone().sub(lastFollowPos)
+            camera.position.add(delta)
+            controls.target.add(delta)
+          }
+          lastFollowPos = targetPos
+        }
+      } else if (wasPerspectiveMode) {
+        // Exiting perspective mode: restore the standard board framing.
+        controls.minDistance = ORBIT_MIN_DISTANCE
+        controls.maxDistance = ORBIT_MAX_DISTANCE
+        applyDims(lastWidthCells, lastHeightCells)
+        lastFollowPos = null
+      }
+      wasPerspectiveMode = perspNow
+
       controls.update()
       // Applying a texture upload queued by the *previous* tick's
       // refreshBoard() — not the one about to run this tick — is what
@@ -509,6 +579,11 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
         ;(group.userData as TokenUserData).unsubscribe?.()
       }
       tokenGroups.clear()
+      for (const child of wallGroupRef.current?.children ?? []) {
+        ;(child as THREE.Mesh).geometry.dispose()
+      }
+      wallGroupRef.current = null
+      lightGroupRef.current = null
       boardTexture.dispose()
       planeGeometry.dispose()
       planeMaterial.dispose()
@@ -565,7 +640,11 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
         scene.add(group)
         groups.set(token.id, group)
       }
-      group.visible = inLiveSight(token)
+      // In perspective mode the viewer's own mini is hidden — nothing to
+      // see looking at yourself, and it would otherwise sit right in front
+      // of the follow camera. See Scene3DProps.perspectiveMode's doc comment.
+      const isOwnToken = token.ownerId === viewerId
+      group.visible = inLiveSight(token) && !(effectivePerspectiveMode && isOwnToken)
       // token.modelAssetId is guaranteed non-null by the visibleTokens filter above.
       updateToken(doc, group, token, token.modelAssetId as string)
     }
@@ -576,7 +655,74 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
       scene.remove(group)
       groups.delete(id)
     }
-  }, [doc, tokens, isDm, activeScene, walls, viewerId])
+  }, [doc, tokens, isDm, activeScene, walls, viewerId, effectivePerspectiveMode])
+
+  // Wall extrusion meshes, perspective-mode only — the flat wall lines baked
+  // into the plane texture are enough for the standard board view, but a
+  // first-person look needs real 3D geometry to actually feel like blocking
+  // structure. Rebuilt whenever the wall list or grid scale changes; kept in
+  // the scene but hidden (not torn down) when perspective mode is off, so
+  // toggling the mode doesn't pay a rebuild cost on every flip.
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    let group = wallGroupRef.current
+    if (!group) {
+      group = new THREE.Group()
+      scene.add(group)
+      wallGroupRef.current = group
+    }
+    for (const child of [...group.children]) {
+      group.remove(child)
+      ;(child as THREE.Mesh).geometry.dispose()
+    }
+    const gridSizePx = activeScene?.gridSizePx ?? 0
+    if (gridSizePx > 0) {
+      for (const wall of walls) {
+        const dx = wall.x2 - wall.x1
+        const dy = wall.y2 - wall.y1
+        const length = Math.hypot(dx, dy)
+        if (length <= 0) continue
+        const thicknessCells = Math.max((wall.thickness ?? 4) / gridSizePx, 0.05)
+        const geometry = new THREE.BoxGeometry(length, WALL_HEIGHT_CELLS, thicknessCells)
+        const mesh = new THREE.Mesh(geometry, WALL_MATERIAL)
+        mesh.position.set((wall.x1 + wall.x2) / 2, WALL_HEIGHT_CELLS / 2, (wall.y1 + wall.y2) / 2)
+        mesh.rotation.y = -Math.atan2(dy, dx)
+        group.add(mesh)
+      }
+    }
+    group.visible = effectivePerspectiveMode
+  }, [walls, activeScene, effectivePerspectiveMode])
+
+  // Real point lights, perspective-mode only — the flat glow baked into the
+  // plane texture reads fine from a top-down board view but doesn't behave
+  // like a light source from inside the scene. Position mirrors
+  // canvas/LightLayer.ts's resolvePosition: authoritative light.x/y unless
+  // attached to a token, in which case the token's live position wins.
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    let group = lightGroupRef.current
+    if (!group) {
+      group = new THREE.Group()
+      scene.add(group)
+      lightGroupRef.current = group
+    }
+    for (const child of [...group.children]) group.remove(child)
+
+    if (effectivePerspectiveMode) {
+      const tokensById = new Map(tokens.map((t) => [t.id, t]))
+      for (const light of lights) {
+        if (!light.enabled) continue
+        const attached = light.attachedTokenId ? tokensById.get(light.attachedTokenId) : null
+        const pos = attached ? { x: attached.x + footprintOf(attached) / 2, y: attached.y + footprintOf(attached) / 2 } : { x: light.x, y: light.y }
+        const pointLight = new THREE.PointLight(light.color, 1.5, light.radius * 2, 2)
+        pointLight.position.set(pos.x, EYE_HEIGHT_CELLS, pos.y)
+        group.add(pointLight)
+      }
+    }
+    group.visible = effectivePerspectiveMode
+  }, [lights, tokens, effectivePerspectiveMode])
 
   void selectedTokenId // see doc comment: no visual highlight yet, kept for API parity with MapCanvas
 

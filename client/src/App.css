@@ -1201,7 +1201,60 @@
   width: 340px;
   max-height: var(--session-body-height);
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 4px;
+  box-sizing: border-box;
+}
+
+/* Sidebar position preference (see screens/useSidebarLayout.ts): row layout
+ * is the default (left/right), column for top/bottom. The panel's actual
+ * width/height/order come from inline styles driven by the saved size and
+ * position — these rules only handle what CSS alone must override per
+ * position (axis, and the panel's own sizing dimension). */
+.session-screen__body[data-position='top'],
+.session-screen__body[data-position='bottom'] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.session-screen__body[data-position='top'] .session-screen__panel,
+.session-screen__body[data-position='bottom'] .session-screen__panel {
+  width: 100%;
+  max-height: none;
+  padding-right: 0;
+}
+
+.session-screen__sidebar-position {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.sidebar-resize-handle {
+  order: 2;
+  flex: 0 0 auto;
+  background: var(--border);
+  border-radius: 2px;
+  touch-action: none;
+}
+
+.sidebar-resize-handle--x {
+  width: 6px;
+  align-self: stretch;
+  cursor: col-resize;
+}
+
+.sidebar-resize-handle--y {
+  height: 6px;
+  width: 100%;
+  cursor: row-resize;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle:active {
+  background: var(--accent);
 }
 
 .session-screen__main {
@@ -1237,6 +1290,17 @@
   position: absolute;
   bottom: 12px;
   left: 12px;
+  z-index: 20;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--panel-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.session-screen__perspective-toggle {
+  position: absolute;
+  bottom: 12px;
+  left: 92px;
   z-index: 20;
   padding: 8px 12px;
   border-radius: 10px;
@@ -1771,10 +1835,23 @@
   }
 
   .session-screen__panel {
-    width: 100%;
-    flex: 1 1 auto;
-    max-height: none;
+    width: 100% !important;
+    height: auto !important;
+    flex: 1 1 auto !important;
+    max-height: none !important;
     padding-right: 0;
+    /* Sidebar position/order is a desktop-only preference (see
+       screens/useSidebarLayout.ts) — always panel-then-map on a narrow
+       screen, regardless of what's saved. */
+    order: 1 !important;
+  }
+
+  .session-screen__main {
+    order: 2 !important;
+  }
+
+  .sidebar-resize-handle {
+    display: none;
   }
 
   .map-canvas {
