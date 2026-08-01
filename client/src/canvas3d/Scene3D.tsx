@@ -17,6 +17,7 @@ import type { TokenRecord } from '../map/types'
 const PLACEHOLDER_COLOR = 0x6b6375
 const HAZARD_COLOR = 0xcc5522
 const STL_COLOR = 0xcfc9bd
+const PLANE_BACKGROUND_COLOR = '#3a3226'
 /** How often (ms) to re-pull a fresh frame from the 2D canvas's live
  * rendering into the plane's texture — see the component doc comment for
  * why the plane is textured this way instead of building its own separate
@@ -282,7 +283,17 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
       boardCanvas.height = extracted.height
       const ctx = boardCanvas.getContext('2d')
       if (!ctx) return
-      ctx.clearRect(0, 0, extracted.width, extracted.height)
+      // The extracted 2D render is mostly transparent outside whatever's
+      // actually drawn (map/grid/walls/tokens) — e.g. a blank scene is
+      // almost entirely empty canvas except thin grid lines. Filling an
+      // opaque background first means those "nothing drawn" pixels read as
+      // this color instead of black: a transparent source pixel still
+      // carries RGB(0,0,0), and since this material never sets
+      // `transparent: true` (the alpha channel is intentionally unused —
+      // the plane is a solid physical tabletop, not a see-through pane),
+      // skipping this fill would make every undrawn pixel render pure black.
+      ctx.fillStyle = PLANE_BACKGROUND_COLOR
+      ctx.fillRect(0, 0, extracted.width, extracted.height)
       ctx.drawImage(extracted, 0, 0)
       boardTexture.needsUpdate = true
 

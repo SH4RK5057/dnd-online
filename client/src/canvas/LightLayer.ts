@@ -35,6 +35,14 @@ export class LightLayer {
 
   constructor() {
     this.container.addChild(this.hitPlane, this.lightsGraphics)
+    // Purely visual (the dot + radius ring) — all light interaction goes
+    // through hitPlane's own explicit hit-testing below. Left at Pixi's
+    // default eventMode, this graphic would otherwise sit in front of
+    // tokens in the render order and intercept pointer events meant for
+    // dragging them, since it's drawn later (world.addChild puts
+    // lightLayer.container after tokenTarget) and Pixi hit-tests
+    // front-to-back.
+    this.lightsGraphics.eventMode = 'none'
     this.hitPlane.eventMode = 'none'
     this.hitPlane.on('pointerdown', this.handlePointerDown)
     this.hitPlane.on('globalpointermove', this.handlePointerMove)

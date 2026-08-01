@@ -517,3 +517,33 @@ Pruned periodically as items get scheduled into a phase or turn out to
 already be covered by something shipped.
 
 **Technical:** desktop-app packaging (Electron) if browser-only proves limiting
+
+**Rules-enforcement gaps (character sheet currently trusts DM/player input
+too much in these spots):**
+- Spell slots can be edited to arbitrarily large values regardless of race/class
+- No item rules (attunement limits, weight/carry, etc. — see Phase 7 note above)
+- No feat rules/prerequisites
+- Level is freely editable per-character; no DM-set campaign level cap that
+  locks players below/at it
+- Ability scores can be set past 20 by hand
+- Speed can be set to an arbitrary/unbounded value
+- Custom weapons can be given arbitrary (e.g. absurd) damage dice
+- Custom items can be created with the same name as an existing compendium item
+- No gold/currency cap — party loot and personal inventory coin fields accept
+  arbitrary values
+- Darkvision isn't modeled at all (race trait exists but has no mechanical effect)
+
+**DM tooling / UX:**
+- Import compendium content directly from a repo URL, not just a local file
+- Placing a light while the token tool is active doesn't work (tool-mode gating bug)
+- Players can see a light's illumination outside their own fog-of-war/FOV
+- A battle-specific menu mode: quick actions during combat, and monster info
+  visible to the DM for everything currently in the encounter
+- DM should be able to explicitly share a specific monster's stat block with
+  players (right now player-facing description visibility is all-or-nothing)
+- DM broadcast tool: send a stat block, note, or handout to one player or
+  to everyone on demand
+- 5etools mirror import performance (large files are slow to ingest)
+- Side panel UX: scrolling through the whole stacked section list is
+  tedious — consider a tool-select-first layout where picking a tool shows
+  just that tool's detail instead of a tall scrolling column
