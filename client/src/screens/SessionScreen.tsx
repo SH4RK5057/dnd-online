@@ -351,17 +351,26 @@ export function SessionScreen() {
                   ]
 
             const sharedSections: Section[] = [
-              {
-                id: 'scene-navigation',
-                title: 'Navigation',
-                content: (
-                  <SceneNavigationPanel
-                    pendingPoiPlacement={pendingPoiPlacement}
-                    onRequestPoiPlacement={setPendingPoiPlacement}
-                    onCancelPoiPlacement={() => setPendingPoiPlacement(null)}
-                  />
-                ),
-              },
+              // SceneNavigationPanel itself renders nothing for a player on a
+              // 'dungeon'-scale scene (those keep free token movement, no
+              // travel/POI UI at all — see its own doc comment) — omitting
+              // the section entirely here means a player never sees an empty,
+              // pointlessly-expandable "Navigation" header in that case.
+              ...(session.role === 'dm' || activeScene?.scale !== 'dungeon'
+                ? [
+                    {
+                      id: 'scene-navigation',
+                      title: 'Navigation',
+                      content: (
+                        <SceneNavigationPanel
+                          pendingPoiPlacement={pendingPoiPlacement}
+                          onRequestPoiPlacement={setPendingPoiPlacement}
+                          onCancelPoiPlacement={() => setPendingPoiPlacement(null)}
+                        />
+                      ),
+                    },
+                  ]
+                : []),
               { id: 'annotations', title: 'Annotations & Pings', content: <AnnotationsPanel /> },
               { id: 'party-loot', title: 'Party Loot', content: <PartyLootPanel /> },
               { id: 'session-recap', title: 'Session Recap', defaultCollapsed: true, content: <SessionRecapPanel /> },
