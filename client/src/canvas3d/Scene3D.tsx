@@ -273,12 +273,14 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken 
       const previous = boardTexture
       boardTexture = new THREE.CanvasTexture(boardCanvas)
       boardTexture.colorSpace = THREE.SRGBColorSpace
-      // Mipmaps would be regenerated every refresh for no benefit (the
-      // whole texture gets replaced wholesale, not sampled at a
-      // distance-varying scale) — skip them and the min/mag filter that
-      // would require them.
-      boardTexture.generateMipmaps = false
-      boardTexture.minFilter = THREE.LinearFilter
+      // Mipmaps ARE needed despite the texture being replaced wholesale
+      // every refresh: the plane is viewed at varying zoom via
+      // OrbitControls, and without mipmaps, minified (zoomed-out) sampling
+      // of thin 1-2px grid lines is aliased — samples land between the
+      // lines as often as on them, making the grid look faint/inconsistent
+      // rather than just smaller.
+      boardTexture.generateMipmaps = true
+      boardTexture.minFilter = THREE.LinearMipmapLinearFilter
       boardTexture.magFilter = THREE.LinearFilter
       planeMaterial.map = boardTexture
       planeMaterial.needsUpdate = true
