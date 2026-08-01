@@ -29,7 +29,7 @@ import {
 } from '../character/rules'
 import type { RollCategory } from '../dice/conditions'
 import type { UseInventoryActionsResult } from '../character/useInventoryActions'
-import type { BackgroundData, ClassData, FeatureChoice, RaceData, SubclassData } from '../content/types'
+import type { BackgroundData, ClassData, FeatureChoice, ItemData, RaceData, SpellData, SubclassData } from '../content/types'
 import { CharacterInventory } from './CharacterInventory'
 import { CharacterSpells } from './CharacterSpells'
 import { InventoryHistoryList } from './InventoryHistoryPanel'
@@ -76,6 +76,8 @@ export function CharacterSheet({
   classes,
   subclasses,
   backgrounds,
+  compendiumSpells,
+  compendiumItems,
   isDm,
 }: {
   character: CharacterRecord
@@ -105,6 +107,11 @@ export function CharacterSheet({
   subclasses: SubclassData[]
   /** SRD-only reference data — see BackgroundData's doc comment. */
   backgrounds: BackgroundData[]
+  /** SRD + mirror + homebrew reference data, for the search-to-add pickers
+   * in the Spells/Inventory tabs (CharacterSpells.tsx/CharacterInventory.tsx)
+   * — same merged compendium the DM's compendium drawer searches. */
+  compendiumSpells: SpellData[]
+  compendiumItems: ItemData[]
   /** Distinct from `canEdit` (isDm || isOwner) — gates DM-only actions on
    * custom overrides (approve/reject) where the owning player themselves
    * shouldn't be able to self-approve their own proposal. False in the
@@ -1313,6 +1320,7 @@ export function CharacterSheet({
           onUpdate={onUpdate}
           inventoryActions={inventoryActions}
           otherCharacters={otherCharacters}
+          compendiumItems={compendiumItems}
         />
       )}
 
@@ -1324,6 +1332,7 @@ export function CharacterSheet({
           onUpdate={onUpdate}
           slotsLocked={casterTypeForClass(character.className) !== 'none'}
           casterClassName={selectedClass?.name}
+          compendiumSpells={compendiumSpells}
         />
       )}
 

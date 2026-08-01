@@ -27,6 +27,8 @@ export function TokenHpConditionEditor({
 
   const {
     tokens,
+    renameToken,
+    setTokenArt,
     setTokenHp,
     setTokenConditions,
     setTokenInitiative,
@@ -75,7 +77,11 @@ export function TokenHpConditionEditor({
   return (
     <div className="token-hp-condition-editor">
       <div className="token-hp-condition-editor__header">
-        <h2>{token.name}</h2>
+        <input
+          className="token-hp-condition-editor__name"
+          value={token.name}
+          onChange={(e) => renameToken(token.id, e.target.value)}
+        />
         <button type="button" onClick={onClose}>
           Close
         </button>
@@ -127,6 +133,18 @@ export function TokenHpConditionEditor({
           <label>
             Altitude (cells)
             <input type="number" value={token.z} onChange={(e) => setTokenZ(token.id, Number(e.target.value))} />
+          </label>
+          <label title="Replaces this token's flat 2D image, shown on the normal map view.">
+            Token image
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                if (file) void setTokenArt(token.id, file)
+                e.target.value = ''
+              }}
+            />
           </label>
           <label title="Optional STL 3D model standing in for this token in the 3D flat-plane view. Leave unset to use a plain placeholder mini.">
             3D model (STL)

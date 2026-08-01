@@ -20,7 +20,7 @@ import { parseNotation, rollNotation } from '../dice/notation'
 export function CharacterManagerScreen({ onBack }: { onBack: () => void }) {
   const [characters, setCharacters] = useState(() => listStandaloneCharacters())
   const [selectedId, setSelectedId] = useState<string | null>(characters[0]?.id ?? null)
-  const { races, classes, subclasses, backgrounds } = useCompendium(null)
+  const { races, classes, subclasses, backgrounds, spells, items } = useCompendium(null)
 
   const refresh = () => setCharacters(listStandaloneCharacters())
   const selected = characters.find((c) => c.id === selectedId) ?? null
@@ -118,6 +118,8 @@ export function CharacterManagerScreen({ onBack }: { onBack: () => void }) {
                 classes={classes}
                 subclasses={subclasses}
                 backgrounds={backgrounds}
+                compendiumSpells={spells}
+                compendiumItems={items}
                 isDm={false}
               />
             </>

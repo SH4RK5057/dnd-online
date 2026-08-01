@@ -79,3 +79,36 @@ export function resolveModelHeight(token: Pick<TokenRecord, 'sizeCategory' | 'ha
   if (token.hazardSize) return 0.12
   return footprintCells(token.sizeCategory) * renderScale(token.sizeCategory) * AUTO_MODEL_HEIGHT_PER_FOOTPRINT_CELL
 }
+
+/**
+ * The uniform scale factor to apply to a normalized (height-1, XZ-centered
+ * — see canvas3d/modelCache.ts) STL mesh so it stands at the right height
+ * *and* never spills outside the token's own grid footprint into
+ * neighboring cells. `localWidth`/`localDepth` are the model's natural X/Z
+ * extents at that normalized height-1 scale (read straight off the loaded
+ * geometry's `boundingBox`).
+ *
+ * Automatic case (no explicit modelHeightCells override): takes the
+ * smallest of three ratios — the height target, and the scale that would
+ * exactly fit the model's width/depth within the footprint — so whichever
+ * dimension is most constraining wins. A slender humanoid is unaffected
+ * (height wins); a squat, wide creature gets scaled down a bit shorter
+ * than its "ideal" height rather than poking into the next cell over.
+ *
+ * Explicit override case: returned as-is, unclamped — an override is a
+ * deliberate "make it exactly this size" choice (see resolveModelHeight's
+ * doc comment), including intentionally larger than its own footprint.
+ */
+export function resolveStlScale(
+  token: Pick<TokenRecord, 'sizeCategory' | 'hazardSize' | 'modelHeightCells'>,
+  localWidth: number,
+  localDepth: number,
+): number {
+  const targetHeight = resolveModelHeight(token)
+  if (token.modelHeightCells !== null) return targetHeight
+  const footprintWidth = token.hazardSize ? token.hazardSize.widthCells : footprintCells(token.sizeCategory)
+  const footprintDepth = token.hazardSize ? token.hazardSize.heightCells : footprintCells(token.sizeCategory)
+  const scaleForWidth = footprintWidth / Math.max(localWidth, 1e-6)
+  const scaleForDepth = footprintDepth / Math.max(localDepth, 1e-6)
+  return Math.min(targetHeight, scaleForWidth, scaleForDepth)
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rectanglesOverlap, resolveModelHeight, snapToSlot, tokenFootprintRect } from './sizeCategory'
+import { rectanglesOverlap, resolveModelHeight, resolveStlScale, snapToSlot, tokenFootprintRect } from './sizeCategory'
 import type { TokenRecord } from './types'
 
 function baseToken(overrides: Partial<Pick<TokenRecord, 'sizeCategory' | 'hazardSize' | 'modelHeightCells'>> = {}) {
@@ -86,5 +86,36 @@ describe('resolveModelHeight', () => {
     expect(resolveModelHeight(baseToken({ sizeCategory: 'tiny' }))).toBeCloseTo(0.425)
     // huge: footprint 3 * renderScale 1 * 0.85 = 2.55
     expect(resolveModelHeight(baseToken({ sizeCategory: 'huge' }))).toBeCloseTo(2.55)
+  })
+})
+
+describe('resolveStlScale', () => {
+  it('returns the override height unclamped, ignoring the model natural proportions', () => {
+    // Footprint is 1 cell wide, but the model is 3 units wide at height 1 —
+    // an explicit override still wins, even though it would overflow.
+    expect(resolveStlScale(baseToken({ modelHeightCells: 2 }), 3, 3)).toBe(2)
+  })
+
+  it('uses the height target when the model is slender enough to fit', () => {
+    // medium footprint 1x1, target height 0.85; a slender model (0.3 wide/deep
+    // at height 1) needs scale 1/0.3≈3.33 to overflow — height wins.
+    expect(resolveStlScale(baseToken({ sizeCategory: 'medium' }), 0.3, 0.3)).toBeCloseTo(0.85)
+  })
+
+  it('clamps to the footprint-fit scale when the model is wider than its footprint allows', () => {
+    // medium footprint 1x1, target height 0.85; a wide model (1.5 wide at
+    // height 1) would need scale 1/1.5≈0.667 to fit — narrower than the
+    // height target, so width wins.
+    expect(resolveStlScale(baseToken({ sizeCategory: 'medium' }), 1.5, 0.3)).toBeCloseTo(1 / 1.5)
+  })
+
+  it('uses the more constraining of width vs depth', () => {
+    expect(resolveStlScale(baseToken({ sizeCategory: 'medium' }), 1.5, 2)).toBeCloseTo(1 / 2)
+  })
+
+  it('uses the hazard footprint dimensions (not sizeCategory) for hazard tokens', () => {
+    // hazard 4x2 cells, wide model (3 units wide, 1 deep at height 1):
+    // scaleForWidth = 4/3, scaleForDepth = 2/1 = 2, target height (hazard) = 0.12 — height wins regardless.
+    expect(resolveStlScale(baseToken({ hazardSize: { widthCells: 4, heightCells: 2 } }), 3, 1)).toBeCloseTo(0.12)
   })
 })

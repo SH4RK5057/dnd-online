@@ -154,6 +154,8 @@ export function TokenInspector({
                 classes={compendium.classes}
                 subclasses={compendium.subclasses}
                 backgrounds={compendium.backgrounds}
+                compendiumSpells={compendium.spells}
+                compendiumItems={compendium.items}
                 isDm={isDm}
               />
             </>

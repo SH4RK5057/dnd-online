@@ -45,7 +45,7 @@ export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { 
   const { walls } = useWalls(doc, activeSceneId)
   const { combat } = useCombat(doc, activeSceneId)
   const { characters, myCharacter, bindCharacter, updateCharacter } = useCharacters(doc)
-  const { races, classes, subclasses, backgrounds } = useCompendium(doc)
+  const { races, classes, subclasses, backgrounds, spells, items } = useCompendium(doc)
   const { pushRoll } = useRollLog(doc, isDm)
   const inventoryActions = useInventoryActions(doc, isDm)
   const { settings: campaignSettings, setRestsEnabled, setAutoResolveAttacksEnabled, setPassivePerceptionEnabled } = useCampaignSettings(doc)
@@ -323,6 +323,8 @@ export function CharacterPanel({ onArmTemplate }: { onArmTemplate: (template: { 
         classes={classes}
         subclasses={subclasses}
         backgrounds={backgrounds}
+        compendiumSpells={spells}
+        compendiumItems={items}
         isDm={isDm}
       />
     </div>

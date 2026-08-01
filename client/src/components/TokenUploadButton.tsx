@@ -104,13 +104,18 @@ export function TokenUploadButton({
           ))}
         </select>
       )}
-      <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-      <input
-        type="file"
-        accept=".stl,model/stl,model/x.stl-binary,model/x.stl-ascii"
-        title="Optional STL 3D model for the 3D flat-plane view"
-        onChange={(event) => setModelFile(event.target.files?.[0] ?? null)}
-      />
+      <label className="token-upload__file-label">
+        Token image (optional)
+        <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+      </label>
+      <label className="token-upload__file-label" title="Used to show this token as a real 3D mini in the 3D flat-plane view">
+        3D model, STL (optional)
+        <input
+          type="file"
+          accept=".stl,model/stl,model/x.stl-binary,model/x.stl-ascii"
+          onChange={(event) => setModelFile(event.target.files?.[0] ?? null)}
+        />
+      </label>
       <button type="submit" disabled={!name.trim()}>
         Add token
       </button>

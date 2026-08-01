@@ -26,9 +26,17 @@ export function getCachedModelGeometry(url: string): THREE.BufferGeometry | null
  * - Re-centered on X/Z and translated so the bounding box's minimum Y sits
  *   at 0, so it sits ON the plane instead of floating or clipping through it.
  * - Scaled so its height is exactly 1 world unit; canvas3d/Scene3D.tsx then
- *   multiplies that by a per-token target height (from sizeCategory), so a
- *   huge dragon's STL and a medium goblin's STL both come out sensibly
- *   sized regardless of the file's original real-world scale.
+ *   applies a uniform scale on top (map/sizeCategory.ts resolveStlScale) —
+ *   normally the largest scale that still fits the model inside the
+ *   token's grid footprint (not just a height target), so a huge dragon's
+ *   STL and a medium goblin's STL both come out sensibly sized regardless
+ *   of the file's original real-world scale, and neither spills into
+ *   neighboring cells.
+ *
+ * `geometry.boundingBox` is left populated with the FINAL normalized
+ * extents (recomputed after the translate/scale above, not the raw
+ * pre-normalization box) — resolveStlScale reads it directly to get the
+ * model's natural width/depth relative to its now-unit height.
  */
 export function loadModelGeometry(url: string): Promise<THREE.BufferGeometry> {
   const cached = cache.get(url)
@@ -52,6 +60,10 @@ export function loadModelGeometry(url: string): Promise<THREE.BufferGeometry> {
         geometry.translate(-center.x, -box.min.y, -center.z)
         geometry.scale(scale, scale, scale)
         geometry.computeVertexNormals()
+        // The box above was computed BEFORE translate/scale — recompute so
+        // geometry.boundingBox reflects the final normalized geometry, not
+        // a stale pre-normalization snapshot.
+        geometry.computeBoundingBox()
         cache.set(url, geometry)
         pending.delete(url)
         return geometry

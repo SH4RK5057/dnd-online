@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSession } from '../session/useSession'
 import { useConnectionStatus } from '../session/useConnectionStatus'
 import { getOrCreatePlayerId } from '../session/lastSession'
@@ -36,6 +36,8 @@ import { EncounterNotificationBanner } from '../components/EncounterNotification
 import { PendingOverridesBanner } from '../components/PendingOverridesBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
 import { useUndoManager } from '../undo/useUndoManager'
+import { usePanelOrder } from './usePanelOrder'
+import { PanelSection } from '../components/PanelSection'
 import { DiceOverlay } from '../components/DiceOverlay'
 import { MapCanvas } from '../canvas/MapCanvas'
 import { Scene3D } from '../canvas3d/Scene3D'
@@ -69,21 +71,14 @@ export function SessionScreen() {
    * character-sheet swap below, so arming a template from the character
    * sheet survives switching back to the map view to actually place it. */
   const [armedTemplate, setArmedTemplate] = useState<{ shape: MeasureShape; sizeFt: number } | null>(null)
-  const [showDiceRoller, setShowDiceRoller] = useState(true)
-  const [showInitiativeTracker, setShowInitiativeTracker] = useState(true)
-  const [showCompendium, setShowCompendium] = useState(false)
-  const [showTokenPlacement, setShowTokenPlacement] = useState(false)
-  const [showDmNotes, setShowDmNotes] = useState(false)
-  const [showHandouts, setShowHandouts] = useState(false)
-  const [showRandomGenerators, setShowRandomGenerators] = useState(false)
-  const [showSoundboard, setShowSoundboard] = useState(false)
-  const [showCampaignFiles, setShowCampaignFiles] = useState(false)
-  const [showChat, setShowChat] = useState(true)
-  const [showSessionRecap, setShowSessionRecap] = useState(false)
   /** Personal display preference, not synced — each viewer picks 2D or 3D
    * for their own screen independently (see canvas3d/Scene3D.tsx's doc
    * comment for what 3D mode does and doesn't support in v1). */
   const [view3d, setView3d] = useState(false)
+  // Side-panel section order (see components/PanelSection.tsx) — DM and
+  // player see different section sets, so each role's arrangement is saved
+  // independently.
+  const panelOrder = usePanelOrder(`session:${session?.role ?? 'unknown'}`)
 
   useEffect(() => {
     if (!notification) return
@@ -282,125 +277,138 @@ export function SessionScreen() {
       <div className="session-screen__body">
         <div className="session-screen__panel">
           {session.role === 'dm' && (
-            <>
-              <div className="session-screen__mode-switcher">
-                <button type="button" onClick={() => setShowSceneBuilder(true)}>
-                  Scene Builder
-                </button>
-                <button type="button" onClick={() => setShowCharacterManager(true)}>
-                  Character Builder
-                </button>
-              </div>
-
-              <FogLightingPanel />
-
-              {activeSceneId && <TokenOwnerAssign sceneId={activeSceneId} />}
-
-              <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />
-
-              {activeSceneId && (
-                <>
-                  <button type="button" onClick={() => setShowTokenPlacement((v) => !v)}>
-                    {showTokenPlacement ? 'Hide token placement' : 'Show token placement'}
-                  </button>
-                  {showTokenPlacement && (
-                    <TokenUploadButton
-                      sceneId={activeSceneId}
-                      pendingPlacement={pendingTokenPlacement}
-                      onRequestPlacement={setPendingTokenPlacement}
-                      onCancelPlacement={() => setPendingTokenPlacement(null)}
-                    />
-                  )}
-                </>
-              )}
-
-              <button type="button" onClick={() => setShowDmNotes((v) => !v)}>
-                {showDmNotes ? 'Hide DM notes' : 'Show DM notes'}
+            <div className="session-screen__mode-switcher">
+              <button type="button" onClick={() => setShowSceneBuilder(true)}>
+                Scene Builder
               </button>
-              {showDmNotes && <DmNotesPanel doc={session.doc} />}
-
-              <button type="button" onClick={() => setShowHandouts((v) => !v)}>
-                {showHandouts ? 'Hide handouts' : 'Show handouts'}
+              <button type="button" onClick={() => setShowCharacterManager(true)}>
+                Character Builder
               </button>
-              {showHandouts && <HandoutsPanel doc={session.doc} />}
-
-              <button type="button" onClick={() => setShowRandomGenerators((v) => !v)}>
-                {showRandomGenerators ? 'Hide random generators' : 'Show random generators'}
-              </button>
-              {showRandomGenerators && <RandomGenerators doc={session.doc} />}
-
-              <button type="button" onClick={() => setShowSoundboard((v) => !v)}>
-                {showSoundboard ? 'Hide soundboard' : 'Show soundboard'}
-              </button>
-              {showSoundboard && <SoundboardPanel />}
-
-              <button type="button" onClick={() => setShowCampaignFiles((v) => !v)}>
-                {showCampaignFiles ? 'Hide campaign files' : 'Show campaign files'}
-              </button>
-              {showCampaignFiles && (
-                <CampaignFilesPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />
-              )}
-            </>
+            </div>
           )}
-
-          <SceneNavigationPanel
-            pendingPoiPlacement={pendingPoiPlacement}
-            onRequestPoiPlacement={setPendingPoiPlacement}
-            onCancelPoiPlacement={() => setPendingPoiPlacement(null)}
-          />
-
-          <AnnotationsPanel />
-
-          <PartyLootPanel />
-
-          <button type="button" onClick={() => setShowSessionRecap((v) => !v)}>
-            {showSessionRecap ? 'Hide session recap' : 'Show session recap'}
-          </button>
-          {showSessionRecap && <SessionRecapPanel />}
 
           {/* Dice, initiative, chat, handouts, and the compendium lookup are
               shared between DM and players — everyone rolls dice and sees
               the initiative order, and a DM can play their own character
               same as anyone. The character sheet itself opens full-screen
-              (see showCharacterSheetFullscreen above) rather than cramming
-              into this narrow sidebar. */}
+              rather than cramming into this narrow sidebar. */}
           <button type="button" onClick={() => setShowCharacterSheetFullscreen(true)}>
             Open character sheet
           </button>
 
-          <button type="button" onClick={() => setShowDiceRoller((v) => !v)}>
-            {showDiceRoller ? 'Hide dice roller' : 'Show dice roller'}
-          </button>
-          {showDiceRoller && (
-            <>
-              <DiceRollerPanel />
-              <RollLog />
-            </>
-          )}
+          {(() => {
+            type Section = { id: string; title: string; defaultCollapsed?: boolean; content: ReactNode }
 
-          <button type="button" onClick={() => setShowInitiativeTracker((v) => !v)}>
-            {showInitiativeTracker ? 'Hide initiative tracker' : 'Show initiative tracker'}
-          </button>
-          {showInitiativeTracker && <InitiativeTracker />}
+            const dmOnlySections: Section[] =
+              session.role !== 'dm'
+                ? []
+                : [
+                    { id: 'fog-lighting', title: 'Fog & Lighting', content: <FogLightingPanel /> },
+                    ...(activeSceneId
+                      ? [{ id: 'token-owner', title: 'Token Ownership', content: <TokenOwnerAssign sceneId={activeSceneId} /> }]
+                      : []),
+                    {
+                      id: 'preview-as-player',
+                      title: 'Preview As',
+                      content: <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />,
+                    },
+                    ...(activeSceneId
+                      ? [
+                          {
+                            id: 'token-placement',
+                            title: 'Token Placement',
+                            defaultCollapsed: true,
+                            content: (
+                              <TokenUploadButton
+                                sceneId={activeSceneId}
+                                pendingPlacement={pendingTokenPlacement}
+                                onRequestPlacement={setPendingTokenPlacement}
+                                onCancelPlacement={() => setPendingTokenPlacement(null)}
+                              />
+                            ),
+                          },
+                        ]
+                      : []),
+                    { id: 'dm-notes', title: 'DM Notes', defaultCollapsed: true, content: <DmNotesPanel doc={session.doc} /> },
+                    { id: 'handouts-dm', title: 'Handouts', defaultCollapsed: true, content: <HandoutsPanel doc={session.doc} /> },
+                    {
+                      id: 'random-generators',
+                      title: 'Random Generators',
+                      defaultCollapsed: true,
+                      content: <RandomGenerators doc={session.doc} />,
+                    },
+                    { id: 'soundboard', title: 'Soundboard', defaultCollapsed: true, content: <SoundboardPanel /> },
+                    {
+                      id: 'campaign-files',
+                      title: 'Campaign Files',
+                      defaultCollapsed: true,
+                      content: <CampaignFilesPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />,
+                    },
+                  ]
 
-          <button type="button" onClick={() => setShowChat((v) => !v)}>
-            {showChat ? 'Hide chat' : 'Show chat'}
-          </button>
-          {showChat && <ChatPanel />}
+            const sharedSections: Section[] = [
+              {
+                id: 'scene-navigation',
+                title: 'Navigation',
+                content: (
+                  <SceneNavigationPanel
+                    pendingPoiPlacement={pendingPoiPlacement}
+                    onRequestPoiPlacement={setPendingPoiPlacement}
+                    onCancelPoiPlacement={() => setPendingPoiPlacement(null)}
+                  />
+                ),
+              },
+              { id: 'annotations', title: 'Annotations & Pings', content: <AnnotationsPanel /> },
+              { id: 'party-loot', title: 'Party Loot', content: <PartyLootPanel /> },
+              { id: 'session-recap', title: 'Session Recap', defaultCollapsed: true, content: <SessionRecapPanel /> },
+              {
+                id: 'dice-roller',
+                title: 'Dice Roller',
+                content: (
+                  <>
+                    <DiceRollerPanel />
+                    <RollLog />
+                  </>
+                ),
+              },
+              { id: 'initiative-tracker', title: 'Initiative', content: <InitiativeTracker /> },
+              { id: 'chat', title: 'Chat', content: <ChatPanel /> },
+              {
+                id: 'compendium',
+                title: 'Compendium',
+                defaultCollapsed: true,
+                content: <CompendiumDrawer doc={session.doc} isDm={session.role === 'dm'} />,
+              },
+            ]
 
-          <button type="button" onClick={() => setShowCompendium((v) => !v)}>
-            {showCompendium ? 'Hide compendium' : 'Show compendium'}
-          </button>
-          {showCompendium && <CompendiumDrawer doc={session.doc} isDm={session.role === 'dm'} />}
+            const playerOnlySections: Section[] =
+              session.role !== 'player'
+                ? []
+                : [{ id: 'handouts-player', title: 'Handouts', defaultCollapsed: true, content: <PlayerHandoutsView doc={session.doc} /> }]
 
-          {session.role === 'player' && (
-            <>
-              <button type="button" onClick={() => setShowHandouts((v) => !v)}>
-                {showHandouts ? 'Hide handouts' : 'Show handouts'}
-              </button>
-              {showHandouts && <PlayerHandoutsView doc={session.doc} />}
-            </>
-          )}
+            const allSections = session.role === 'dm' ? [...dmOnlySections, ...sharedSections] : [...sharedSections, ...playerOnlySections]
+            const sectionsById = new Map(allSections.map((s) => [s.id, s]))
+            const availableIds = allSections.map((s) => s.id)
+            const orderedIds = panelOrder.orderedIds(availableIds)
+
+            return orderedIds.map((id, index) => {
+              const section = sectionsById.get(id)
+              if (!section) return null
+              return (
+                <PanelSection
+                  key={id}
+                  title={section.title}
+                  defaultCollapsed={section.defaultCollapsed}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < orderedIds.length - 1}
+                  onMoveUp={() => panelOrder.moveUp(id, availableIds)}
+                  onMoveDown={() => panelOrder.moveDown(id, availableIds)}
+                >
+                  {section.content}
+                </PanelSection>
+              )
+            })
+          })()}
 
           {activeSceneId && selectedTokenId && (
             <TokenHpConditionEditor

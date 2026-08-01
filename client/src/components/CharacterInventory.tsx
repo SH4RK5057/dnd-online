@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import type { CharacterRecord, FeatEntry, InventoryItem } from '../character/types'
 import type { UseInventoryActionsResult } from '../character/useInventoryActions'
+import type { ItemData } from '../content/types'
+import { filterItems } from '../content/search'
+
+const MAX_SEARCH_RESULTS = 8
 
 /** Inventory + feats row-CRUD. Always editable regardless of `character.locked`
  * — gear and feats change during normal play, unlike the core blueprint.
@@ -13,6 +17,7 @@ export function CharacterInventory({
   onUpdate,
   inventoryActions,
   otherCharacters = [],
+  compendiumItems,
 }: {
   character: CharacterRecord
   canEdit: boolean
@@ -23,8 +28,14 @@ export function CharacterInventory({
   /** Everyone else's character, for the transfer-to dropdown. Empty (no
    * transfer UI) when omitted or there's no one else to give items to. */
   otherCharacters?: { id: string; name: string }[]
+  /** SRD + mirror + homebrew item reference data, for the search-to-add
+   * picker below — the same merged compendium the DM's compendium drawer
+   * searches (content/useCompendium.ts). */
+  compendiumItems: ItemData[]
 }) {
   const [transferTargetByItemId, setTransferTargetByItemId] = useState<Record<string, string>>({})
+  const [itemQuery, setItemQuery] = useState('')
+  const itemMatches = itemQuery.trim() ? filterItems(compendiumItems, itemQuery, 'all').slice(0, MAX_SEARCH_RESULTS) : []
 
   const updateItemFields = (id: string, patch: Partial<Pick<InventoryItem, 'name' | 'notes'>>) => {
     onUpdate({ inventory: character.inventory.map((item) => (item.id === id ? { ...item, ...patch } : item)) })
@@ -42,6 +53,15 @@ export function CharacterInventory({
     } else {
       onUpdate({ inventory: [...character.inventory, { id: crypto.randomUUID(), name: '', quantity: 1, notes: '' }] })
     }
+  }
+  const addItemFromCompendium = (data: ItemData) => {
+    const notes = [data.type, data.rarity].filter(Boolean).join(', ')
+    if (inventoryActions) {
+      inventoryActions.addItem(character.id, character.name, { name: data.name, quantity: 1, notes })
+    } else {
+      onUpdate({ inventory: [...character.inventory, { id: crypto.randomUUID(), name: data.name, quantity: 1, notes }] })
+    }
+    setItemQuery('')
   }
   const removeItem = (item: InventoryItem) => {
     if (inventoryActions) inventoryActions.removeItem(character.id, character.name, item)
@@ -117,9 +137,24 @@ export function CharacterInventory({
         ))}
       </ul>
       {canEdit && (
-        <button type="button" onClick={addItem}>
-          Add item
-        </button>
+        <div className="character-sheet__compendium-search">
+          <input placeholder="Search compendium items to add…" value={itemQuery} onChange={(e) => setItemQuery(e.target.value)} />
+          {itemMatches.length > 0 && (
+            <ul className="character-sheet__search-results">
+              {itemMatches.map((data) => (
+                <li key={data.key}>
+                  <button type="button" onClick={() => addItemFromCompendium(data)}>
+                    {data.name}
+                    <span className="compendium-drawer__source">{data.type}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" onClick={addItem}>
+            Add custom item
+          </button>
+        </div>
       )}
 
       <h3>Feats</h3>

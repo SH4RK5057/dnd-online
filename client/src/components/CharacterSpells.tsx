@@ -1,6 +1,10 @@
+import { useState } from 'react'
 import type { CharacterRecord, SpellEntry } from '../character/types'
+import type { SpellData } from '../content/types'
+import { filterSpells } from '../content/search'
 
 const SPELL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+const MAX_SEARCH_RESULTS = 8
 
 /** Spell-slot totals table (index 0 = level-1 slots) + spellbook list.
  * Slot totals are part of the blueprint (level-derived) so they respect
@@ -13,6 +17,7 @@ export function CharacterSpells({
   onUpdate,
   slotsLocked,
   casterClassName,
+  compendiumSpells,
 }: {
   character: CharacterRecord
   canEdit: boolean
@@ -25,7 +30,13 @@ export function CharacterSpells({
    * HP. Unrecognized/non-caster classes leave slots freely editable. */
   slotsLocked?: boolean
   casterClassName?: string
+  /** SRD + mirror + homebrew spell reference data, for the search-to-add
+   * picker below — the same merged compendium the DM's compendium drawer
+   * searches (content/useCompendium.ts). */
+  compendiumSpells: SpellData[]
 }) {
+  const [query, setQuery] = useState('')
+  const matches = query.trim() ? filterSpells(compendiumSpells, query, 'all', 'all').slice(0, MAX_SEARCH_RESULTS) : []
   const setSlot = (levelIndex: number, value: number) => {
     const next = [...character.spellSlotsByLevel]
     while (next.length <= levelIndex) next.push(0)
@@ -50,6 +61,11 @@ export function CharacterSpells({
   const addSpell = () => {
     const spell: SpellEntry = { id: crypto.randomUUID(), name: '', level: 1, prepared: false, notes: '' }
     onUpdate({ spells: [...character.spells, spell] })
+  }
+  const addSpellFromCompendium = (data: SpellData) => {
+    const spell: SpellEntry = { id: crypto.randomUUID(), name: data.name, level: data.level, prepared: false, notes: data.school }
+    onUpdate({ spells: [...character.spells, spell] })
+    setQuery('')
   }
   const removeSpell = (id: string) => onUpdate({ spells: character.spells.filter((s) => s.id !== id) })
 
@@ -133,9 +149,30 @@ export function CharacterSpells({
         ))}
       </ul>
       {canEdit && (
-        <button type="button" onClick={addSpell}>
-          Add spell
-        </button>
+        <div className="character-sheet__compendium-search">
+          <input
+            placeholder="Search compendium spells to add…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {matches.length > 0 && (
+            <ul className="character-sheet__search-results">
+              {matches.map((data) => (
+                <li key={data.key}>
+                  <button type="button" onClick={() => addSpellFromCompendium(data)}>
+                    {data.name}
+                    <span className="compendium-drawer__source">
+                      {data.level === 0 ? 'Cantrip' : `Lvl ${data.level}`} · {data.school}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" onClick={addSpell}>
+            Add custom spell
+          </button>
+        </div>
       )}
     </div>
   )
