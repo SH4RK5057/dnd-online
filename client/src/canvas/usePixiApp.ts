@@ -23,19 +23,7 @@ export function usePixiApp(containerRef: RefObject<HTMLDivElement | null>): Appl
       .init({
         backgroundAlpha: 0,
         resizeTo: container,
-        // Deliberately NOT antialiased: this renderer is also the source
-        // for canvas3d/Scene3D.tsx's repeated renderer.extract.canvas()
-        // calls (reading fogTarget/tokenTarget/lightLayer back out every
-        // ~200ms to texture the 3D plane), and reading back from an
-        // antialiased (multisampled) render target is a known troublesome
-        // Chromium/Pixi combination — it reproducibly threw
-        // "glCopySubTextureCHROMIUM: Offset overflows texture dimensions"
-        // on real GPUs (both Chrome and Brave) even though the same code
-        // never errored in this project's own (software-rendered)
-        // automated browser, consistent with a GPU/driver-dependent MSAA
-        // resolve bug rather than anything wrong with the extracted data
-        // itself.
-        antialias: false,
+        antialias: true,
       })
       .then(() => {
         if (cancelled) {
