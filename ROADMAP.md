@@ -859,15 +859,53 @@ real change in constraints.
       existing baseline-then-diff dedup (`seenSentAtRef`) still tracks
       every record's `sentAt` unconditionally so a viewer who wasn't shown
       one broadcast still correctly detects the next new one.
-- [x] Handouts + Broadcast merged into one "Messages" tab — both are
-      "DM composes something, targets some/all players, shares it," just
-      with different lifetimes (one-shot transient banner vs. a
+- [x] Handouts + Broadcast merged into one "Messages" tab, on both sides —
+      both are "DM composes something, targets some/all players, shares
+      it," just with different lifetimes (one-shot transient banner vs. a
       persistent, revisitable, toggle-visible list), so a new
-      `components/MessagesPanel.tsx` combines them as two labeled
-      sub-sections under a single DM-only tab instead of two separate
-      ones. Deliberately a UI-only merge — `BroadcastRecord` and
-      `HandoutRecord` stay their own distinct data shapes/hooks, nothing
-      about the underlying send-now-vs-persistent-share semantics changed.
+      `components/MessagesPanel.tsx` combines them as labeled sub-sections
+      under a single DM-only tab instead of two separate ones, and a new
+      `components/PlayerMessagesView.tsx` gives players the matching tab
+      (renamed from the old player-only "Handouts" tab). Deliberately a
+      UI-only merge — `BroadcastRecord` and `HandoutRecord` stay their own
+      distinct data shapes/hooks, nothing about the underlying
+      send-now-vs-persistent-share semantics changed.
+- [x] Persistent broadcast message log, so dismissing (or missing) the
+      transient banner doesn't lose it — `useBroadcast.ts` moved off a
+      single overwritten `'current'` record to a real `doc.getMap` keyed by
+      id (same shape dice/useRollLog.ts already uses: capped at
+      `MAX_BROADCAST_LOG_ENTRIES` = 100, oldest trimmed by the DM's client
+      only). The hook now also returns `history` — every broadcast this
+      viewer was allowed to see (respecting `visibleToPlayerIds`), newest
+      first. A new `components/BroadcastLog.tsx` renders it (with the
+      attached monster stat block, same as the banner) and is shared by
+      both `MessagesPanel` (DM's own "Sent messages" section, sees
+      everything they sent) and `PlayerMessagesView` (a player's own "DM
+      messages" section, filtered to them).
+- [x] Two more tool-tab combinations, matching the reasoning that already
+      merged Handouts+Broadcast: **Tokens** (`components/TokensPanel.tsx`)
+      combines the old separate Token Ownership / Preview As / Token
+      Placement tabs — all DM map/token setup with no strong reason to be
+      split — and **DM Toolbox** (`components/DmToolboxPanel.tsx`)
+      combines Random Generators / Soundboard / Campaign Files, three
+      low-frequency utilities that don't each need a dedicated tab. Unlike
+      Messages, both of these get a "jump to section" pill row
+      (`components/SubTabNav.tsx`) at the top — a genuinely multi-part
+      combined tool benefits from one, a two-or-three-short-section one
+      like Messages doesn't. `SubTabNav` doesn't hide/switch content (every
+      part still renders, stacked, exactly as before); clicking a pill just
+      scrolls to that part's anchor.
+- [x] Fixed: 3D perspective (first-person) mode's camera hovered absurdly
+      high above the followed token (`PERSPECTIVE_HOVER_HEIGHT_CELLS` was
+      3.5 grid cells — at a typical 5 ft./cell grid, over 17 feet up),
+      reading as a disorienting "floating drone" viewpoint rather than a
+      personal one. Lowered to 1.5 cells, roughly a standing creature's own
+      eye level (`canvas3d/Scene3D.tsx`). The viewer's own mini still stays
+      hidden while in perspective mode specifically (unchanged — the camera
+      sits close enough above the token that showing it would mean looking
+      at the inside of your own model) but, as before, is always shown in
+      the standard free-orbit board view, same as every other in-sight
+      token.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---

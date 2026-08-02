@@ -863,6 +863,31 @@
   padding: 8px 0;
 }
 
+.broadcast-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.broadcast-log__item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.broadcast-log__item p {
+  margin: 4px 0 0;
+}
+
+.broadcast-log__time {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
 .handouts-panel__image {
   max-width: 100%;
   border-radius: 6px;
@@ -1514,6 +1539,19 @@
   font-size: 14px;
 }
 
+.tokens-panel,
+.dm-toolbox-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tokens-panel__section h3,
+.dm-toolbox-panel__section h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
 .session-screen__tool-tab {
   padding: 4px 10px;
   font-size: 13px;
@@ -1527,6 +1565,24 @@
   background: var(--accent);
   color: #fff;
   border-color: transparent;
+}
+
+.sub-tab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.sub-tab-nav__pill {
+  padding: 3px 9px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  cursor: pointer;
 }
 
 .session-screen__tool-detail {

@@ -38,8 +38,12 @@ const WALL_COLOR = 0x8a7a5c
 /** Grid cells — height the perspective-mode camera hovers directly above
  * the followed token. No horizontal offset from the token's own x/z: this
  * is a fixed-position "look around from here" camera, not an over-the-
- * shoulder chase cam — see the animate() loop's perspective-mode block. */
-const PERSPECTIVE_HOVER_HEIGHT_CELLS = 3.5
+ * shoulder chase cam — see the animate() loop's perspective-mode block.
+ * Kept modest — roughly a standing creature's own eye level (compare
+ * EYE_HEIGHT_CELLS) rather than a tall "hovering drone" height, which read
+ * as an unnaturally high, disorienting viewpoint rather than a personal
+ * first-person one. */
+const PERSPECTIVE_HOVER_HEIGHT_CELLS = 1.5
 /** Grid cells — fixed camera-to-target distance kept while in perspective
  * mode. The camera's actual position never moves from directly above the
  * token (re-pinned there every frame), so this doesn't control how far
@@ -168,11 +172,15 @@ interface Scene3DProps {
   onSelectToken?: (tokenId: string) => void
   /** Player-only "over-the-shoulder" mode: the camera stays close above and
    * follows the viewer's own token instead of freely orbiting the whole
-   * board, their own mini is hidden (nothing to see looking at yourself),
-   * walls get real 3D extrusion instead of just being flat lines on the
-   * plane texture, and lights become real point lights with distance
-   * falloff instead of only the flat glow baked into the texture. Ignored
-   * for the DM, who always gets the standard free-orbit board view. */
+   * board, their own mini is hidden (nothing to see looking at yourself,
+   * and it would otherwise sit right in front of the close-in follow
+   * camera — see PERSPECTIVE_HOVER_HEIGHT_CELLS's doc comment), walls get
+   * real 3D extrusion instead of just being flat lines on the plane
+   * texture, and lights become real point lights with distance falloff
+   * instead of only the flat glow baked into the texture. Ignored for the
+   * DM, who always gets the standard free-orbit board view (where every
+   * in-sight token, including your own, is always shown — the hiding is
+   * perspective-mode-only). */
   perspectiveMode?: boolean
 }
 
@@ -659,9 +667,12 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken,
         scene.add(group)
         groups.set(token.id, group)
       }
-      // In perspective mode the viewer's own mini is hidden — nothing to
-      // see looking at yourself, and it would otherwise sit right in front
-      // of the follow camera. See Scene3DProps.perspectiveMode's doc comment.
+      // In first-person mode specifically the viewer's own mini is hidden —
+      // the camera sits close enough above the token (see
+      // PERSPECTIVE_HOVER_HEIGHT_CELLS) that showing it would mean looking
+      // at the inside of your own model. The standard free-orbit board view
+      // (effectivePerspectiveMode false) always shows every in-sight token,
+      // including your own, same as 2D.
       const isOwnToken = token.ownerId === viewerId
       group.visible = inLiveSight(token) && !(effectivePerspectiveMode && isOwnToken)
       // token.modelAssetId is guaranteed non-null by the visibleTokens filter above.

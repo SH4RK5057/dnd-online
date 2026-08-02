@@ -25,11 +25,13 @@ export interface HandoutRecord {
 }
 
 /** A one-shot "push this right now" — distinct from HandoutRecord's
- * persistently-toggled-visible sharing. Stored as a single record (see
- * useBroadcast.ts's fixed BROADCAST_KEY), overwritten by each new send;
- * `sentAt` is what lets viewers tell a fresh broadcast apart from the one
- * already dismissed. */
+ * persistently-toggled-visible sharing in *when* it's shown (a transient
+ * banner on send, vs. a revisitable toggled-on list), but every sent
+ * broadcast is still kept (capped, see useBroadcast.ts's
+ * MAX_BROADCAST_LOG_ENTRIES) as a message log players can refer back to
+ * even after dismissing the banner. */
 export interface BroadcastRecord {
+  id: string
   text: string
   /** Optional compendium monster key to show a full StatBlockCard alongside
    * the text — covers the "send a stat block" half of this feature without

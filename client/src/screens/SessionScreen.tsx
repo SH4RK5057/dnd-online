@@ -11,28 +11,23 @@ import { CopyJoinCode } from '../components/CopyJoinCode'
 import { ConnectionErrorPanel } from '../components/ConnectionErrorPanel'
 import { CharacterPanel } from '../components/CharacterPanel'
 import { FogLightingPanel } from '../components/FogLightingPanel'
-import { TokenOwnerAssign } from '../components/TokenOwnerAssign'
-import { PreviewAsPlayer } from '../components/PreviewAsPlayer'
 import { AnnotationsPanel } from '../components/AnnotationsPanel'
 import { PartyLootPanel } from '../components/PartyLootPanel'
 import { SessionRecapPanel } from '../components/SessionRecapPanel'
-import { TokenUploadButton } from '../components/TokenUploadButton'
 import { DiceRollerPanel } from '../components/DiceRollerPanel'
 import { RollLog } from '../components/RollLog'
 import { InitiativeTracker } from '../components/InitiativeTracker'
 import { TokenHpConditionEditor } from '../components/TokenHpConditionEditor'
 import { TokenInspector } from '../components/TokenInspector'
 import { DmNotesPanel } from '../components/DmNotesPanel'
-import { PlayerHandoutsView } from '../components/HandoutsPanel'
 import { MessagesPanel } from '../components/MessagesPanel'
+import { PlayerMessagesView } from '../components/PlayerMessagesView'
 import { BroadcastNotificationBanner } from '../components/BroadcastNotificationBanner'
-import { RandomGenerators } from '../components/RandomGenerators'
-import { SoundboardPanel } from '../components/SoundboardPanel'
-import { CampaignFilesPanel } from '../components/CampaignFilesPanel'
 import { ChatPanel } from '../components/ChatPanel'
 import { SceneNavigationPanel } from '../components/SceneNavigationPanel'
 import { FloorSwitcher } from '../components/FloorSwitcher'
-import { CharacterTokenMenu } from '../components/CharacterTokenMenu'
+import { TokensPanel } from '../components/TokensPanel'
+import { DmToolboxPanel } from '../components/DmToolboxPanel'
 import { CharacterManagerScreen } from './CharacterManagerScreen'
 import { SceneBuilderScreen } from './SceneBuilderScreen'
 import { CompendiumScreen } from './CompendiumScreen'
@@ -419,49 +414,26 @@ export function SessionScreen() {
                 ? []
                 : [
                     { id: 'fog-lighting', title: 'Fog & Lighting', content: <FogLightingPanel /> },
-                    ...(activeSceneId
-                      ? [{ id: 'token-owner', title: 'Token Ownership', content: <TokenOwnerAssign sceneId={activeSceneId} /> }]
-                      : []),
                     {
-                      id: 'preview-as-player',
-                      title: 'Preview As',
-                      content: <PreviewAsPlayer previewPlayerId={previewPlayerId} onChange={setPreviewPlayerId} />,
+                      id: 'tokens',
+                      title: 'Tokens',
+                      content: (
+                        <TokensPanel
+                          sceneId={activeSceneId}
+                          pendingPlacement={pendingTokenPlacement}
+                          onRequestPlacement={setPendingTokenPlacement}
+                          onCancelPlacement={() => setPendingTokenPlacement(null)}
+                          previewPlayerId={previewPlayerId}
+                          onPreviewPlayerChange={setPreviewPlayerId}
+                        />
+                      ),
                     },
-                    ...(activeSceneId
-                      ? [
-                          {
-                            id: 'token-placement',
-                            title: 'Token Placement',
-                            content: (
-                              <>
-                                <TokenUploadButton
-                                  sceneId={activeSceneId}
-                                  pendingPlacement={pendingTokenPlacement}
-                                  onRequestPlacement={setPendingTokenPlacement}
-                                  onCancelPlacement={() => setPendingTokenPlacement(null)}
-                                />
-                                <CharacterTokenMenu
-                                  sceneId={activeSceneId}
-                                  pendingPlacement={pendingTokenPlacement}
-                                  onRequestPlacement={setPendingTokenPlacement}
-                                />
-                              </>
-                            ),
-                          },
-                        ]
-                      : []),
                     { id: 'dm-notes', title: 'DM Notes', content: <DmNotesPanel doc={session.doc} /> },
                     { id: 'messages', title: 'Messages', content: <MessagesPanel doc={session.doc} /> },
                     {
-                      id: 'random-generators',
-                      title: 'Random Generators',
-                      content: <RandomGenerators doc={session.doc} />,
-                    },
-                    { id: 'soundboard', title: 'Soundboard', content: <SoundboardPanel /> },
-                    {
-                      id: 'campaign-files',
-                      title: 'Campaign Files',
-                      content: <CampaignFilesPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />,
+                      id: 'dm-toolbox',
+                      title: 'DM Toolbox',
+                      content: <DmToolboxPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />,
                     },
                   ]
 
@@ -508,9 +480,9 @@ export function SessionScreen() {
                 ? []
                 : [
                     {
-                      id: 'handouts-player',
-                      title: 'Handouts',
-                      content: <PlayerHandoutsView doc={session.doc} myPlayerId={getOrCreatePlayerId()} />,
+                      id: 'messages-player',
+                      title: 'Messages',
+                      content: <PlayerMessagesView doc={session.doc} myPlayerId={getOrCreatePlayerId()} />,
                     },
                   ]
 
