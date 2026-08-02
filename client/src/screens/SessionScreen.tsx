@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSession } from '../session/useSession'
 import { useConnectionStatus } from '../session/useConnectionStatus'
 import { getOrCreatePlayerId } from '../session/lastSession'
@@ -47,7 +47,11 @@ import { PanelSection } from '../components/PanelSection'
 import { SidebarResizeHandle } from '../components/SidebarResizeHandle'
 import { DiceOverlay } from '../components/DiceOverlay'
 import { MapCanvas } from '../canvas/MapCanvas'
-import { Scene3D } from '../canvas3d/Scene3D'
+// Lazy: three.js + OrbitControls are a real chunk of weight (canvas3d/*)
+// that only the personal 3D-view toggle ever needs — most sessions spend
+// their whole time in the 2D map, so this keeps that weight out of the
+// initial bundle instead of every viewer paying for it up front.
+const Scene3D = lazy(() => import('../canvas3d/Scene3D').then((m) => ({ default: m.Scene3D })))
 import type { MeasureShape } from '../canvas/MeasureLayer'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
@@ -512,12 +516,14 @@ export function SessionScreen() {
               )}
               {session.role === 'dm' && <FloorSwitcher doc={session.doc} />}
               {view3d && (
-                <Scene3D
-                  getBoardCanvas={() => boardCanvasExtractorRef.current?.() ?? null}
-                  selectedTokenId={selectedTokenId}
-                  onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
-                  perspectiveMode={perspectiveMode}
-                />
+                <Suspense fallback={<p className="session-screen__notice">Loading 3D view…</p>}>
+                  <Scene3D
+                    getBoardCanvas={() => boardCanvasExtractorRef.current?.() ?? null}
+                    selectedTokenId={selectedTokenId}
+                    onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}
+                    perspectiveMode={perspectiveMode}
+                  />
+                </Suspense>
               )}
               {/* Stays mounted (just hidden) even in 3D view — its Pixi
                   renderer keeps computing fog/tokens/walls in the background

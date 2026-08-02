@@ -737,13 +737,6 @@ export function MapCanvas({
     const lightLayerContainer = lightLayerRef.current.container
     const { width, height } = mapSize
 
-    // TEMPORARY diagnostic: pinpointing a GL_INVALID_VALUE
-    // "glCopySubTextureCHROMIUM: Offset overflows texture dimensions"
-    // error reported on real hardware (never reproduced on software-
-    // rendered test browsers). Throttled to ~1/sec so it stays readable
-    // over a live session. Remove once the mismatch is found.
-    let lastExtractLogAt = 0
-
     const extract = (): HTMLCanvasElement | null => {
       if (width <= 0 || height <= 0) return null
       const frame = new Rectangle(0, 0, width, height)
@@ -772,14 +765,6 @@ export function MapCanvas({
       // player's own board canvas and only ever contributes content to the
       // DM's.
       const lightsCanvas = app.renderer.extract.canvas({ target: lightLayerContainer, frame })
-      const now = performance.now()
-      if (now - lastExtractLogAt > 1000) {
-        lastExtractLogAt = now
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[extract-diag] requestedFrame=${width}x${height} combined=${combined.width}x${combined.height} terrain=${terrain.width}x${terrain.height} tokensCanvas=${tokensCanvas.width}x${tokensCanvas.height} lightsCanvas=${lightsCanvas.width}x${lightsCanvas.height} dpr=${window.devicePixelRatio} rendererResolution=${app.renderer.resolution}`,
-        )
-      }
       ctx.drawImage(terrain as unknown as CanvasImageSource, 0, 0)
       ctx.drawImage(tokensCanvas as unknown as CanvasImageSource, 0, 0)
       ctx.drawImage(lightsCanvas as unknown as CanvasImageSource, 0, 0)

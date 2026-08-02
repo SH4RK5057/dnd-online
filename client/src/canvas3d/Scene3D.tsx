@@ -341,7 +341,6 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken,
     let lastWidthCells = BLANK_SCENE_WIDTH_CELLS
     let lastHeightCells = BLANK_SCENE_HEIGHT_CELLS
     let lastSceneId: string | null = null
-    let lastRefreshLogAt = 0
     // Set after refreshBoard() finishes writing boardCanvas via drawImage;
     // consumed one animate() tick later (see below) rather than
     // immediately. On real hardware (unthrottled, properly-focused tabs —
@@ -406,18 +405,6 @@ export function Scene3D({ getBoardCanvas, selectedTokenId = null, onSelectToken,
       // skipping this fill would make every undrawn pixel render pure black.
       ctx.fillStyle = PLANE_BACKGROUND_COLOR
       ctx.fillRect(0, 0, extracted.width, extracted.height)
-      // TEMPORARY diagnostic: see the matching note in MapCanvas.tsx's
-      // extract() — pinpointing a GL_INVALID_VALUE
-      // "glCopySubTextureCHROMIUM: Offset overflows texture dimensions"
-      // error reported on real hardware. Remove once the mismatch is found.
-      const nowLog = performance.now()
-      if (nowLog - lastRefreshLogAt > 1000) {
-        lastRefreshLogAt = nowLog
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[refresh-diag] extracted=${extracted.width}x${extracted.height} boardCanvasBefore=${boardCanvas.width}x${boardCanvas.height}`,
-        )
-      }
       ctx.drawImage(extracted, 0, 0)
       // Deliberately NOT setting boardTexture.needsUpdate here — see
       // pendingTextureUpload below.

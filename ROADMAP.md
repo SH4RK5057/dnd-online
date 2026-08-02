@@ -738,6 +738,43 @@ real change in constraints.
       so `SceneToolbar` and `FloorSwitcher` share one implementation.
       Tokens/walls/lights/fog per floor stay fully independent, same as
       any other two scenes — nothing here changes that.
+- [x] Performance pass — three changes, chosen after reading the actual code
+      rather than guessing:
+      - **Mirror import** (the real fix for "large files are slow to
+        ingest," profiled rather than assumed): `content/mirrorStorage.ts`'s
+        `fetchMirrorFromUrl`/`fetchGithubRepo`/`fetchIndexedFamily` were
+        fetching every source file **sequentially** (`for` + `await`) even
+        though each file is independent — for a mirror with dozens of
+        spell/bestiary/class source files, that's dozens of network round
+        trips paid one at a time. JSON parsing/normalization was never the
+        bottleneck; it's synchronous and fast. Switched every such loop to
+        `Promise.all(...)`, so all of a family's (or a GitHub repo's) files
+        fetch concurrently — the `content`/`errors` mutations stay race-free
+        since JS's single-threaded event loop still runs each fetch's
+        `.then` callback to completion before the next one starts.
+      - **3D view code-splitting**: `canvas3d/Scene3D.tsx` (three.js +
+        OrbitControls) was statically imported in `SessionScreen.tsx`, so
+        every viewer downloaded that weight on page load whether or not
+        they ever open the 3D toggle. Switched to `React.lazy` +
+        `Suspense`, splitting it into its own chunk fetched on first use —
+        cut the main bundle from ~1.43 MB to ~740 KB (390 KB to 213 KB
+        gzipped) in the production build. Purely a module-loading-timing
+        change; the component's own logic (texture handling, STL caching,
+        raycasting, etc.) is untouched.
+      - **Stale diagnostic logging removed**: `MapCanvas.tsx`'s `extract()`
+        and `Scene3D.tsx`'s `refreshBoard()` each had a `console.warn`
+        (throttled to ~1/sec, but still computing `performance.now()` and
+        building a template string on every ~200ms board refresh) left over
+        from tracking down a since-fixed Chromium GPU-compositor race —
+        both were explicitly marked "TEMPORARY... remove once the mismatch
+        is found," and the fix (recreate-not-mutate CanvasTexture, deferred
+        upload, `willReadFrequently`) has been shipped and stable since.
+        Deliberately did **not** touch any of that actual fix logic, or the
+        per-refresh CanvasTexture recreation it depends on — both are
+        hard-won correctness tradeoffs, not naive slowness, and the whole
+        point of this pass was not to break the 3D view. Live-verified
+        after all three changes: toggling 3D on/off/on repeatedly still
+        mounts a healthy WebGL context with no console errors.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---

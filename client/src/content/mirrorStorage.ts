@@ -242,28 +242,53 @@ export async function fetchMirrorFromUrl(
   const content: MirrorContent = { spells: [], monsters: [], items: [], races: [], classes: [], subclasses: [], importedAt: Date.now(), sourceKey }
   const errors: string[] = []
 
+  // Every content family below is fetched independently, so they all run
+  // concurrently rather than one after another — with dozens of source
+  // files across spells/bestiary/classes/items, waiting out each network
+  // round trip in sequence (the old behavior) was the actual bottleneck
+  // behind "large mirrors are slow to import", not JSON parsing or
+  // normalization (both fast, synchronous, and unaffected by this change).
+  // `content`/`errors` are safe to mutate from multiple in-flight fetches:
+  // JS's single-threaded event loop means each fetch's `.then` callback
+  // still runs to completion before the next one starts, so the array
+  // pushes below never interleave.
+  const tasks: Promise<void>[] = []
+
   if (categories.includeRaces) {
-    const racesJson = await tryFetchJson(`${base}/data/races.json`, token)
-    if (racesJson) ingestFile('races.json', racesJson, content, errors, categories)
-    else errors.push('data/races.json: not found or unreachable')
+    tasks.push(
+      (async () => {
+        const racesJson = await tryFetchJson(`${base}/data/races.json`, token)
+        if (racesJson) ingestFile('races.json', racesJson, content, errors, categories)
+        else errors.push('data/races.json: not found or unreachable')
+      })(),
+    )
   }
 
-  if (categories.includeClasses) await fetchIndexedFamily(base, 'class', token, content, errors, categories, 'class-fighter.json')
+  if (categories.includeClasses) tasks.push(fetchIndexedFamily(base, 'class', token, content, errors, categories, 'class-fighter.json'))
 
   if (categories.includeItems) {
     // 5etools-2014-src splits items across two files: items.json (magic
     // items) and items-base.json (mundane gear) — fetch both,
     // items-base.json is optional (older/simpler mirrors may only have one).
-    const itemsJson = await tryFetchJson(`${base}/data/items.json`, token)
-    if (itemsJson) ingestFile('items.json', itemsJson, content, errors, categories)
-    else errors.push('data/items.json: not found or unreachable (check the URL, and the token if this is a private repo)')
-
-    const itemsBaseJson = await tryFetchJson(`${base}/data/items-base.json`, token)
-    if (itemsBaseJson) ingestFile('items-base.json', itemsBaseJson, content, errors, categories)
+    tasks.push(
+      (async () => {
+        const itemsJson = await tryFetchJson(`${base}/data/items.json`, token)
+        if (itemsJson) ingestFile('items.json', itemsJson, content, errors, categories)
+        else errors.push('data/items.json: not found or unreachable (check the URL, and the token if this is a private repo)')
+      })(),
+    )
+    tasks.push(
+      (async () => {
+        const itemsBaseJson = await tryFetchJson(`${base}/data/items-base.json`, token)
+        if (itemsBaseJson) ingestFile('items-base.json', itemsBaseJson, content, errors, categories)
+      })(),
+    )
   }
 
-  if (categories.includeSpells) await fetchIndexedFamily(base, 'spells', token, content, errors, categories, 'spells-phb.json')
-  if (categories.includeMonsters) await fetchIndexedFamily(base, 'bestiary', token, content, errors, categories, 'bestiary-mm.json')
+  if (categories.includeSpells) tasks.push(fetchIndexedFamily(base, 'spells', token, content, errors, categories, 'spells-phb.json'))
+  if (categories.includeMonsters) tasks.push(fetchIndexedFamily(base, 'bestiary', token, content, errors, categories, 'bestiary-mm.json'))
+
+  await Promise.all(tasks)
 
   await putCachedMirrorContent(content)
   return { content, errors }
@@ -330,12 +355,18 @@ export async function fetchGithubRepo(
     errors.push(`No .json files found under "${prefix || '/'}" in ${owner}/${repo}@${branch}.`)
   }
 
+  // Fetched concurrently rather than one file at a time — see
+  // fetchMirrorFromUrl's matching comment for why this was the actual
+  // import-performance bottleneck, and why concurrent content/errors
+  // mutation from multiple in-flight fetches is safe here.
   const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`
-  for (const filePath of jsonPaths) {
-    const json = await tryFetchJson(`${rawBase}/${filePath}`, token)
-    if (json) ingestFile(filePath, json, content, errors, categories)
-    else errors.push(`${filePath}: not found or unreachable`)
-  }
+  await Promise.all(
+    jsonPaths.map(async (filePath) => {
+      const json = await tryFetchJson(`${rawBase}/${filePath}`, token)
+      if (json) ingestFile(filePath, json, content, errors, categories)
+      else errors.push(`${filePath}: not found or unreachable`)
+    }),
+  )
 
   await putCachedMirrorContent(content)
   return { content, errors }
@@ -359,9 +390,12 @@ async function fetchIndexedFamily(
     // No index — fall back to the most common single-source filename for this family.
     filenames.push(fallbackFilename)
   }
-  for (const filename of filenames) {
-    const json = await tryFetchJson(`${base}/data/${folder}/${filename}`, token)
-    if (json) ingestFile(`${folder}/${filename}`, json, content, errors, categories)
-    else errors.push(`${folder}/${filename}: not found or unreachable`)
-  }
+  // Fetched concurrently — see fetchMirrorFromUrl's matching comment.
+  await Promise.all(
+    filenames.map(async (filename) => {
+      const json = await tryFetchJson(`${base}/data/${folder}/${filename}`, token)
+      if (json) ingestFile(`${folder}/${filename}`, json, content, errors, categories)
+      else errors.push(`${folder}/${filename}: not found or unreachable`)
+    }),
+  )
 }
