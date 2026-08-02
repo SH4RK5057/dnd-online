@@ -1,4 +1,4 @@
-import type { AbilityKey, AbilityScores, CharacterRecord, ResourceEntry, SkillId } from './types'
+import type { AbilityKey, AbilityScores, CharacterRecord, InventoryItem, ResourceEntry, SkillId } from './types'
 import type { TokenRecord } from '../map/types'
 import type { RaceData } from '../content/types'
 
@@ -312,6 +312,30 @@ export function darkvisionRadiusFt(traits: string[]): number {
     if (match) best = Math.max(best, Number(match[1]))
   }
   return best
+}
+
+/** 5e's standard carry-capacity formula: Strength score × 15 lb. This app
+ * only flags being over capacity (a visual warning in
+ * CharacterInventory.tsx) rather than auto-applying the variant
+ * encumbrance speed penalty — same DM-narrates-the-consequence trust model
+ * this app already uses for hazards/traps and other rules edges. */
+export const CARRY_CAPACITY_LB_PER_STR = 15
+
+export function computeCarryCapacityLb(strScore: number): number {
+  return strScore * CARRY_CAPACITY_LB_PER_STR
+}
+
+export function computeCarriedWeightLb(inventory: InventoryItem[]): number {
+  return inventory.reduce((sum, item) => sum + (item.weight ?? 0) * item.quantity, 0)
+}
+
+/** Parses a 5etools-style item weight string ("3 lb.", "0.5 lb") into a
+ * plain number, for auto-filling InventoryItem.weight when a compendium
+ * item is added — 0 (unweighted) if the string doesn't match, same
+ * fail-soft convention as darkvisionRadiusFt. */
+export function parseItemWeightLb(text: string): number {
+  const match = /^([\d.]+)\s*lb/i.exec(text.trim())
+  return match ? Number(match[1]) : 0
 }
 
 /** 5e's standard cap on simultaneously-attuned magic items — this app

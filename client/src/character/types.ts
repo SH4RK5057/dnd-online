@@ -40,6 +40,11 @@ export interface InventoryItem {
    * for the 5e 3-item cap this is checked against. Optional/undefined reads
    * as false for items saved before this field existed. */
   attuned?: boolean
+  /** Weight in pounds, per unit (multiplied by quantity for carry-weight
+   * totals — see rules.ts's computeCarriedWeightLb). Optional/undefined
+   * reads as 0 for items saved before this field existed, or for a custom
+   * item the player never bothered to weigh. */
+  weight?: number
 }
 
 export interface SpellEntry {

@@ -3,7 +3,7 @@ import type { CharacterRecord, FeatEntry, InventoryItem } from '../character/typ
 import type { UseInventoryActionsResult } from '../character/useInventoryActions'
 import type { ItemData } from '../content/types'
 import { filterItems } from '../content/search'
-import { MAX_ATTUNED_ITEMS } from '../character/rules'
+import { MAX_ATTUNED_ITEMS, computeCarryCapacityLb, computeCarriedWeightLb, parseItemWeightLb } from '../character/rules'
 
 const MAX_SEARCH_RESULTS = 8
 
@@ -49,6 +49,12 @@ export function CharacterInventory({
   const updateItemFields = (id: string, patch: Partial<Pick<InventoryItem, 'name' | 'notes'>>) => {
     onUpdate({ inventory: character.inventory.map((item) => (item.id === id ? { ...item, ...patch } : item)) })
   }
+  const updateItemWeight = (item: InventoryItem, weight: number) => {
+    onUpdate({ inventory: character.inventory.map((i) => (i.id === item.id ? { ...i, weight: Math.max(0, weight) } : i)) })
+  }
+  const carriedWeightLb = computeCarriedWeightLb(character.inventory)
+  const carryCapacityLb = computeCarryCapacityLb(character.abilities.str)
+  const overCapacity = carriedWeightLb > carryCapacityLb
   const attunedCount = character.inventory.filter((i) => i.attuned).length
   const toggleAttuned = (item: InventoryItem, attuned: boolean) => {
     if (attuned && attunedCount >= MAX_ATTUNED_ITEMS) return
@@ -63,17 +69,18 @@ export function CharacterInventory({
   }
   const addItem = () => {
     if (inventoryActions) {
-      inventoryActions.addItem(character.id, character.name, { name: '', quantity: 1, notes: '' })
+      inventoryActions.addItem(character.id, character.name, { name: '', quantity: 1, notes: '', weight: 0 })
     } else {
-      onUpdate({ inventory: [...character.inventory, { id: crypto.randomUUID(), name: '', quantity: 1, notes: '' }] })
+      onUpdate({ inventory: [...character.inventory, { id: crypto.randomUUID(), name: '', quantity: 1, notes: '', weight: 0 }] })
     }
   }
   const addItemFromCompendium = (data: ItemData) => {
     const notes = [data.type, data.rarity].filter(Boolean).join(', ')
+    const weight = parseItemWeightLb(data.weight)
     if (inventoryActions) {
-      inventoryActions.addItem(character.id, character.name, { name: data.name, quantity: 1, notes })
+      inventoryActions.addItem(character.id, character.name, { name: data.name, quantity: 1, notes, weight })
     } else {
-      onUpdate({ inventory: [...character.inventory, { id: crypto.randomUUID(), name: data.name, quantity: 1, notes }] })
+      onUpdate({ inventory: [...character.inventory, { id: crypto.randomUUID(), name: data.name, quantity: 1, notes, weight }] })
     }
     setItemQuery('')
   }
@@ -105,6 +112,10 @@ export function CharacterInventory({
       <p className="character-sheet__hint">
         Attuned: {attunedCount}/{MAX_ATTUNED_ITEMS}
       </p>
+      <p className="character-sheet__hint" style={overCapacity ? { color: '#c0392b' } : undefined}>
+        Carrying: {carriedWeightLb} / {carryCapacityLb} lb (Str {character.abilities.str})
+        {overCapacity && ' — over capacity'}
+      </p>
       <ul className="character-sheet__row-list">
         {character.inventory.map((item) => (
           <li key={item.id} className="character-sheet__row">
@@ -128,6 +139,15 @@ export function CharacterInventory({
               value={item.notes}
               disabled={!canEdit}
               onChange={(e) => updateItemFields(item.id, { notes: e.target.value })}
+            />
+            <input
+              type="number"
+              min={0}
+              step="0.1"
+              title="Weight per item, in pounds"
+              value={item.weight ?? 0}
+              disabled={!canEdit}
+              onChange={(e) => updateItemWeight(item, Number(e.target.value))}
             />
             <label title={!item.attuned && attunedCount >= MAX_ATTUNED_ITEMS ? `Already attuned to ${MAX_ATTUNED_ITEMS} items — unattune one first.` : 'Attuned'}>
               <input

@@ -434,6 +434,13 @@ real change in constraints.
   formula, first-class-only save proficiencies, per-class ASI
   breakpoints, and a level-up/character-sheet UI overhaul to manage a list
   of classes instead of one) isn't worth taking on for this app.
+- **Feat prerequisites** — `FeatEntry` stays freeform (`name` + `notes`).
+  The SRD 5.1 (this app's only bundled content) doesn't include feats at
+  all — they were never OGL-published — so unlike races/classes/spells/
+  items there's no official list to hand-author into the compendium and
+  validate against. Building a structured feat data model just to check
+  prerequisites against user-typed homebrew entries isn't worth it; feats
+  stay a plain reference field, same as before.
 
 ## Phase 10 — Stretch goals
 - [x] 3D dice roll animations — a lightweight CSS 3D die (no WebGL/three.js
@@ -662,8 +669,17 @@ real change in constraints.
       `InventoryItem.attuned`: a 4th item's checkbox disables itself once
       the cap is hit, with a tooltip explaining why. Doesn't model *which*
       items require attunement or the short-rest ritual, just the numeric
-      cap — the rest of "item rules" (weight/carry) stays out of scope,
-      same Phase 7 boundary as before.
+      cap.
+- [x] Item weight/carry — `InventoryItem.weight` (lb per unit, auto-filled
+      from a compendium item's own weight string via `rules.ts`'s
+      `parseItemWeightLb` when added via search-to-add, editable by hand
+      otherwise). `CharacterInventory.tsx` sums carried weight
+      (`computeCarriedWeightLb`) against 5e's standard Strength×15
+      capacity (`computeCarryCapacityLb`) and shows a red "over capacity"
+      hint when exceeded — a non-blocking visual warning, same trust model
+      as hazards/traps and every other rules edge this app flags rather
+      than enforces: no automatic speed penalty, the DM narrates the
+      consequence.
 - [x] DM broadcast tool, handouts half — `dmtools/types.ts`'s
       `HandoutRecord.visibleToPlayerId` (null = everyone, the original
       behavior) lets the DM narrow an already-shown handout to one
@@ -701,12 +717,6 @@ Pruned periodically as items get scheduled into a phase or turn out to
 already be covered by something shipped.
 
 **Technical:** desktop-app packaging (Electron) if browser-only proves limiting
-
-**Rules-enforcement gaps (character sheet currently trusts DM/player input
-too much in these spots):**
-- No item weight/carry rules (attunement limits now enforced, see Phase 10 above)
-- No feat rules/prerequisites — blocked on `FeatEntry` having no structured
-  data model to check prerequisites against; would need that built first
 
 **DM tooling / UX:**
 - DM broadcast tool: send a stat block or note to everyone on demand, not

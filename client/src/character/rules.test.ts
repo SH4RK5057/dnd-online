@@ -5,6 +5,8 @@ import {
   applyRacialBonus,
   casterTypeForClass,
   combineAbilityBonuses,
+  computeCarriedWeightLb,
+  computeCarryCapacityLb,
   computeChosenAbilityBonuses,
   computeClassResourceGrants,
   computeDamagePatch,
@@ -25,6 +27,7 @@ import {
   mergeClassResourceGrants,
   normalizeCharacterRecord,
   parseHitDiceCount,
+  parseItemWeightLb,
   pointBuyCost,
   resolveTokenAc,
   resolveTokenHp,
@@ -705,5 +708,31 @@ describe('darkvisionRadiusFt', () => {
 
   it('returns the largest radius if multiple darkvision-like traits are present', () => {
     expect(darkvisionRadiusFt(['Darkvision 60 ft.', 'Superior Darkvision 120 ft.'])).toBe(120)
+  })
+})
+
+describe('computeCarryCapacityLb / computeCarriedWeightLb / parseItemWeightLb', () => {
+  it('computes carry capacity as Strength score times 15', () => {
+    expect(computeCarryCapacityLb(10)).toBe(150)
+    expect(computeCarryCapacityLb(18)).toBe(270)
+  })
+
+  it('sums weight times quantity across the inventory, treating a missing weight as 0', () => {
+    const inventory = [
+      { id: '1', name: 'Longsword', quantity: 1, notes: '', weight: 3 },
+      { id: '2', name: 'Arrow', quantity: 20, notes: '', weight: 0.05 },
+      { id: '3', name: 'Mystery item', quantity: 2, notes: '' },
+    ]
+    expect(computeCarriedWeightLb(inventory)).toBeCloseTo(3 + 1 + 0)
+  })
+
+  it('parses a 5etools-style weight string into a number', () => {
+    expect(parseItemWeightLb('3 lb.')).toBe(3)
+    expect(parseItemWeightLb('0.5 lb')).toBe(0.5)
+  })
+
+  it('returns 0 for an unparseable weight string', () => {
+    expect(parseItemWeightLb('')).toBe(0)
+    expect(parseItemWeightLb('varies')).toBe(0)
   })
 })
