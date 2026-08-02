@@ -16,13 +16,13 @@ export interface UseHandoutsResult {
   setHandoutText: (id: string, text: string) => void
   setHandoutImage: (id: string, file: File) => Promise<void>
   setHandoutShown: (id: string, shown: boolean) => void
-  setHandoutVisibleToPlayer: (id: string, playerId: string | null) => void
+  setHandoutVisibleToPlayers: (id: string, playerIds: string[] | null) => void
 }
 
 /** DM shares an image and/or text "on demand" — created privately, revealed
  * to players by flipping `shownToPlayers` (same on/off convention as
- * SceneRecord.published), optionally narrowed to a single player via
- * `visibleToPlayerId` instead of broadcasting to everyone. Images reuse the
+ * SceneRecord.published), optionally narrowed to a subset of players via
+ * `visibleToPlayerIds` instead of broadcasting to everyone. Images reuse the
  * same chunked-sync asset pipeline as maps/tokens (map/assetSync.ts) — kind
  * 'handout', already threaded through AssetKind. */
 export function useHandouts(doc: Y.Doc | null): UseHandoutsResult {
@@ -61,7 +61,7 @@ export function useHandouts(doc: Y.Doc | null): UseHandoutsResult {
         assetId: null,
         text: '',
         shownToPlayers: false,
-        visibleToPlayerId: null,
+        visibleToPlayerIds: null,
         createdAt: Date.now(),
       }
       handoutsMap(doc).set(id, record)
@@ -80,8 +80,8 @@ export function useHandouts(doc: Y.Doc | null): UseHandoutsResult {
 
   const setHandoutText = useCallback((id: string, text: string) => patchHandout(id, { text }), [patchHandout])
   const setHandoutShown = useCallback((id: string, shownToPlayers: boolean) => patchHandout(id, { shownToPlayers }), [patchHandout])
-  const setHandoutVisibleToPlayer = useCallback(
-    (id: string, playerId: string | null) => patchHandout(id, { visibleToPlayerId: playerId }),
+  const setHandoutVisibleToPlayers = useCallback(
+    (id: string, playerIds: string[] | null) => patchHandout(id, { visibleToPlayerIds: playerIds }),
     [patchHandout],
   )
 
@@ -95,5 +95,5 @@ export function useHandouts(doc: Y.Doc | null): UseHandoutsResult {
     [doc, patchHandout],
   )
 
-  return { handouts, createHandout, deleteHandout, setHandoutText, setHandoutImage, setHandoutShown, setHandoutVisibleToPlayer }
+  return { handouts, createHandout, deleteHandout, setHandoutText, setHandoutImage, setHandoutShown, setHandoutVisibleToPlayers }
 }

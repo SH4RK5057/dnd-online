@@ -4,6 +4,7 @@ import { useHandouts } from '../dmtools/useHandouts'
 import { useAssetUrl } from '../map/assetSync'
 import { useSession } from '../session/useSession'
 import { useConnectionStatus } from '../session/useConnectionStatus'
+import { PlayerRecipientPicker } from './PlayerRecipientPicker'
 
 function HandoutImage({ doc, assetId }: { doc: Y.Doc | null; assetId: string | null }) {
   const url = useAssetUrl(doc, assetId)
@@ -14,7 +15,7 @@ function HandoutImage({ doc, assetId }: { doc: Y.Doc | null; assetId: string | n
 /** DM-only management: create, upload an image and/or write text, and
  * toggle each handout visible to players "on demand". */
 export function HandoutsPanel({ doc }: { doc: Y.Doc | null }) {
-  const { handouts, createHandout, deleteHandout, setHandoutText, setHandoutImage, setHandoutShown, setHandoutVisibleToPlayer } =
+  const { handouts, createHandout, deleteHandout, setHandoutText, setHandoutImage, setHandoutShown, setHandoutVisibleToPlayers } =
     useHandouts(doc)
   const { session } = useSession()
   const { peers } = useConnectionStatus(session)
@@ -66,18 +67,11 @@ export function HandoutsPanel({ doc }: { doc: Y.Doc | null }) {
                 Show to players
               </label>
               {handout.shownToPlayers && (
-                <select
-                  value={handout.visibleToPlayerId ?? ''}
-                  onChange={(e) => setHandoutVisibleToPlayer(handout.id, e.target.value || null)}
-                  title="Restrict this handout to a single player instead of broadcasting to everyone."
-                >
-                  <option value="">Everyone</option>
-                  {players.map((player) => (
-                    <option key={player.playerId} value={player.playerId}>
-                      {player.name}
-                    </option>
-                  ))}
-                </select>
+                <PlayerRecipientPicker
+                  players={players}
+                  value={handout.visibleToPlayerIds}
+                  onChange={(next) => setHandoutVisibleToPlayers(handout.id, next)}
+                />
               )}
               <button type="button" onClick={() => deleteHandout(handout.id)}>
                 Delete
@@ -110,10 +104,12 @@ export function HandoutsPanel({ doc }: { doc: Y.Doc | null }) {
 }
 
 /** Player-facing view — only handouts the DM has flipped to shown, and
- * further narrowed to this viewer if the DM targeted a single player. */
+ * further narrowed to this viewer if the DM targeted a subset of players. */
 export function PlayerHandoutsView({ doc, myPlayerId }: { doc: Y.Doc | null; myPlayerId: string }) {
   const { handouts } = useHandouts(doc)
-  const visible = handouts.filter((h) => h.shownToPlayers && (h.visibleToPlayerId == null || h.visibleToPlayerId === myPlayerId))
+  const visible = handouts.filter(
+    (h) => h.shownToPlayers && (h.visibleToPlayerIds == null || h.visibleToPlayerIds.includes(myPlayerId)),
+  )
 
   if (visible.length === 0) return <p className="character-sheet__hint">Nothing shared yet.</p>
 

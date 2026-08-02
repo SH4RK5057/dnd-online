@@ -11,7 +11,7 @@ function broadcastMap(doc: Y.Doc) {
 export interface UseBroadcastResult {
   notification: BroadcastRecord | null
   dismiss: () => void
-  send: (text: string, monsterKey: string | null) => void
+  send: (text: string, monsterKey: string | null, visibleToPlayerIds: string[] | null) => void
 }
 
 /** DM "push this right now" tool — distinct from Handouts' persistently-
@@ -21,8 +21,16 @@ export interface UseBroadcastResult {
  * a page reload) doesn't replay the last broadcast as if it just happened.
  * `dismiss()` is purely local (per-viewer) — it never touches the shared
  * record, so a late-joining player still sees the current broadcast once,
- * then it's gone until the DM sends another. */
-export function useBroadcast(doc: Y.Doc | null): UseBroadcastResult {
+ * then it's gone until the DM sends another.
+ *
+ * `viewerId`/`isDm` gate whether *this* viewer's `notification` fires at all
+ * for a targeted broadcast (BroadcastRecord.visibleToPlayerIds) — the DM
+ * always sees their own broadcast regardless of targeting (confirmation
+ * it went out), a targeted player only sees it if they're in the list. The
+ * shared `seenSentAtRef` dedup still tracks every record's `sentAt`
+ * unconditionally, so a viewer who wasn't shown one broadcast still
+ * correctly detects the next new one. */
+export function useBroadcast(doc: Y.Doc | null, viewerId: string, isDm: boolean): UseBroadcastResult {
   const [notification, setNotification] = useState<BroadcastRecord | null>(null)
   const seenSentAtRef = useRef<number | null | 'unset'>('unset')
 
@@ -36,18 +44,20 @@ export function useBroadcast(doc: Y.Doc | null): UseBroadcastResult {
       const seen = seenSentAtRef.current
       seenSentAtRef.current = record?.sentAt ?? null
       if (seen === 'unset') return // baseline pass — record state, don't notify
-      if (record && record.sentAt !== seen) setNotification(record)
+      if (!record || record.sentAt === seen) return
+      const visible = isDm || record.visibleToPlayerIds == null || record.visibleToPlayerIds.includes(viewerId)
+      if (visible) setNotification(record)
     }
 
     sync()
     m.observe(sync)
     return () => m.unobserve(sync)
-  }, [doc])
+  }, [doc, viewerId, isDm])
 
   const send = useCallback(
-    (text: string, monsterKey: string | null) => {
+    (text: string, monsterKey: string | null, visibleToPlayerIds: string[] | null) => {
       if (!doc) return
-      broadcastMap(doc).set(BROADCAST_KEY, { text, monsterKey, sentAt: Date.now() })
+      broadcastMap(doc).set(BROADCAST_KEY, { text, monsterKey, visibleToPlayerIds, sentAt: Date.now() })
     },
     [doc],
   )

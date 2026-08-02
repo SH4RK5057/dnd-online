@@ -843,6 +843,31 @@ real change in constraints.
       graphic this project shipped with from the start) with a simple d20
       die icon (hexagonal outline, faceted lines, a bold "20") in warm
       gold-on-brown, matching this app's parchment/fantasy theme.
+- [x] Targeted messaging to a subset of players, not just one-or-everyone —
+      `HandoutRecord`/`BroadcastRecord` both changed their single
+      `visibleToPlayerId: string | null` field to `visibleToPlayerIds:
+      string[] | null` (null = everyone, unchanged default behavior; a
+      non-empty array = just those players). A new shared
+      `components/PlayerRecipientPicker.tsx` (an "Everyone" checkbox plus
+      one per connected player; unchecking the last specific player falls
+      back to "Everyone" rather than leaving a silent visible-to-no-one
+      state) replaces the old single-player `<select>` in both
+      `HandoutsPanel.tsx` and `BroadcastComposer.tsx`. `useBroadcast.ts`'s
+      `send` now takes the target list, and its per-viewer `notification`
+      only fires for a viewer who's targeted (or the sending DM, always,
+      as confirmation it went out, or everyone when untargeted) — the
+      existing baseline-then-diff dedup (`seenSentAtRef`) still tracks
+      every record's `sentAt` unconditionally so a viewer who wasn't shown
+      one broadcast still correctly detects the next new one.
+- [x] Handouts + Broadcast merged into one "Messages" tab — both are
+      "DM composes something, targets some/all players, shares it," just
+      with different lifetimes (one-shot transient banner vs. a
+      persistent, revisitable, toggle-visible list), so a new
+      `components/MessagesPanel.tsx` combines them as two labeled
+      sub-sections under a single DM-only tab instead of two separate
+      ones. Deliberately a UI-only merge — `BroadcastRecord` and
+      `HandoutRecord` stay their own distinct data shapes/hooks, nothing
+      about the underlying send-now-vs-persistent-share semantics changed.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---

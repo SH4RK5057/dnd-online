@@ -23,8 +23,8 @@ import { InitiativeTracker } from '../components/InitiativeTracker'
 import { TokenHpConditionEditor } from '../components/TokenHpConditionEditor'
 import { TokenInspector } from '../components/TokenInspector'
 import { DmNotesPanel } from '../components/DmNotesPanel'
-import { HandoutsPanel, PlayerHandoutsView } from '../components/HandoutsPanel'
-import { BroadcastComposer } from '../components/BroadcastComposer'
+import { PlayerHandoutsView } from '../components/HandoutsPanel'
+import { MessagesPanel } from '../components/MessagesPanel'
 import { BroadcastNotificationBanner } from '../components/BroadcastNotificationBanner'
 import { RandomGenerators } from '../components/RandomGenerators'
 import { SoundboardPanel } from '../components/SoundboardPanel'
@@ -67,7 +67,11 @@ export function SessionScreen() {
   const { status, peers, failure, retry } = useConnectionStatus(session)
   const { scenes, activeSceneId, activeScene, switchToScene } = useScenes(session?.doc ?? null)
   const { notification, dismiss: dismissNotification } = useEncounterNotifications(session?.doc ?? null, scenes)
-  const { notification: broadcastNotification, dismiss: dismissBroadcast } = useBroadcast(session?.doc ?? null)
+  const { notification: broadcastNotification, dismiss: dismissBroadcast } = useBroadcast(
+    session?.doc ?? null,
+    getOrCreatePlayerId(),
+    session?.role === 'dm',
+  )
   const compendium = useCompendium(session?.doc ?? null)
   const { undo, redo, canUndo, canRedo } = useUndoManager(session?.role === 'dm' ? (session?.doc ?? null) : null)
   const { tokens, createToken, setTokenArt, setTokenModel, initTokenFromMonster, linkCharacter, assignOwner } = useTokens(
@@ -447,8 +451,7 @@ export function SessionScreen() {
                         ]
                       : []),
                     { id: 'dm-notes', title: 'DM Notes', content: <DmNotesPanel doc={session.doc} /> },
-                    { id: 'handouts-dm', title: 'Handouts', content: <HandoutsPanel doc={session.doc} /> },
-                    { id: 'broadcast', title: 'Broadcast', content: <BroadcastComposer doc={session.doc} /> },
+                    { id: 'messages', title: 'Messages', content: <MessagesPanel doc={session.doc} /> },
                     {
                       id: 'random-generators',
                       title: 'Random Generators',

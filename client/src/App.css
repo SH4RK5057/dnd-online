@@ -833,6 +833,22 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.player-recipient-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.player-recipient-picker label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
 }
 
 .dm-notes-panel__item-header button:first-child {
@@ -1483,7 +1499,19 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-top: 16px;
   margin-bottom: 12px;
+}
+
+.messages-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.messages-panel__section h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
 }
 
 .session-screen__tool-tab {
