@@ -12,7 +12,7 @@ import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken
 import { footprintCells, snapToSlot } from '../map/sizeCategory'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
-import type { MonsterData } from '../content/types'
+import type { ItemData, MonsterData } from '../content/types'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingTokenPlacement } from './pendingTokenPlacement'
 
@@ -98,6 +98,19 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
         ac: monster.ac,
         speed: parseSpeedFeet(monster.speed),
       },
+      characterInit: null,
+      hazardSize: null,
+    })
+  }
+
+  const handleAddItemToScene = (item: ItemData) => {
+    setPendingPlacement({
+      name: item.name,
+      sizeCategory: 'tiny',
+      file: null,
+      modelFile: null,
+      monsterInit: null,
+      characterInit: null,
       hazardSize: null,
     })
   }
@@ -121,7 +134,12 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
             {showCompendium ? 'Hide compendium' : 'Show compendium'}
           </button>
           {showCompendium && (
-            <CompendiumDrawer doc={doc} isDm onAddMonsterToScene={activeSceneId ? handleAddMonsterToScene : undefined} />
+            <CompendiumDrawer
+              doc={doc}
+              isDm
+              onAddMonsterToScene={activeSceneId ? handleAddMonsterToScene : undefined}
+              onAddItemToScene={activeSceneId ? handleAddItemToScene : undefined}
+            />
           )}
 
           <button type="button" onClick={() => setShowHomebrewEditor((v) => !v)}>

@@ -17,6 +17,13 @@ export interface PendingTokenPlacement {
    * button (encounter drag-and-drop) instead of TokenUploadButton — carries
    * the stat block fields to initialize on the token once it's placed. */
   monsterInit: { monsterKey: string; hp: { current: number; max: number; temp: number }; ac: number; speed: number } | null
+  /** Set when this placement came from the character roster's "Place token"
+   * button (components/CharacterTokenMenu.tsx) instead of TokenUploadButton
+   * or the compendium — links the new token to the character sheet (HP then
+   * lives there, see character/rules.ts resolveTokenHp) and assigns the
+   * token's owner so a player-owned character's fog-of-war comes online
+   * immediately without a separate Token Ownership step. */
+  characterInit: { characterId: string; ownerId: string } | null
   /** Set when placing a DM-configured hazard/trap token (custom rectangular
    * size, starts hidden) instead of a normal creature token. */
   hazardSize: { widthCells: number; heightCells: number } | null

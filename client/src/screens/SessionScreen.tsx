@@ -32,6 +32,7 @@ import { CampaignFilesPanel } from '../components/CampaignFilesPanel'
 import { ChatPanel } from '../components/ChatPanel'
 import { SceneNavigationPanel } from '../components/SceneNavigationPanel'
 import { FloorSwitcher } from '../components/FloorSwitcher'
+import { CharacterTokenMenu } from '../components/CharacterTokenMenu'
 import { CharacterManagerScreen } from './CharacterManagerScreen'
 import { SceneBuilderScreen } from './SceneBuilderScreen'
 import { CompendiumScreen } from './CompendiumScreen'
@@ -43,7 +44,6 @@ import { useCompendium, findByKey } from '../content/useCompendium'
 import { useUndoManager } from '../undo/useUndoManager'
 import { usePanelOrder } from './usePanelOrder'
 import { useSidebarLayout, type SidebarPosition } from './useSidebarLayout'
-import { PanelSection } from '../components/PanelSection'
 import { SidebarResizeHandle } from '../components/SidebarResizeHandle'
 import { DiceOverlay } from '../components/DiceOverlay'
 import { MapCanvas } from '../canvas/MapCanvas'
@@ -56,6 +56,8 @@ import type { MeasureShape } from '../canvas/MeasureLayer'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
 import { footprintCells, snapToSlot } from '../map/sizeCategory'
+import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken'
+import type { ItemData, MonsterData } from '../content/types'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingPoiPlacement } from './pendingPoiPlacement'
 import type { PendingTokenPlacement } from './pendingTokenPlacement'
@@ -68,7 +70,10 @@ export function SessionScreen() {
   const { notification: broadcastNotification, dismiss: dismissBroadcast } = useBroadcast(session?.doc ?? null)
   const compendium = useCompendium(session?.doc ?? null)
   const { undo, redo, canUndo, canRedo } = useUndoManager(session?.role === 'dm' ? (session?.doc ?? null) : null)
-  const { tokens, createToken, setTokenArt, setTokenModel } = useTokens(session?.doc ?? null, activeSceneId)
+  const { tokens, createToken, setTokenArt, setTokenModel, initTokenFromMonster, linkCharacter, assignOwner } = useTokens(
+    session?.doc ?? null,
+    activeSceneId,
+  )
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
   const [showCharacterManager, setShowCharacterManager] = useState(false)
   const [showSceneBuilder, setShowSceneBuilder] = useState(false)
@@ -97,11 +102,14 @@ export function SessionScreen() {
   // — Scene3D calls this to render its plane as a live texture of the 2D
   // canvas's own rendering instead of reimplementing it.
   const boardCanvasExtractorRef = useRef<(() => HTMLCanvasElement | null) | null>(null)
-  // Side-panel section order (see components/PanelSection.tsx) — DM and
-  // player see different section sets, so each role's arrangement is saved
-  // independently.
+  // Side-panel tool tab order — DM and player see different tool sets, so
+  // each role's arrangement is saved independently.
   const panelOrder = usePanelOrder(`session:${session?.role ?? 'unknown'}`)
   const sidebarLayout = useSidebarLayout()
+  // Tool-select-first sidebar: which single tool's detail panel is showing,
+  // instead of a tall stacked accordion of every section at once. Not
+  // persisted — defaults back to the first tab each time the screen mounts.
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!notification) return
@@ -176,6 +184,41 @@ export function SessionScreen() {
 
   if (!session) return null
 
+  // Armed from the Compendium screen's "Add to scene" buttons — lives here
+  // (not in CompendiumScreen) because pendingTokenPlacement/handlePlaceToken
+  // already live here, and closing back to the map is what lets the DM
+  // actually click somewhere to place it.
+  const handleAddMonsterToScene = (monster: MonsterData) => {
+    setPendingTokenPlacement({
+      name: monster.name,
+      sizeCategory: monsterSizeToCategory(monster.size),
+      file: null,
+      modelFile: null,
+      monsterInit: {
+        monsterKey: monster.key,
+        hp: { current: monster.hp, max: monster.hp, temp: 0 },
+        ac: monster.ac,
+        speed: parseSpeedFeet(monster.speed),
+      },
+      characterInit: null,
+      hazardSize: null,
+    })
+    setShowCompendium(false)
+  }
+
+  const handleAddItemToScene = (item: ItemData) => {
+    setPendingTokenPlacement({
+      name: item.name,
+      sizeCategory: 'tiny',
+      file: null,
+      modelFile: null,
+      monsterInit: null,
+      characterInit: null,
+      hazardSize: null,
+    })
+    setShowCompendium(false)
+  }
+
   // Scene building, character building, and the in-session character sheet
   // are all entirely separate views that fully swap out this screen, the
   // same way — the session/WebRTC connection stays alive underneath (owned
@@ -188,7 +231,13 @@ export function SessionScreen() {
     return <SceneBuilderScreen onBack={() => setShowSceneBuilder(false)} />
   }
   if (showCompendium) {
-    return <CompendiumScreen onBack={() => setShowCompendium(false)} />
+    return (
+      <CompendiumScreen
+        onBack={() => setShowCompendium(false)}
+        onAddMonsterToScene={session.role === 'dm' && activeSceneId ? handleAddMonsterToScene : undefined}
+        onAddItemToScene={session.role === 'dm' && activeSceneId ? handleAddItemToScene : undefined}
+      />
+    )
   }
   if (showCharacterSheetFullscreen) {
     return (
@@ -230,7 +279,7 @@ export function SessionScreen() {
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingTokenPlacement || !activeSceneId) return
-    const { name, sizeCategory, file, modelFile, hazardSize } = pendingTokenPlacement
+    const { name, sizeCategory, file, modelFile, monsterInit, characterInit, hazardSize } = pendingTokenPlacement
     setPendingTokenPlacement(null)
     try {
       const footprint = hazardSize ? Math.max(hazardSize.widthCells, hazardSize.heightCells) : footprintCells(sizeCategory)
@@ -247,6 +296,11 @@ export function SessionScreen() {
       })
       if (file) void setTokenArt(tokenId, file)
       if (modelFile) void setTokenModel(tokenId, modelFile)
+      if (monsterInit) initTokenFromMonster(tokenId, monsterInit)
+      if (characterInit) {
+        linkCharacter(tokenId, characterInit.characterId)
+        assignOwner(tokenId, characterInit.ownerId)
+      }
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not add that token.')
     }
@@ -354,7 +408,7 @@ export function SessionScreen() {
           </button>
 
           {(() => {
-            type Section = { id: string; title: string; defaultCollapsed?: boolean; content: ReactNode }
+            type Section = { id: string; title: string; content: ReactNode }
 
             const dmOnlySections: Section[] =
               session.role !== 'dm'
@@ -374,32 +428,36 @@ export function SessionScreen() {
                           {
                             id: 'token-placement',
                             title: 'Token Placement',
-                            defaultCollapsed: true,
                             content: (
-                              <TokenUploadButton
-                                sceneId={activeSceneId}
-                                pendingPlacement={pendingTokenPlacement}
-                                onRequestPlacement={setPendingTokenPlacement}
-                                onCancelPlacement={() => setPendingTokenPlacement(null)}
-                              />
+                              <>
+                                <TokenUploadButton
+                                  sceneId={activeSceneId}
+                                  pendingPlacement={pendingTokenPlacement}
+                                  onRequestPlacement={setPendingTokenPlacement}
+                                  onCancelPlacement={() => setPendingTokenPlacement(null)}
+                                />
+                                <CharacterTokenMenu
+                                  sceneId={activeSceneId}
+                                  pendingPlacement={pendingTokenPlacement}
+                                  onRequestPlacement={setPendingTokenPlacement}
+                                />
+                              </>
                             ),
                           },
                         ]
                       : []),
-                    { id: 'dm-notes', title: 'DM Notes', defaultCollapsed: true, content: <DmNotesPanel doc={session.doc} /> },
-                    { id: 'handouts-dm', title: 'Handouts', defaultCollapsed: true, content: <HandoutsPanel doc={session.doc} /> },
-                    { id: 'broadcast', title: 'Broadcast', defaultCollapsed: true, content: <BroadcastComposer doc={session.doc} /> },
+                    { id: 'dm-notes', title: 'DM Notes', content: <DmNotesPanel doc={session.doc} /> },
+                    { id: 'handouts-dm', title: 'Handouts', content: <HandoutsPanel doc={session.doc} /> },
+                    { id: 'broadcast', title: 'Broadcast', content: <BroadcastComposer doc={session.doc} /> },
                     {
                       id: 'random-generators',
                       title: 'Random Generators',
-                      defaultCollapsed: true,
                       content: <RandomGenerators doc={session.doc} />,
                     },
-                    { id: 'soundboard', title: 'Soundboard', defaultCollapsed: true, content: <SoundboardPanel /> },
+                    { id: 'soundboard', title: 'Soundboard', content: <SoundboardPanel /> },
                     {
                       id: 'campaign-files',
                       title: 'Campaign Files',
-                      defaultCollapsed: true,
                       content: <CampaignFilesPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />,
                     },
                   ]
@@ -409,7 +467,7 @@ export function SessionScreen() {
               // 'dungeon'-scale scene (those keep free token movement, no
               // travel/POI UI at all — see its own doc comment) — omitting
               // the section entirely here means a player never sees an empty,
-              // pointlessly-expandable "Navigation" header in that case.
+              // pointlessly-selectable "Navigation" tab in that case.
               ...(session.role === 'dm' || activeScene?.scale !== 'dungeon'
                 ? [
                     {
@@ -427,7 +485,7 @@ export function SessionScreen() {
                 : []),
               { id: 'annotations', title: 'Annotations & Pings', content: <AnnotationsPanel /> },
               { id: 'party-loot', title: 'Party Loot', content: <PartyLootPanel /> },
-              { id: 'session-recap', title: 'Session Recap', defaultCollapsed: true, content: <SessionRecapPanel /> },
+              { id: 'session-recap', title: 'Session Recap', content: <SessionRecapPanel /> },
               {
                 id: 'dice-roller',
                 title: 'Dice Roller',
@@ -449,7 +507,6 @@ export function SessionScreen() {
                     {
                       id: 'handouts-player',
                       title: 'Handouts',
-                      defaultCollapsed: true,
                       content: <PlayerHandoutsView doc={session.doc} myPlayerId={getOrCreatePlayerId()} />,
                     },
                   ]
@@ -458,24 +515,56 @@ export function SessionScreen() {
             const sectionsById = new Map(allSections.map((s) => [s.id, s]))
             const availableIds = allSections.map((s) => s.id)
             const orderedIds = panelOrder.orderedIds(availableIds)
+            const activeId = activeSectionId && sectionsById.has(activeSectionId) ? activeSectionId : (orderedIds[0] ?? null)
+            const activeSection = activeId ? sectionsById.get(activeId) : null
+            const activeIndex = activeId ? orderedIds.indexOf(activeId) : -1
 
-            return orderedIds.map((id, index) => {
-              const section = sectionsById.get(id)
-              if (!section) return null
-              return (
-                <PanelSection
-                  key={id}
-                  title={section.title}
-                  defaultCollapsed={section.defaultCollapsed}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < orderedIds.length - 1}
-                  onMoveUp={() => panelOrder.moveUp(id, availableIds)}
-                  onMoveDown={() => panelOrder.moveDown(id, availableIds)}
-                >
-                  {section.content}
-                </PanelSection>
-              )
-            })
+            return (
+              <>
+                <div className="session-screen__tool-tabs">
+                  {orderedIds.map((id) => {
+                    const section = sectionsById.get(id)
+                    if (!section) return null
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className={id === activeId ? 'session-screen__tool-tab session-screen__tool-tab--active' : 'session-screen__tool-tab'}
+                        onClick={() => setActiveSectionId(id)}
+                      >
+                        {section.title}
+                      </button>
+                    )
+                  })}
+                </div>
+                {activeSection && (
+                  <div className="session-screen__tool-detail">
+                    <div className="session-screen__tool-detail-header">
+                      <h3>{activeSection.title}</h3>
+                      <div className="session-screen__tool-detail-move">
+                        <button
+                          type="button"
+                          onClick={() => panelOrder.moveUp(activeSection.id, availableIds)}
+                          disabled={activeIndex <= 0}
+                          title="Move tab earlier"
+                        >
+                          ←
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => panelOrder.moveDown(activeSection.id, availableIds)}
+                          disabled={activeIndex === -1 || activeIndex >= orderedIds.length - 1}
+                          title="Move tab later"
+                        >
+                          →
+                        </button>
+                      </div>
+                    </div>
+                    {activeSection.content}
+                  </div>
+                )}
+              </>
+            )
           })()}
 
           {activeSceneId && selectedTokenId && (

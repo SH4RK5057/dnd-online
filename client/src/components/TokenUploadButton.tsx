@@ -42,6 +42,7 @@ export function TokenUploadButton({
       file,
       modelFile,
       monsterInit: null,
+      characterInit: null,
       hazardSize: isHazard ? { widthCells: Math.max(1, hazardWidth), heightCells: Math.max(1, hazardHeight) } : null,
     })
     setName('')

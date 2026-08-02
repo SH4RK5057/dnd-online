@@ -81,6 +81,47 @@
   flex: 0 1 200px;
 }
 
+.character-token-menu {
+  margin-top: 12px;
+}
+
+.character-token-menu h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.character-token-menu__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.character-token-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.character-token-menu__owner {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+.character-token-menu__badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  font-size: 11px;
+}
+
 .preview-as-player {
   display: flex;
   align-items: center;
@@ -677,6 +718,15 @@
 
 .token-hp-condition-editor__advanced input[type='number'] {
   width: 70px;
+}
+
+.token-hp-condition-editor__monster-attach {
+  margin-bottom: 8px;
+}
+
+.token-hp-condition-editor__monster-attach h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
 }
 
 .encounter-builder {
@@ -1429,51 +1479,56 @@
   margin-bottom: 24px;
 }
 
-.panel-section {
-  border-bottom: 1px solid var(--border);
+.session-screen__tool-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 12px;
-  padding-bottom: 12px;
 }
 
-.panel-section__header {
+.session-screen__tool-tab {
+  padding: 4px 10px;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: none;
+  cursor: pointer;
+}
+
+.session-screen__tool-tab--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.session-screen__tool-detail {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-bottom: 12px;
+}
+
+.session-screen__tool-detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 8px;
 }
 
-.panel-section__collapse-toggle {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 2px 0;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
+.session-screen__tool-detail-header h3 {
+  margin: 0;
+  font-size: 15px;
 }
 
-.panel-section__chevron {
-  display: inline-block;
-  width: 0.9em;
-  opacity: 0.7;
-}
-
-.panel-section__move-buttons {
+.session-screen__tool-detail-move {
   display: flex;
   gap: 2px;
   flex: 0 0 auto;
 }
 
-.panel-section__move-buttons button {
+.session-screen__tool-detail-move button {
   padding: 2px 6px;
   line-height: 1;
-}
-
-.panel-section__body {
-  margin-top: 8px;
 }
 
 .session-screen__mode-switcher {

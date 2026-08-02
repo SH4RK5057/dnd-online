@@ -31,12 +31,13 @@ export interface UsePanelOrderResult {
 }
 
 /**
- * Persists a personal, per-viewer section-ordering preference for a group
- * of reorderable panels (see components/PanelSection.tsx) — local to this
- * browser only, never synced through the Yjs doc, same convention as the
- * 2D/3D view toggle and other per-viewer display preferences. `storageKey`
- * scopes independent orderings for different panel groups (e.g. DM vs
- * player see different section sets, so each gets its own saved order).
+ * Persists a personal, per-viewer ordering preference for a group of
+ * reorderable tool tabs (see screens/SessionScreen.tsx's tool-tab strip) —
+ * local to this browser only, never synced through the Yjs doc, same
+ * convention as the 2D/3D view toggle and other per-viewer display
+ * preferences. `storageKey` scopes independent orderings for different tab
+ * groups (e.g. DM vs player see different tool sets, so each gets its own
+ * saved order).
  */
 export function usePanelOrder(storageKey: string): UsePanelOrderResult {
   const [savedOrder, setSavedOrder] = useState<string[]>(() => loadOrder(storageKey))

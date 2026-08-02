@@ -57,6 +57,10 @@ export interface UseTokensResult {
     tokenId: string,
     fields: { monsterKey: string; hp: { current: number; max: number; temp: number }; ac: number; speed: number },
   ) => void
+  /** Detach a token from its compendium stat block (set monsterKey to null)
+   * without touching hp/ac/speed — the DM may have hand-edited those since
+   * attaching, and detaching shouldn't discard that tracking. */
+  setTokenMonsterKey: (tokenId: string, monsterKey: string | null) => void
 }
 
 /** Note (same as the rest of this app's DM-authoritative model): Yjs has no
@@ -203,6 +207,10 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     ) => patchToken(tokenId, fields),
     [patchToken],
   )
+  const setTokenMonsterKey = useCallback(
+    (tokenId: string, monsterKey: string | null) => patchToken(tokenId, { monsterKey }),
+    [patchToken],
+  )
 
   const setTokenArt = useCallback(
     async (tokenId: string, file: File) => {
@@ -265,6 +273,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     setTokenReactionAvailable,
     setTokenHazardSize,
     initTokenFromMonster,
+    setTokenMonsterKey,
   }
 }
 

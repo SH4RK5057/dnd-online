@@ -775,6 +775,74 @@ real change in constraints.
         point of this pass was not to break the 3D view. Live-verified
         after all three changes: toggling 3D on/off/on repeatedly still
         mounts a healthy WebGL context with no console errors.
+- [x] Side panel tool-select-first layout — replaced the old stacked,
+      collapsible-accordion section list (`components/PanelSection.tsx`,
+      now deleted) with a tab strip (`session-screen__tool-tabs`) that
+      shows exactly one tool's detail panel at a time
+      (`session-screen__tool-detail`), so picking a tool no longer means
+      scrolling past every other DM/player panel to reach it. Tab order is
+      still a personal, per-role, `localStorage`-persisted preference via
+      the existing `screens/usePanelOrder.ts` (unchanged) — reordering
+      moved from per-section ↑/↓ buttons to a single ←/→ pair in the active
+      tab's own detail header, since a row of small tab chips doesn't have
+      room for inline move buttons per item. Per-tool collapse state is
+      gone too (a tool is either the one selected tab or not rendered at
+      all) — that concept only existed to manage a tall stacked column,
+      which no longer exists.
+- [x] Fixed: encounter monster/item placement was broken during live play —
+      `screens/CompendiumScreen.tsx` never forwarded `onAddMonsterToScene`
+      to `CompendiumDrawer`, so the "Add to scene" button (working correctly
+      in Scene Builder) never rendered when the DM opened the Compendium
+      from a live session, and `SessionScreen.tsx`'s own `handlePlaceToken`
+      didn't destructure/apply `monsterInit` even when a placement did get
+      armed some other way — so a monster token placed live never got its
+      `monsterKey`/HP/AC/speed seeded. Fixed by threading
+      `onAddMonsterToScene`/`onAddItemToScene` callbacks from
+      `SessionScreen.tsx` through `CompendiumScreen.tsx` (arming a
+      placement then closing the compendium back to the map so the DM can
+      click where to drop it) and applying `monsterInit` in
+      `handlePlaceToken`, matching `SceneBuilderScreen.tsx`'s already-
+      correct equivalent.
+- [x] Item token placement from the compendium — `components/
+      CompendiumDrawer.tsx` gained an `onAddItemToScene` prop and an "Add
+      to scene" button on the Items tab (previously monsters-only), wired
+      through the same click-to-place flow as monsters in both
+      `SessionScreen.tsx` and `SceneBuilderScreen.tsx`. An item placement
+      carries no `monsterInit` and defaults to `sizeCategory: 'tiny'`
+      (a potion or scroll doesn't need a stat block, just a marker on the
+      map).
+- [x] Attach a monster stat block to an already-placed token —
+      `map/useTokens.ts` gained `setTokenMonsterKey` (clears/sets
+      `TokenRecord.monsterKey` without touching `hp`/`ac`/`speed`, since a
+      DM may have hand-edited those since attaching and detaching
+      shouldn't discard that tracking) alongside the existing
+      `initTokenFromMonster` (already used for encounter drag-and-drop,
+      now reused here for a fresh attach). `components/
+      TokenHpConditionEditor.tsx` gained a DM-only "Monster stat block"
+      section — search-and-attach when nothing's linked (same
+      `filterMonsters` search-result pattern `BroadcastComposer.tsx`
+      already uses), or an "Attached: X — Detach" line once one is.
+- [x] Place a token directly from the character roster — a new DM-only
+      `components/CharacterTokenMenu.tsx` (rendered in the Token Placement
+      tab, alongside `TokenUploadButton`) lists every `CharacterRecord`
+      bound to the campaign — player characters and DM-authored NPC
+      sheets alike, via the existing `useCharacters` hook — each with a
+      "Place token" button that arms a placement exactly like the
+      compendium's monster "Add to scene" does. `PendingTokenPlacement`
+      gained a `characterInit: {characterId, ownerId} | null` field
+      (parallel to `monsterInit`); on placement `handlePlaceToken` calls
+      the existing `linkCharacter` (HP then reads from the character sheet,
+      see `character/rules.ts` `resolveTokenHp`) and `assignOwner` (so a
+      player-owned character's fog-of-war comes online immediately,
+      without a separate Token Ownership step) setters. Each roster row
+      shows its owner (a connected player's name, or "NPC") and an "on
+      this scene" badge if that character already has a token here — a
+      hint, not a block, since the DM may genuinely want a second one.
+- [x] D&D-themed favicon — replaced the generic abstract purple/blue
+      geometric logo (`public/favicon.svg`, the framework-default-looking
+      graphic this project shipped with from the start) with a simple d20
+      die icon (hexagonal outline, faceted lines, a bold "20") in warm
+      gold-on-brown, matching this app's parchment/fantasy theme.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---
@@ -787,10 +855,3 @@ already be covered by something shipped.
 
 **Technical:** desktop-app packaging (Electron) if browser-only proves limiting
 
-**DM tooling / UX:**
-- 5etools mirror import performance (large files are slow to ingest) — needs
-  profiling to find the actual bottleneck (parse vs. IndexedDB write vs. tag
-  parsing) before it's worth coding a fix
-- Side panel UX: scrolling through the whole stacked section list is
-  tedious — consider a tool-select-first layout where picking a tool shows
-  just that tool's detail instead of a tall scrolling column

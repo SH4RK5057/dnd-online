@@ -5,13 +5,13 @@ import { filterItems, filterMonsters, filterSpells } from '../content/search'
 import { loadSavedMirrorToken, loadSavedMirrorUrl, saveMirrorToken, saveMirrorUrl } from '../content/constants'
 import { describeContentSource } from '../content/contentSourceTypes'
 import { StatBlockCard } from './StatBlockCard'
-import type { MonsterData } from '../content/types'
+import type { ItemData, MonsterData } from '../content/types'
 
 type Tab = 'spells' | 'monsters' | 'items'
 
 /** Searchable/filterable reference drawer over the merged compendium (SRD
  * fallback + private mirror import + homebrew). DM-only "Add to scene"
- * button on monster cards is the encounter drag-and-drop entry point —
+ * buttons on monster/item cards are the encounter drag-and-drop entry point —
  * "drag" here means "click to place", matching this app's existing
  * click-to-place pattern for tokens/walls/lights rather than introducing a
  * new native HTML drag-and-drop interaction for one feature. */
@@ -19,10 +19,12 @@ export function CompendiumDrawer({
   doc,
   isDm,
   onAddMonsterToScene,
+  onAddItemToScene,
 }: {
   doc: Y.Doc | null
   isDm: boolean
   onAddMonsterToScene?: (monster: MonsterData) => void
+  onAddItemToScene?: (item: ItemData) => void
 }) {
   const compendium = useCompendium(doc)
   // Monster stat blocks are DM-only reference material (encounter prep,
@@ -212,6 +214,11 @@ export function CompendiumDrawer({
             />
             {isDm && tab === 'monsters' && onAddMonsterToScene && (
               <button type="button" onClick={() => onAddMonsterToScene(selectedEntry as MonsterData)}>
+                Add to scene
+              </button>
+            )}
+            {isDm && tab === 'items' && onAddItemToScene && (
+              <button type="button" onClick={() => onAddItemToScene(selectedEntry as ItemData)}>
                 Add to scene
               </button>
             )}

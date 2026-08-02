@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useSession } from '../session/useSession'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useTokens } from '../map/useTokens'
@@ -5,6 +6,11 @@ import { useCharacters } from '../character/useCharacters'
 import { resolveTokenHp } from '../character/rules'
 import { resolveModelHeight } from '../map/sizeCategory'
 import { KNOWN_CONDITIONS } from '../dice/conditions'
+import { useCompendium } from '../content/useCompendium'
+import { filterMonsters } from '../content/search'
+import { parseSpeedFeet } from '../content/monsterToToken'
+
+const MAX_MONSTER_SEARCH_RESULTS = 8
 
 /** Inline panel shown when a token is selected on the map — HP, conditions,
  * and initiative, gated to `isDm || isOwner` per the app's DM-authoritative
@@ -39,11 +45,30 @@ export function TokenHpConditionEditor({
     setTokenModel,
     setTokenModelHeight,
     deleteToken,
+    initTokenFromMonster,
+    setTokenMonsterKey,
   } = useTokens(doc, sceneId)
   const { characters, updateCharacter, createNpcCharacter } = useCharacters(doc)
+  const compendium = useCompendium(doc)
+  const [monsterQuery, setMonsterQuery] = useState('')
 
   const token = tokens.find((t) => t.id === selectedTokenId)
   if (!doc || !token) return null
+
+  const monsterMatches = monsterQuery.trim()
+    ? filterMonsters(compendium.monsters, monsterQuery, 'all', 'all').slice(0, MAX_MONSTER_SEARCH_RESULTS)
+    : []
+  const attachedMonster = token.monsterKey ? compendium.monsters.find((m) => m.key === token.monsterKey) : null
+
+  const handleAttachMonster = (monster: (typeof compendium.monsters)[number]) => {
+    initTokenFromMonster(token.id, {
+      monsterKey: monster.key,
+      hp: { current: monster.hp, max: monster.hp, temp: 0 },
+      ac: monster.ac,
+      speed: parseSpeedFeet(monster.speed),
+    })
+    setMonsterQuery('')
+  }
 
   const canEdit = isDm || token.ownerId === myPlayerId
   if (!canEdit) return null
@@ -123,6 +148,40 @@ export function TokenHpConditionEditor({
         >
           + Create NPC character sheet
         </button>
+      )}
+
+      {isDm && (
+        <div className="token-hp-condition-editor__monster-attach">
+          <h4>Monster stat block</h4>
+          {attachedMonster ? (
+            <p className="character-sheet__hint">
+              Attached: {attachedMonster.name}{' '}
+              <button type="button" onClick={() => setTokenMonsterKey(token.id, null)}>
+                Detach
+              </button>
+            </p>
+          ) : (
+            <div className="character-sheet__compendium-search">
+              <input
+                placeholder="Attach a monster's stat block…"
+                value={monsterQuery}
+                onChange={(e) => setMonsterQuery(e.target.value)}
+              />
+              {monsterMatches.length > 0 && (
+                <ul className="character-sheet__search-results">
+                  {monsterMatches.map((data) => (
+                    <li key={data.key}>
+                      <button type="button" onClick={() => handleAttachMonster(data)}>
+                        {data.name}
+                        <span className="compendium-drawer__source">{data.type}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {isDm && (
