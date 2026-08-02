@@ -24,6 +24,8 @@ import { TokenHpConditionEditor } from '../components/TokenHpConditionEditor'
 import { TokenInspector } from '../components/TokenInspector'
 import { DmNotesPanel } from '../components/DmNotesPanel'
 import { HandoutsPanel, PlayerHandoutsView } from '../components/HandoutsPanel'
+import { BroadcastComposer } from '../components/BroadcastComposer'
+import { BroadcastNotificationBanner } from '../components/BroadcastNotificationBanner'
 import { RandomGenerators } from '../components/RandomGenerators'
 import { SoundboardPanel } from '../components/SoundboardPanel'
 import { CampaignFilesPanel } from '../components/CampaignFilesPanel'
@@ -35,6 +37,8 @@ import { CompendiumScreen } from './CompendiumScreen'
 import { EncounterNotificationBanner } from '../components/EncounterNotificationBanner'
 import { PendingOverridesBanner } from '../components/PendingOverridesBanner'
 import { useEncounterNotifications } from '../combat/useEncounterNotifications'
+import { useBroadcast } from '../dmtools/useBroadcast'
+import { useCompendium, findByKey } from '../content/useCompendium'
 import { useUndoManager } from '../undo/useUndoManager'
 import { usePanelOrder } from './usePanelOrder'
 import { useSidebarLayout, type SidebarPosition } from './useSidebarLayout'
@@ -56,6 +60,8 @@ export function SessionScreen() {
   const { status, peers, failure, retry } = useConnectionStatus(session)
   const { scenes, activeSceneId, activeScene, switchToScene } = useScenes(session?.doc ?? null)
   const { notification, dismiss: dismissNotification } = useEncounterNotifications(session?.doc ?? null, scenes)
+  const { notification: broadcastNotification, dismiss: dismissBroadcast } = useBroadcast(session?.doc ?? null)
+  const compendium = useCompendium(session?.doc ?? null)
   const { undo, redo, canUndo, canRedo } = useUndoManager(session?.role === 'dm' ? (session?.doc ?? null) : null)
   const { tokens, createToken, setTokenArt, setTokenModel } = useTokens(session?.doc ?? null, activeSceneId)
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
@@ -287,6 +293,14 @@ export function SessionScreen() {
         />
       )}
 
+      {broadcastNotification && (
+        <BroadcastNotificationBanner
+          notification={broadcastNotification}
+          monsterEntry={broadcastNotification.monsterKey ? findByKey(compendium, broadcastNotification.monsterKey) : null}
+          onDismiss={dismissBroadcast}
+        />
+      )}
+
       {session.role === 'dm' && <PendingOverridesBanner doc={session.doc} />}
 
       <div className="session-screen__body" data-position={sidebarLayout.position}>
@@ -369,6 +383,7 @@ export function SessionScreen() {
                       : []),
                     { id: 'dm-notes', title: 'DM Notes', defaultCollapsed: true, content: <DmNotesPanel doc={session.doc} /> },
                     { id: 'handouts-dm', title: 'Handouts', defaultCollapsed: true, content: <HandoutsPanel doc={session.doc} /> },
+                    { id: 'broadcast', title: 'Broadcast', defaultCollapsed: true, content: <BroadcastComposer doc={session.doc} /> },
                     {
                       id: 'random-generators',
                       title: 'Random Generators',

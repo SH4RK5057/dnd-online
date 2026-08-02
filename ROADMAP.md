@@ -661,9 +661,7 @@ real change in constraints.
       brightness within the radius, not 5e's actual "shades of gray beyond
       dim light" — this app's fog model doesn't track light *color*, only
       brightness, and adding that distinction would mean a larger FogLayer
-      rework. Feat prerequisites remain unaddressed — `FeatEntry` has no
-      structured data model to check against, and neither does item
-      weight/carry — both still need a bigger data-model pass first.
+      rework.
 - [x] Attunement limit — `character/rules.ts`'s `MAX_ATTUNED_ITEMS` (3, the
       5e standard), checked in `components/CharacterInventory.tsx` against
       `InventoryItem.attuned`: a 4th item's checkbox disables itself once
@@ -680,18 +678,28 @@ real change in constraints.
       as hazards/traps and every other rules edge this app flags rather
       than enforces: no automatic speed penalty, the DM narrates the
       consequence.
-- [x] DM broadcast tool, handouts half — `dmtools/types.ts`'s
+- [x] DM broadcast tool, targeted-handouts half — `dmtools/types.ts`'s
       `HandoutRecord.visibleToPlayerId` (null = everyone, the original
       behavior) lets the DM narrow an already-shown handout to one
       connected player instead of broadcasting to the whole party
       (`components/HandoutsPanel.tsx`'s new "Visible to" dropdown, same
       peer-list pattern `TokenOwnerAssign`/group-roll-requests already use).
-      A handout with only text and no image already covers the "note"
-      case; a "stat block" broadcast is covered separately by the
-      per-token `statBlockShared` opt-in shipped above. DM Notes stays
-      DM-only by design (its own panel explicitly warns notes still sync
-      to every player's browser even though only the DM's UI shows them) —
-      not turned into a third broadcast channel.
+      DM Notes stays DM-only by design (its own panel explicitly warns
+      notes still sync to every player's browser even though only the
+      DM's UI shows them) — not turned into a third broadcast channel.
+- [x] DM broadcast tool, "push to everyone right now" half — a new
+      `dmtools/useBroadcast.ts` (single-record Yjs map, same baseline-
+      then-diff "only fire on a genuinely new send" logic as
+      `combat/useEncounterNotifications.ts`) lets the DM compose a note
+      and/or attach a compendium monster's stat block
+      (`components/BroadcastComposer.tsx`, a new DM-only sidebar section)
+      and push it to every connected viewer as a transient, dismissible
+      banner (`components/BroadcastNotificationBanner.tsx`, rendered next
+      to the existing encounter-start banner in `SessionScreen.tsx`) —
+      distinct from a Handout's persistently-toggled-visible sharing:
+      this is one-shot, not a standing state a late joiner would replay.
+      `dismiss()` is purely local per-viewer, so a late-joining player
+      still sees the current broadcast once before it's gone.
 - [x] Battle-specific menu mode, both halves — `InitiativeTracker.tsx`
       gained a DM-only "Info" toggle per monster-linked combatant (expands
       the same `StatBlockCard` the compendium drawer/token inspector
@@ -719,10 +727,6 @@ already be covered by something shipped.
 **Technical:** desktop-app packaging (Electron) if browser-only proves limiting
 
 **DM tooling / UX:**
-- DM broadcast tool: send a stat block or note to everyone on demand, not
-  just a single player (handouts now support per-player targeting, see
-  Phase 10 above; a true "send to everyone right now" push — as opposed to
-  a persistently-toggled-visible handout — is still open)
 - 5etools mirror import performance (large files are slow to ingest) — needs
   profiling to find the actual bottleneck (parse vs. IndexedDB write vs. tag
   parsing) before it's worth coding a fix

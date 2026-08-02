@@ -693,6 +693,33 @@
   margin-bottom: 16px;
 }
 
+.broadcast-notification-banner {
+  padding: 12px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.broadcast-notification-banner__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.broadcast-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.broadcast-composer textarea {
+  width: 100%;
+  resize: vertical;
+}
+
 .pending-overrides-banner {
   padding: 12px;
   border: 1px solid goldenrod;

@@ -22,3 +22,17 @@ export interface HandoutRecord {
   visibleToPlayerId: string | null
   createdAt: number
 }
+
+/** A one-shot "push this to everyone right now" — distinct from
+ * HandoutRecord's persistently-toggled-visible sharing. Stored as a single
+ * record (see useBroadcast.ts's fixed BROADCAST_KEY), overwritten by each
+ * new send; `sentAt` is what lets viewers tell a fresh broadcast apart from
+ * the one already dismissed. */
+export interface BroadcastRecord {
+  text: string
+  /** Optional compendium monster key to show a full StatBlockCard alongside
+   * the text — covers the "send a stat block" half of this feature without
+   * a separate data shape. Null for a text-only broadcast. */
+  monsterKey: string | null
+  sentAt: number
+}
