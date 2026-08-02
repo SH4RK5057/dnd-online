@@ -31,6 +31,7 @@ import { SoundboardPanel } from '../components/SoundboardPanel'
 import { CampaignFilesPanel } from '../components/CampaignFilesPanel'
 import { ChatPanel } from '../components/ChatPanel'
 import { SceneNavigationPanel } from '../components/SceneNavigationPanel'
+import { FloorSwitcher } from '../components/FloorSwitcher'
 import { CharacterManagerScreen } from './CharacterManagerScreen'
 import { SceneBuilderScreen } from './SceneBuilderScreen'
 import { CompendiumScreen } from './CompendiumScreen'
@@ -509,6 +510,7 @@ export function SessionScreen() {
               {isUnassignedPlayer && (
                 <p className="session-screen__notice">Your DM hasn't assigned you a token on this scene yet.</p>
               )}
+              {session.role === 'dm' && <FloorSwitcher doc={session.doc} />}
               {view3d && (
                 <Scene3D
                   getBoardCanvas={() => boardCanvasExtractorRef.current?.() ?? null}

@@ -40,6 +40,8 @@ export interface UseScenesResult {
   setConsensusMode: (sceneId: string, mode: ConsensusMode) => void
   setPartyLeader: (sceneId: string, playerId: string | null) => void
   setCurrentPoi: (sceneId: string, poiId: string | null) => void
+  setFloorGroup: (sceneId: string, floorGroup: string) => void
+  setFloorOrder: (sceneId: string, floorOrder: number) => void
 }
 
 export function useScenes(doc: Y.Doc | null): UseScenesResult {
@@ -93,6 +95,8 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
         currentPoiId: null,
         blankWidthCells: null,
         blankHeightCells: null,
+        floorGroup: '',
+        floorOrder: 0,
         createdAt: Date.now(),
       }
       scenesMap(doc).set(id, record)
@@ -349,6 +353,28 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     [doc],
   )
 
+  const setFloorGroup = useCallback(
+    (sceneId: string, floorGroup: string) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, floorGroup })
+    },
+    [doc],
+  )
+
+  const setFloorOrder = useCallback(
+    (sceneId: string, floorOrder: number) => {
+      if (!doc) return
+      const scenesM = scenesMap(doc)
+      const scene = scenesM.get(sceneId)
+      if (!scene) return
+      scenesM.set(sceneId, { ...scene, floorOrder })
+    },
+    [doc],
+  )
+
   const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null
 
   return {
@@ -373,5 +399,7 @@ export function useScenes(doc: Y.Doc | null): UseScenesResult {
     setConsensusMode,
     setPartyLeader,
     setCurrentPoi,
+    setFloorGroup,
+    setFloorOrder,
   }
 }

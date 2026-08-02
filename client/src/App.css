@@ -34,6 +34,26 @@
   font-size: 14px;
 }
 
+.floor-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.floor-switcher__tab {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #ccc);
+  background: transparent;
+}
+
+.floor-switcher__tab--active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  font-weight: 600;
+}
+
 .token-owner-assign {
   margin-bottom: 24px;
 }

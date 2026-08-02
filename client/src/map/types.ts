@@ -91,6 +91,22 @@ export interface SceneRecord {
    * this is read. */
   blankWidthCells: number | null
   blankHeightCells: number | null
+  /** Groups this scene with others as floors/levels of one location (a
+   * multi-story tower, a stacked dungeon) — empty string means "not part of
+   * a floor group," the default and read fallback (`?? ''`) for scenes
+   * created before this field existed. Exact-string-match grouping, same
+   * DM-trusted convention as everywhere else in this app (no separate
+   * group-id/rename flow) — scenes sharing a non-empty floorGroup show a
+   * floor-switcher tab strip (components/FloorSwitcher.tsx) instead of
+   * requiring the DM to leave the live map for Scene Builder's scene
+   * dropdown to change floors. Each scene's own `name` is the tab label. */
+  floorGroup: string
+  /** Sort position within its floor group — lower shows first (e.g. a
+   * basement before the ground floor before an upper floor). Ties break by
+   * createdAt, same as the flat scene list. Read as `?? 0` for scenes
+   * created before this field existed. Meaningless while floorGroup is
+   * empty. */
+  floorOrder: number
   createdAt: number
 }
 

@@ -4,6 +4,7 @@ import { useScenes } from '../map/useScenes'
 import { exportScene, importSceneFile } from '../dmtools/sceneFile'
 import { readJsonFile } from '../dmtools/fileUtils'
 import { BLANK_SCENE_HEIGHT_CELLS, BLANK_SCENE_WIDTH_CELLS } from '../map/constants'
+import { floorSiblings } from '../map/floorGroups'
 import type { GridType } from '../map/types'
 
 interface ScenePreset {
@@ -37,6 +38,8 @@ export function SceneToolbar() {
     updateGrid,
     toggleFog,
     setAmbientBrightness,
+    setFloorGroup,
+    setFloorOrder,
   } = useScenes(doc)
 
   const [newSceneName, setNewSceneName] = useState('')
@@ -178,6 +181,40 @@ export function SceneToolbar() {
 
       {activeScene && (
         <>
+          <section className="scene-toolbar__section">
+            <h3 className="scene-toolbar__heading">Floor</h3>
+            <div className="scene-toolbar__row">
+              <label htmlFor="floor-group">Floor group</label>
+              <input
+                id="floor-group"
+                value={activeScene.floorGroup ?? ''}
+                onChange={(event) => setFloorGroup(activeScene.id, event.target.value)}
+                placeholder="e.g. Tower (blank = not a floor)"
+              />
+              <label htmlFor="floor-order">Floor order</label>
+              <input
+                id="floor-order"
+                type="number"
+                value={activeScene.floorOrder ?? 0}
+                onChange={(event) => setFloorOrder(activeScene.id, Number(event.target.value))}
+                disabled={!activeScene.floorGroup}
+              />
+            </div>
+            <p className="scene-toolbar__hint">
+              Scenes sharing the same floor group name show a quick floor-switcher tab strip during play instead of
+              requiring the full scene dropdown — lower order shows first (e.g. a basement before the ground floor).
+              {(() => {
+                const siblings = floorSiblings(scenes, activeScene)
+                return siblings.length > 1
+                  ? ` Currently grouped with: ${siblings
+                      .filter((s) => s.id !== activeScene.id)
+                      .map((s) => s.name)
+                      .join(', ')}.`
+                  : ''
+              })()}
+            </p>
+          </section>
+
           <section className="scene-toolbar__section">
             <h3 className="scene-toolbar__heading">Map</h3>
             <div className="scene-toolbar__row">

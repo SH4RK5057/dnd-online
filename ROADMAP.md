@@ -714,6 +714,30 @@ real change in constraints.
       clutter; a bare monsterKey-only token with no linked sheet still
       only gets the Info toggle, since it has no structured weapon/spell
       data to roll from.
+- [x] Multiple floors/levels per scene — `SceneRecord.floorGroup` (empty =
+      not part of a group, the default) and `floorOrder` (sort position
+      within the group, ties broken by `createdAt`) let a DM link several
+      scenes as floors of one location by giving them the same floor group
+      name, set from a new "Floor" section in `SceneToolbar.tsx`. A DM-only
+      `components/FloorSwitcher.tsx` tab strip — rendered above the map in
+      `SessionScreen.tsx`, using each grouped scene's own `name` as its tab
+      label — lets the DM flip floors with one click during live play
+      instead of leaving for Scene Builder's full scene dropdown; it
+      reuses `switchToScene` unchanged and renders nothing for an
+      ungrouped scene or a "group" of one. Deliberately the lightweight
+      option over the two heavier alternatives: POIs already handle
+      scene-to-scene links but are travel/consensus-flavored and gated off
+      dungeon-scale scenes (wrong semantics for "flip between views of the
+      same building"), and true vertical 3D floor-stacking would be a much
+      larger render-multiple-maps-at-once feature this app's flat-plane 3D
+      view isn't built for. Exact-string-match grouping, same DM-trusted,
+      no-referential-integrity convention already used everywhere else in
+      this app (scene names, homebrew content, etc.) — no group-rename
+      flow, a typo just splits a scene off silently. Pure grouping/sort
+      logic lives in `map/floorGroups.ts` (`floorSiblings`, unit tested)
+      so `SceneToolbar` and `FloorSwitcher` share one implementation.
+      Tokens/walls/lights/fog per floor stay fully independent, same as
+      any other two scenes — nothing here changes that.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---
@@ -733,7 +757,3 @@ already be covered by something shipped.
 - Side panel UX: scrolling through the whole stacked section list is
   tedious — consider a tool-select-first layout where picking a tool shows
   just that tool's detail instead of a tall scrolling column
-
-**Map / scene features:**
-- Multiple floors/levels per scene (e.g. a multi-story building or dungeon
-  with stacked levels), with a way to switch between or stack them
