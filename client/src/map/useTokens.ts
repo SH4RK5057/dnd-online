@@ -3,6 +3,7 @@ import * as Y from 'yjs'
 import { publishAsset } from './assetSync'
 import { TOKEN_IMAGE_MAX_DIMENSION, TOKEN_IMAGE_QUALITY } from './constants'
 import { compressImage } from './imageCompress'
+import type { AreaEffect } from './areaEffects'
 import type { ActiveCondition, SizeCategory, TokenRecord } from './types'
 
 function tokensMap(doc: Y.Doc) {
@@ -18,6 +19,10 @@ export interface CreateTokenInput {
   assetId?: string | null
   /** Set only for DM-placed hazard/trap tokens — see TokenRecord.hazardSize. */
   hazardSize?: { widthCells: number; heightCells: number } | null
+  /** Only meaningful alongside hazardSize — see TokenRecord.trapEffect. */
+  trapEffect?: AreaEffect | null
+  /** Set only for DM-placed chest/container tokens — see TokenRecord.containerItems. */
+  containerItems?: { name: string; quantity: number; notes: string }[] | null
   /** Hazard tokens are placed hidden by default (reveal-on-trigger); other
    * callers omit this and get the normal `false`. */
   hidden?: boolean
@@ -51,6 +56,7 @@ export interface UseTokensResult {
   setTokenZ: (tokenId: string, z: number) => void
   setTokenReactionAvailable: (tokenId: string, available: boolean) => void
   setTokenHazardSize: (tokenId: string, size: { widthCells: number; heightCells: number } | null) => void
+  setTokenContainerItems: (tokenId: string, items: { name: string; quantity: number; notes: string }[] | null) => void
   /** Encounter drag-and-drop: one atomic patch initializing HP/AC/speed and
    * recording the compendium source, instead of several separate writes. */
   initTokenFromMonster: (
@@ -119,6 +125,8 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
         z: 0,
         reactionAvailable: true,
         hazardSize: input.hazardSize ?? null,
+        trapEffect: input.trapEffect ?? null,
+        containerItems: input.containerItems ?? null,
         modelAssetId: null,
         modelHeightCells: null,
         createdAt: Date.now(),
@@ -200,6 +208,11 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     (tokenId: string, size: { widthCells: number; heightCells: number } | null) => patchToken(tokenId, { hazardSize: size }),
     [patchToken],
   )
+  const setTokenContainerItems = useCallback(
+    (tokenId: string, items: { name: string; quantity: number; notes: string }[] | null) =>
+      patchToken(tokenId, { containerItems: items }),
+    [patchToken],
+  )
   const initTokenFromMonster = useCallback(
     (
       tokenId: string,
@@ -272,6 +285,7 @@ export function useTokens(doc: Y.Doc | null, sceneId: string | null): UseTokensR
     setTokenZ,
     setTokenReactionAvailable,
     setTokenHazardSize,
+    setTokenContainerItems,
     initTokenFromMonster,
     setTokenMonsterKey,
   }

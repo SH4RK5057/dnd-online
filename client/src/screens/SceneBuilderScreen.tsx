@@ -9,9 +9,14 @@ import { HomebrewEditor } from '../components/HomebrewEditor'
 import { RuleOverridesPanel } from '../components/RuleOverridesPanel'
 import { MapCanvas } from '../canvas/MapCanvas'
 import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken'
-import { footprintCells, snapToSlot } from '../map/sizeCategory'
+import { footprintCells, rectanglesOverlap, snapToSlot, tokenFootprintRect } from '../map/sizeCategory'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
+import { useTerrain } from '../map/useTerrain'
+import { useCharacters } from '../character/useCharacters'
+import { useRollLog } from '../dice/useRollLog'
+import { resolveAreaEffect } from '../map/areaEffects'
+import { TERRAIN_LABELS } from '../map/constants'
 import type { ItemData, MonsterData } from '../content/types'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingTokenPlacement } from './pendingTokenPlacement'
@@ -29,7 +34,10 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
   const { session } = useSession()
   const doc = session?.doc ?? null
   const { activeSceneId, activeScene } = useScenes(doc)
-  const { createToken, setTokenArt, setTokenModel, initTokenFromMonster } = useTokens(doc, activeSceneId)
+  const { createToken, setTokenArt, setTokenModel, initTokenFromMonster, setTokenHp } = useTokens(doc, activeSceneId)
+  const { terrain } = useTerrain(doc, activeSceneId)
+  const { characters, updateCharacter } = useCharacters(doc)
+  const { pushRoll } = useRollLog(doc, true)
 
   const [toolMode, setToolMode] = useState<ToolMode>('move')
   const [snapWalls, setSnapWalls] = useState(false)
@@ -63,7 +71,7 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingPlacement || !activeSceneId) return
-    const { name, sizeCategory, file, modelFile, monsterInit, hazardSize } = pendingPlacement
+    const { name, sizeCategory, file, modelFile, monsterInit, hazardSize, trapEffect, containerInit } = pendingPlacement
     setPendingPlacement(null)
     try {
       const footprint = hazardSize ? Math.max(hazardSize.widthCells, hazardSize.heightCells) : footprintCells(sizeCategory)
@@ -76,11 +84,30 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
         x: snappedX,
         y: snappedY,
         hazardSize,
+        trapEffect,
+        containerItems: containerInit?.items ?? null,
         hidden: !!hazardSize,
       })
       if (file) void setTokenArt(tokenId, file)
       if (modelFile) void setTokenModel(tokenId, modelFile)
       if (monsterInit) initTokenFromMonster(tokenId, monsterInit)
+      // Same terrain-on-placement check as SessionScreen's handlePlaceToken —
+      // see its comment for why no "newly overlapping" tracking is needed.
+      if (!hazardSize) {
+        const placedRect = tokenFootprintRect(snappedX, snappedY, footprint, footprint)
+        const charactersById = new Map(characters.map((c) => [c.id, c]))
+        for (const patch of terrain) {
+          if (!patch.effect) continue
+          const terrainRect = tokenFootprintRect(patch.x, patch.y, patch.widthCells, patch.heightCells)
+          if (!rectanglesOverlap(placedRect, terrainRect)) continue
+          resolveAreaEffect(
+            patch.effect,
+            [{ id: tokenId, name, characterId: null, hp: monsterInit?.hp ?? null }],
+            charactersById,
+            { pushRoll, updateCharacter, setTokenHp, sourceName: TERRAIN_LABELS[patch.terrainType] },
+          )
+        }
+      }
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not add that token.')
     }
@@ -100,6 +127,8 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
       },
       characterInit: null,
       hazardSize: null,
+      trapEffect: null,
+      containerInit: null,
     })
   }
 
@@ -112,6 +141,8 @@ export function SceneBuilderScreen({ onBack }: { onBack: () => void }) {
       monsterInit: null,
       characterInit: null,
       hazardSize: null,
+      trapEffect: null,
+      containerInit: null,
     })
   }
 

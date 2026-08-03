@@ -3,6 +3,7 @@ import { useSession } from '../session/useSession'
 import { getOrCreatePlayerId } from '../session/lastSession'
 import { useTokens } from '../map/useTokens'
 import { useCharacters } from '../character/useCharacters'
+import { usePartyLoot } from '../loot/usePartyLoot'
 import { resolveTokenHp } from '../character/rules'
 import { resolveModelHeight } from '../map/sizeCategory'
 import { KNOWN_CONDITIONS } from '../dice/conditions'
@@ -47,8 +48,10 @@ export function TokenHpConditionEditor({
     deleteToken,
     initTokenFromMonster,
     setTokenMonsterKey,
+    setTokenContainerItems,
   } = useTokens(doc, sceneId)
   const { characters, updateCharacter, createNpcCharacter } = useCharacters(doc)
+  const { addItem: addLootItem } = usePartyLoot(doc)
   const compendium = useCompendium(doc)
   const [monsterQuery, setMonsterQuery] = useState('')
 
@@ -104,6 +107,12 @@ export function TokenHpConditionEditor({
       token.id,
       token.conditions.map((c) => (c.name === name ? { ...c, roundsRemaining } : c)),
     )
+  }
+
+  const handleOpenContainer = () => {
+    if (!token.containerItems) return
+    for (const item of token.containerItems) addLootItem(item.name, item.quantity, item.notes)
+    setTokenContainerItems(token.id, [])
   }
 
   return (
@@ -303,6 +312,29 @@ export function TokenHpConditionEditor({
         placeholder="Not rolled"
         onChange={(e) => setTokenInitiative(token.id, e.target.value === '' ? null : Number(e.target.value))}
       />
+
+      {token.containerItems !== null && (
+        <>
+          <h3>Container</h3>
+          {token.containerItems.length > 0 ? (
+            <>
+              <ul className="character-sheet__row-list">
+                {token.containerItems.map((item, index) => (
+                  <li key={index} className="character-sheet__row">
+                    {item.name} {item.quantity > 1 ? `×${item.quantity}` : ''}
+                    {item.notes && <span className="character-sheet__hint"> ({item.notes})</span>}
+                  </li>
+                ))}
+              </ul>
+              <button type="button" onClick={handleOpenContainer}>
+                Open — move to party loot
+              </button>
+            </>
+          ) : (
+            <p className="character-sheet__hint">Empty.</p>
+          )}
+        </>
+      )}
     </div>
   )
 }

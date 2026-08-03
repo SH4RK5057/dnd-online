@@ -5,4 +5,4 @@
  * mode: SessionScreen switches into it automatically when a token
  * placement is staged, overriding whatever mode the DM had selected, and
  * switches back out once the placement click lands (or is cancelled). */
-export type ToolMode = 'move' | 'draw-walls' | 'place-lights' | 'place-tokens' | 'place-pois'
+export type ToolMode = 'move' | 'draw-walls' | 'place-lights' | 'place-tokens' | 'place-pois' | 'place-terrain' | 'place-trigger'

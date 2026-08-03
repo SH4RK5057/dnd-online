@@ -2,6 +2,7 @@ import { TokenOwnerAssign } from './TokenOwnerAssign'
 import { PreviewAsPlayer } from './PreviewAsPlayer'
 import { TokenUploadButton } from './TokenUploadButton'
 import { CharacterTokenMenu } from './CharacterTokenMenu'
+import { ChestPlacementPanel } from './ChestPlacementPanel'
 import { SubTabNav } from './SubTabNav'
 import type { PendingTokenPlacement } from '../screens/pendingTokenPlacement'
 
@@ -53,6 +54,7 @@ export function TokensPanel({
             onCancelPlacement={onCancelPlacement}
           />
           <CharacterTokenMenu sceneId={sceneId} pendingPlacement={pendingPlacement} onRequestPlacement={onRequestPlacement} />
+          <ChestPlacementPanel pendingPlacement={pendingPlacement} onRequestPlacement={onRequestPlacement} />
         </section>
       )}
     </div>

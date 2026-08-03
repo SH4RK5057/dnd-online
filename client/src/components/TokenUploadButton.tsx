@@ -3,7 +3,9 @@ import { useSession } from '../session/useSession'
 import { useTokens } from '../map/useTokens'
 import { SIZE_LABELS } from '../map/constants'
 import type { SizeCategory } from '../map/types'
+import type { AreaEffect } from '../map/areaEffects'
 import type { PendingTokenPlacement } from '../screens/pendingTokenPlacement'
+import { AreaEffectFields } from './AreaEffectFields'
 
 const SIZE_OPTIONS = Object.keys(SIZE_LABELS) as SizeCategory[]
 
@@ -31,6 +33,7 @@ export function TokenUploadButton({
   const [isHazard, setIsHazard] = useState(false)
   const [hazardWidth, setHazardWidth] = useState(2)
   const [hazardHeight, setHazardHeight] = useState(2)
+  const [trapEffect, setTrapEffect] = useState<AreaEffect | null>(null)
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -44,6 +47,8 @@ export function TokenUploadButton({
       monsterInit: null,
       characterInit: null,
       hazardSize: isHazard ? { widthCells: Math.max(1, hazardWidth), heightCells: Math.max(1, hazardHeight) } : null,
+      trapEffect: isHazard ? trapEffect : null,
+      containerInit: null,
     })
     setName('')
     setFile(null)
@@ -95,6 +100,7 @@ export function TokenUploadButton({
             title="Height (grid cells)"
           />
           cells
+          <AreaEffectFields label="Deals damage on entry" value={trapEffect} onChange={setTrapEffect} />
         </span>
       ) : (
         <select value={sizeCategory} onChange={(event) => setSizeCategory(event.target.value as SizeCategory)}>

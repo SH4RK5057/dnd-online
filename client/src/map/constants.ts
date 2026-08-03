@@ -1,4 +1,4 @@
-import type { SizeCategory } from './types'
+import type { SizeCategory, TerrainType } from './types'
 
 export const DEFAULT_GRID_SIZE_PX = 70
 
@@ -50,6 +50,15 @@ export const SIZE_LABELS: Record<SizeCategory, string> = {
   large: 'Large',
   huge: 'Huge',
   gargantuan: 'Gargantuan',
+}
+
+export const TERRAIN_LABELS: Record<TerrainType, string> = {
+  water: 'Water',
+  lava: 'Lava',
+  acid: 'Acid',
+  ice: 'Ice',
+  mud: 'Mud',
+  difficult: 'Difficult',
 }
 
 /** Grid cells, matching TokenRecord/WallRecord/LightRecord's coordinate convention. */

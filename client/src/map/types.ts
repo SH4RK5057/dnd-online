@@ -1,3 +1,5 @@
+import type { AreaEffect } from './areaEffects'
+
 export type SizeCategory = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan'
 
 export type AssetKind = 'map' | 'token' | 'handout' | 'audio' | 'model'
@@ -199,6 +201,20 @@ export interface TokenRecord {
    * area rather than a creature size category. Null for every normal
    * token, which keeps using sizeCategory as before. */
   hazardSize: { widthCells: number; heightCells: number } | null
+  /** Only meaningful when hazardSize is set. A configured trap effect
+   * (map/areaEffects.ts) that auto-resolves — damage roll, per-target save,
+   * HP application, all logged to the roll log — the moment a token's
+   * footprint overlaps this hazard's, no DM click required. Null = the
+   * hazard just reveals itself on entry (the original, pre-effect
+   * behavior) with no mechanical damage. */
+  trapEffect: AreaEffect | null
+  /** Null for every normal token. A list (possibly empty, once opened) makes
+   * this token a chest/container — see components/ChestPlacementPanel.tsx
+   * (loading it) and TokenHpConditionEditor.tsx's "Container" section
+   * (opening it into Party Loot). The token itself is never auto-deleted
+   * when emptied, matching this app's convention of leaving placed objects
+   * on the map until the DM removes them. */
+  containerItems: { name: string; quantity: number; notes: string }[] | null
   /** An uploaded STL 3D model (AssetKind 'model') standing in for this
    * token in the 3D flat-plane view (canvas3d/Scene3D.tsx) — synced through
    * the same chunked asset pipeline as map/token images (map/assetSync.ts),
@@ -256,6 +272,71 @@ export interface WallRecord {
    * or closed) so its location stays visible — only the blocking behavior
    * changes with `open`. */
   open?: boolean
+  createdAt: number
+}
+
+/** A fixed picklist rather than freeform text — each type maps to one
+ * preset render color (canvas/TerrainLayer.ts) so painting stays a quick
+ * click, not a color-picker exercise. A v1 limitation: no custom types. */
+export type TerrainType = 'water' | 'lava' | 'acid' | 'ice' | 'mud' | 'difficult'
+
+/** A DM-painted rectangular patch of ground with a visual state — purely
+ * cosmetic geography (no line-of-sight/movement interaction; it doesn't
+ * plug into the wall/fog system at all, just renders under tokens like the
+ * map image itself). */
+export interface TerrainRecord {
+  id: string
+  sceneId: string
+  /** Grid-cell units, top-left anchor — same convention as TokenRecord.x/y. */
+  x: number
+  y: number
+  widthCells: number
+  heightCells: number
+  terrainType: TerrainType
+  /** Optional mechanical payload (map/areaEffects.ts) — makes this patch a
+   * hazard, not just scenery: a token whose footprint newly overlaps it
+   * auto-resolves damage/save/apply, same as a hazard token's trapEffect.
+   * Null = purely cosmetic, the v1 default. */
+  effect: AreaEffect | null
+  createdAt: number
+}
+
+/** One thing a trigger does when it fires — a discriminated union so
+ * map/triggerActions.ts's applyTriggerActions can dispatch on `type` without
+ * a separate "which fields are set" convention like AreaEffect uses. */
+export type TriggerAction =
+  | { type: 'toggleDoor'; wallId: string; open: boolean }
+  | { type: 'revealToken'; tokenId: string }
+  | { type: 'spawnToken'; monsterKey: string; x: number; y: number }
+  | { type: 'applyEffect'; effect: AreaEffect }
+
+/** A DM-built area that fires one or more TriggerActions the moment some
+ * other token's footprint newly overlaps it — the generic version of the
+ * hazard-token-reveal / hazardous-terrain mechanisms above (pressure
+ * plates, tripwires: "step here, door opens / monster spawns / trap
+ * effect resolves"). */
+export interface TriggerRecord {
+  id: string
+  sceneId: string
+  name: string
+  /** Grid-cell units, top-left anchor — same convention as TerrainRecord. */
+  x: number
+  y: number
+  widthCells: number
+  heightCells: number
+  /** DM-only visibility until it fires (or is manually revealed some other
+   * way) — same convention as TokenRecord.hidden. */
+  hidden: boolean
+  /** Same convention as TokenRecord.perceptionDc — only meaningful while hidden. */
+  perceptionDc: number | null
+  /** Whether this trigger only ever fires once. When true, `firedAt` gates
+   * re-firing (map/triggerActions.ts shouldTriggerFire); when false it fires
+   * again on every fresh overlap. */
+  oneShot: boolean
+  /** Timestamp of the last time this trigger fired, or null if it never has.
+   * Only meaningful (read) when oneShot is true. */
+  firedAt: number | null
+  actions: TriggerAction[]
   createdAt: number
 }
 

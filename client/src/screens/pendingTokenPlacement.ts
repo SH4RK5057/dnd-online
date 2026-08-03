@@ -1,4 +1,5 @@
 import type { SizeCategory } from '../map/types'
+import type { AreaEffect } from '../map/areaEffects'
 
 /** A token the DM has configured (name/size/art) but not yet placed —
  * staged from TokenUploadButton's form, resolved into an actual token once
@@ -27,4 +28,10 @@ export interface PendingTokenPlacement {
   /** Set when placing a DM-configured hazard/trap token (custom rectangular
    * size, starts hidden) instead of a normal creature token. */
   hazardSize: { widthCells: number; heightCells: number } | null
+  /** Only meaningful alongside hazardSize — see TokenRecord.trapEffect. */
+  trapEffect: AreaEffect | null
+  /** Set when this placement came from ChestPlacementPanel instead of
+   * TokenUploadButton — carries the pre-loaded item list to initialize on
+   * the token once it's placed. See TokenRecord.containerItems. */
+  containerInit: { items: { name: string; quantity: number; notes: string }[] } | null
 }

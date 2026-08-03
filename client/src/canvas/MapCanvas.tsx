@@ -5,6 +5,8 @@ import { getOrCreatePlayerId } from '../session/lastSession'
 import { useScenes } from '../map/useScenes'
 import { useTokens } from '../map/useTokens'
 import { useWalls } from '../map/useWalls'
+import { useTerrain } from '../map/useTerrain'
+import { useTriggers } from '../map/useTriggers'
 import { useLights } from '../map/useLights'
 import { useExploration } from '../map/useExploration'
 import { usePings } from '../map/usePings'
@@ -15,15 +17,21 @@ import { useAssetUrl } from '../map/assetSync'
 import { useCharacters } from '../character/useCharacters'
 import { useCampaignSettings } from '../character/useCampaignSettings'
 import { useCompendium } from '../content/useCompendium'
+import { useRollLog } from '../dice/useRollLog'
 import { resolveTokenHp, computePassiveSkill, darkvisionRadiusFt } from '../character/rules'
-import { footprintCells, rectanglesOverlap, tokenFootprintRect } from '../map/sizeCategory'
-import { PERSONAL_VISION_RADIUS_CELLS, MAX_VISION_RADIUS_CELLS } from '../map/constants'
+import { resolveAreaEffect } from '../map/areaEffects'
+import { applyTriggerActions, shouldTriggerFire } from '../map/triggerActions'
+import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken'
+import { footprintCells, rectanglesOverlap, snapToSlot, tokenFootprintRect } from '../map/sizeCategory'
+import { PERSONAL_VISION_RADIUS_CELLS, MAX_VISION_RADIUS_CELLS, TERRAIN_LABELS } from '../map/constants'
 import { resolveCanvasSizeCells } from '../map/canvasSize'
 import { usePixiApp } from './usePixiApp'
 import { MapLayer } from './MapLayer'
 import { GridLayer } from './GridLayer'
 import { TokenLayer } from './TokenLayer'
 import { WallLayer } from './WallLayer'
+import { TerrainLayer } from './TerrainLayer'
+import { TriggerLayer } from './TriggerLayer'
 import { LightLayer } from './LightLayer'
 import { FogLayer } from './FogLayer'
 import { PingLayer } from './PingLayer'
@@ -47,6 +55,8 @@ interface MapCanvasProps {
   wallDoorMode?: boolean
   onPlaceToken?: (x: number, y: number) => void
   onPlacePoi?: (x: number, y: number) => void
+  onPlaceTerrain?: (x: number, y: number) => void
+  onPlaceTrigger?: (x: number, y: number) => void
   /** Double-click-to-ping and shift-drag annotations are live-session
    * communication aids, not scene-editing tools — Scene Builder's canvas
    * disables both (default true) so they can't fire mid-gesture while
@@ -89,6 +99,8 @@ export function MapCanvas({
   wallDoorMode = false,
   onPlaceToken,
   onPlacePoi,
+  onPlaceTerrain,
+  onPlaceTrigger,
   enablePing = true,
   enableAnnotations = true,
   previewPlayerId = null,
@@ -114,13 +126,19 @@ export function MapCanvas({
   const isDmUnmasked = isDm && !previewPlayerId
   const { activeScene } = useScenes(doc)
   const mapUrl = useAssetUrl(doc, activeScene?.mapAssetId ?? null)
-  const { tokens, moveToken, setTokenHidden } = useTokens(doc, activeScene?.id ?? null)
+  const { tokens, moveToken, setTokenHidden, setTokenHp, createToken, initTokenFromMonster } = useTokens(
+    doc,
+    activeScene?.id ?? null,
+  )
   const { walls, createWall, updateWallEndpoint, toggleDoor, deleteWall } = useWalls(doc, activeScene?.id ?? null)
+  const { terrain } = useTerrain(doc, activeScene?.id ?? null)
+  const { triggers, markFired } = useTriggers(doc, activeScene?.id ?? null)
   const { lights, createLight, moveLight, detachLight, deleteLight } = useLights(doc, activeScene?.id ?? null)
   const { exploredCells, revealCells } = useExploration(doc, activeScene?.id ?? null, effectiveViewerId)
-  const { characters } = useCharacters(doc)
+  const { characters, updateCharacter } = useCharacters(doc)
+  const { pushRoll } = useRollLog(doc, isDm)
   const { settings: campaignSettings } = useCampaignSettings(doc)
-  const { races } = useCompendium(doc)
+  const { races, monsters } = useCompendium(doc)
   const { pings, createPing } = usePings(doc, activeScene?.id ?? null, isDm)
   const { annotations, createAnnotation } = useAnnotations(doc, activeScene?.id ?? null, isDm)
   const { pois } = usePois(doc, activeScene?.id ?? null)
@@ -133,6 +151,8 @@ export function MapCanvas({
   const tokenTargetRef = useRef<Container | null>(null)
   const mapLayerRef = useRef<MapLayer | null>(null)
   const gridLayerRef = useRef<GridLayer | null>(null)
+  const terrainLayerRef = useRef<TerrainLayer | null>(null)
+  const triggerLayerRef = useRef<TriggerLayer | null>(null)
   const tokenLayerRef = useRef<TokenLayer | null>(null)
   const wallLayerRef = useRef<WallLayer | null>(null)
   const lightLayerRef = useRef<LightLayer | null>(null)
@@ -163,6 +183,8 @@ export function MapCanvas({
     const tokenTarget = new Container()
     const mapLayer = new MapLayer()
     const gridLayer = new GridLayer()
+    const terrainLayer = new TerrainLayer()
+    const triggerLayer = new TriggerLayer()
     const tokenLayer = new TokenLayer()
     const wallLayer = new WallLayer()
     const lightLayer = new LightLayer()
@@ -172,7 +194,7 @@ export function MapCanvas({
     const poiLayer = new PoiLayer()
     const measureLayer = new MeasureLayer()
 
-    fogTarget.addChild(mapLayer.container, gridLayer.container, wallLayer.container)
+    fogTarget.addChild(mapLayer.container, terrainLayer.container, triggerLayer.container, gridLayer.container, wallLayer.container)
     tokenTarget.addChild(tokenLayer.container)
     world.addChild(
       tokenTarget,
@@ -196,6 +218,8 @@ export function MapCanvas({
     tokenTargetRef.current = tokenTarget
     mapLayerRef.current = mapLayer
     gridLayerRef.current = gridLayer
+    terrainLayerRef.current = terrainLayer
+    triggerLayerRef.current = triggerLayer
     tokenLayerRef.current = tokenLayer
     wallLayerRef.current = wallLayer
     lightLayerRef.current = lightLayer
@@ -208,6 +232,8 @@ export function MapCanvas({
     return () => {
       mapLayer.destroy()
       gridLayer.destroy()
+      terrainLayer.destroy()
+      triggerLayer.destroy()
       tokenLayer.destroy()
       wallLayer.destroy()
       lightLayer.destroy()
@@ -224,6 +250,8 @@ export function MapCanvas({
       tokenTargetRef.current = null
       mapLayerRef.current = null
       gridLayerRef.current = null
+      terrainLayerRef.current = null
+      triggerLayerRef.current = null
       tokenLayerRef.current = null
       wallLayerRef.current = null
       lightLayerRef.current = null
@@ -300,21 +328,90 @@ export function MapCanvas({
     const charactersById = new Map(characters.map((c) => [c.id, c]))
     const resolvedHpByTokenId = new Map(visibleTokens.map((t) => [t.id, resolveTokenHp(t, charactersById)]))
     // A hidden hazard token (trap) reveals itself the first time some other
-    // token's footprint overlaps its own — a lightweight "trigger" that
-    // doesn't try to guess or auto-apply the trap's actual effect (DM
-    // resolves that manually with the same tools as any other damage/save,
-    // same reasoning as the spell-cast flow's manual target checklist).
-    // Hazards don't trigger each other.
+    // token's footprint overlaps its own. If it has a configured trapEffect
+    // (map/areaEffects.ts), that resolves automatically right here too —
+    // damage roll, save, apply, all logged — no DM click required; a hazard
+    // with no trapEffect just reveals, same as before that field existed.
+    // Hazards don't trigger each other. `hazard.hidden` doubles as the
+    // one-shot gate: once revealed it's excluded from this loop for good,
+    // so the effect can never re-fire on a later move across the same spot.
+    const spawnMonsterToken = (monsterKey: string, x: number, y: number) => {
+      const monster = monsters.find((m) => m.key === monsterKey)
+      if (!monster || !activeScene) return
+      const sizeCategory = monsterSizeToCategory(monster.size)
+      const footprint = footprintCells(sizeCategory)
+      const tokenId = createToken({
+        sceneId: activeScene.id,
+        name: monster.name,
+        sizeCategory,
+        x: snapToSlot(x, footprint),
+        y: snapToSlot(y, footprint),
+      })
+      initTokenFromMonster(tokenId, {
+        monsterKey: monster.key,
+        hp: { current: monster.hp, max: monster.hp, temp: 0 },
+        ac: monster.ac,
+        speed: parseSpeedFeet(monster.speed),
+      })
+    }
+
     const handleMoveEnd = (tokenId: string, x: number, y: number) => {
-      moveToken(tokenId, x, y)
       const movedToken = tokens.find((t) => t.id === tokenId)
+      moveToken(tokenId, x, y)
       if (!movedToken || movedToken.hazardSize) return
       const size = footprintCells(movedToken.sizeCategory)
+      const oldRect = tokenFootprintRect(movedToken.x, movedToken.y, size, size)
       const movedRect = tokenFootprintRect(x, y, size, size)
       for (const hazard of tokens) {
         if (!hazard.hazardSize || !hazard.hidden) continue
         const hazardRect = tokenFootprintRect(hazard.x, hazard.y, hazard.hazardSize.widthCells, hazard.hazardSize.heightCells)
-        if (rectanglesOverlap(movedRect, hazardRect)) setTokenHidden(hazard.id, false)
+        if (!rectanglesOverlap(movedRect, hazardRect)) continue
+        setTokenHidden(hazard.id, false)
+        if (hazard.trapEffect) {
+          resolveAreaEffect(hazard.trapEffect, [movedToken], charactersById, {
+            pushRoll,
+            updateCharacter,
+            setTokenHp,
+            sourceName: hazard.name,
+          })
+        }
+      }
+      // Hazardous terrain has no hidden flag to double as a one-shot gate,
+      // so this compares the footprint's overlap before and after the move
+      // instead — only a *newly* overlapping patch fires, not every move
+      // end while still standing in it.
+      for (const patch of terrain) {
+        if (!patch.effect) continue
+        const terrainRect = tokenFootprintRect(patch.x, patch.y, patch.widthCells, patch.heightCells)
+        const wasOverlapping = rectanglesOverlap(oldRect, terrainRect)
+        if (wasOverlapping || !rectanglesOverlap(movedRect, terrainRect)) continue
+        resolveAreaEffect(patch.effect, [movedToken], charactersById, {
+          pushRoll,
+          updateCharacter,
+          setTokenHp,
+          sourceName: TERRAIN_LABELS[patch.terrainType],
+        })
+      }
+      // Same newly-overlapping check as hazardous terrain above, plus
+      // shouldTriggerFire's oneShot gate — a non-oneShot trigger fires on
+      // every fresh entry, a oneShot one only until its first firedAt.
+      for (const trigger of triggers) {
+        const triggerRect = tokenFootprintRect(trigger.x, trigger.y, trigger.widthCells, trigger.heightCells)
+        const wasOverlapping = rectanglesOverlap(oldRect, triggerRect)
+        if (wasOverlapping || !rectanglesOverlap(movedRect, triggerRect) || !shouldTriggerFire(trigger)) continue
+        applyTriggerActions(trigger.actions, {
+          toggleDoor,
+          revealToken: (revealedId) => setTokenHidden(revealedId, false),
+          spawnToken: spawnMonsterToken,
+          applyEffect: (effect) =>
+            resolveAreaEffect(effect, [movedToken], charactersById, {
+              pushRoll,
+              updateCharacter,
+              setTokenHp,
+              sourceName: trigger.name,
+            }),
+        })
+        markFired(trigger.id)
       }
     }
 
@@ -332,7 +429,28 @@ export function MapCanvas({
         onSelect: (tokenId) => onSelectToken?.(tokenId),
       },
     )
-  }, [doc, tokens, characters, activeScene, isDmUnmasked, toolMode, selectedTokenId, moveToken, onSelectToken, setTokenHidden])
+  }, [
+    doc,
+    tokens,
+    characters,
+    terrain,
+    triggers,
+    monsters,
+    activeScene,
+    isDmUnmasked,
+    toolMode,
+    selectedTokenId,
+    moveToken,
+    onSelectToken,
+    setTokenHidden,
+    setTokenHp,
+    updateCharacter,
+    pushRoll,
+    createToken,
+    initTokenFromMonster,
+    toggleDoor,
+    markFired,
+  ])
 
   // Keep the measure layer's grid-cell-to-pixel conversion in sync.
   useEffect(() => {
@@ -372,6 +490,18 @@ export function MapCanvas({
     toggleDoor,
     deleteWall,
   ])
+
+  // Update terrain (purely cosmetic — see TerrainRecord's doc comment).
+  useEffect(() => {
+    if (!terrainLayerRef.current || !activeScene) return
+    terrainLayerRef.current.update(terrain, activeScene.gridSizePx)
+  }, [terrain, activeScene])
+
+  // Update trigger zones — DM-only unless revealed, same as hazard tokens.
+  useEffect(() => {
+    if (!triggerLayerRef.current || !activeScene) return
+    triggerLayerRef.current.update(triggers, activeScene.gridSizePx, isDmUnmasked)
+  }, [triggers, activeScene, isDmUnmasked])
 
   // Update lights.
   useEffect(() => {
@@ -640,6 +770,22 @@ export function MapCanvas({
         return
       }
 
+      if (toolMode === 'place-terrain') {
+        const world = worldRef.current
+        if (!world || !onPlaceTerrain || !activeScene) return
+        const local = world.toLocal(event.global)
+        onPlaceTerrain(local.x / activeScene.gridSizePx, local.y / activeScene.gridSizePx)
+        return
+      }
+
+      if (toolMode === 'place-trigger') {
+        const world = worldRef.current
+        if (!world || !onPlaceTrigger || !activeScene) return
+        const local = world.toLocal(event.global)
+        onPlaceTrigger(local.x / activeScene.gridSizePx, local.y / activeScene.gridSizePx)
+        return
+      }
+
       if (toolMode !== 'move') return
       panning = true
       panStart = { x: event.global.x, y: event.global.y }
@@ -708,6 +854,8 @@ export function MapCanvas({
     activeScene,
     onPlaceToken,
     onPlacePoi,
+    onPlaceTerrain,
+    onPlaceTrigger,
     enablePing,
     enableAnnotations,
     createPing,

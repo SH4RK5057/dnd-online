@@ -85,6 +85,39 @@
   margin-top: 12px;
 }
 
+.chest-placement-panel {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chest-placement-panel h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.trigger-builder-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trigger-builder-panel h4 {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+.trigger-builder-panel__draft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
 .character-token-menu h3 {
   margin: 0 0 4px;
   font-size: 14px;
@@ -1320,6 +1353,17 @@
   width: 48px;
 }
 
+.area-effect-fields {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.area-effect-fields input {
+  width: 90px;
+}
+
 .token-upload--pending {
   background: rgba(255, 200, 80, 0.12);
   border: 1px dashed rgba(255, 200, 80, 0.6);
@@ -1540,14 +1584,16 @@
 }
 
 .tokens-panel,
-.dm-toolbox-panel {
+.dm-toolbox-panel,
+.terrain-triggers-panel {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .tokens-panel__section h3,
-.dm-toolbox-panel__section h3 {
+.dm-toolbox-panel__section h3,
+.terrain-triggers-panel__section h3 {
   margin: 0 0 6px;
   font-size: 14px;
 }

@@ -906,6 +906,65 @@ real change in constraints.
       at the inside of your own model) but, as before, is always shown in
       the standard free-orbit board view, same as every other in-sight
       token.
+- [x] Scene-building batch — five DM requests to make encounters richer to
+      set up and run:
+      - **Live snap preview while dragging a large/huge/gargantuan token** —
+        `canvas/TokenSprite.ts` now redraws a translucent ghost rectangle
+        (via `map/sizeCategory.ts`'s existing `snapToSlot`) on every
+        `handlePointerMove` tick during a drag, cleared on release, so a
+        big-footprint token shows exactly where it'll land before you let
+        go instead of only snapping visibly on drop. Pure UI polish — the
+        drop-time snap math itself was already correct.
+      - **Terrain tiles** — a new `TerrainRecord` (`map/types.ts`: a
+        picklist `TerrainType` — water/lava/acid/ice/mud/difficult — plus a
+        rectangular area) painted via `components/TerrainPaintPanel.tsx`
+        (type + width/height, then click-to-place, same staged flow as
+        token placement) and rendered by `canvas/TerrainLayer.ts` under the
+        grid/walls, cosmetic-only in v1 (no line-of-sight or movement
+        interaction).
+      - **Area-effect engine + trap auto-apply + hazardous terrain** — a
+        new `map/areaEffects.ts` extracts `SpellCastPanel`'s roll-damage →
+        roll-each-target's-save → apply-and-log pipeline into a reusable
+        `resolveAreaEffect(effect, targets, charactersById, ctx)`, driven
+        by a DM-authored `AreaEffect` (damage dice, save ability, DC,
+        half/negates on success) instead of a caster's spell save DC.
+        Hazard tokens gained an optional `trapEffect`
+        (`components/TokenUploadButton.tsx`'s hazard section, a new
+        "Deals damage on entry" checkbox) and terrain gained an optional
+        `effect` (same checkbox in `TerrainPaintPanel.tsx`), both built
+        from a shared `components/AreaEffectFields.tsx` form.
+        `canvas/MapCanvas.tsx`'s existing hazard-reveal-on-overlap check
+        now also fires the trap's effect automatically (no DM click), and
+        a parallel newly-overlapping check does the same for hazardous
+        terrain; the same terrain check runs from the token-placement
+        handlers too, so placing a token directly onto hazardous terrain
+        counts the same as dragging onto it.
+      - **Chests/containers** — `TokenRecord.containerItems` (null for a
+        normal token; a list, possibly empty once opened, for a chest).
+        `components/ChestPlacementPanel.tsx` (next to `TokenUploadButton`
+        in Tokens → Placement) builds a chest's item list via the same
+        compendium search-to-add pattern `CharacterInventory` uses, then
+        arms the shared token-placement flow. `TokenHpConditionEditor.tsx`
+        gained a "Container" section — a read-only item list plus an
+        "Open — move to party loot" button that calls `usePartyLoot`'s
+        `addItem` per item and clears the list to `[]` (the token itself
+        is never auto-deleted, matching this app's leave-it-on-the-map
+        convention).
+      - **Triggers** — a generic "step here, something happens" zone
+        (`TriggerRecord`: name/area/hidden/perceptionDc/oneShot/`actions`,
+        `map/useTriggers.ts` for CRUD), built via
+        `components/TriggerBuilderPanel.tsx` (new second section in the
+        "Terrain & Triggers" tab) with an "add action" row per action type
+        — toggle a door (reuses `useWalls`' `toggleDoor`), reveal a hidden
+        token, spawn a monster from the compendium, or apply an
+        `AreaEffect`. `map/triggerActions.ts`'s `applyTriggerActions`
+        dispatches each action against injected callbacks (kept
+        unit-testable without a live doc), and a `shouldTriggerFire` helper
+        gates `oneShot` triggers to firing exactly once. `MapCanvas.tsx`'s
+        move-end handler fires a trigger's actions the moment some other
+        token's footprint newly overlaps it, marks it fired, and reveals
+        it if hidden — the same "newly overlapping" and hazard-reveal
+        conventions the terrain/hazard checks above already established.
 - [ ] Support for non-5e systems (generalize the rules engine)
 
 ---

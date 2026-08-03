@@ -61,6 +61,8 @@ export function CharacterTokenMenu({
                   monsterInit: null,
                   characterInit: { characterId: character.id, ownerId: character.ownerId },
                   hazardSize: null,
+                  trapEffect: null,
+                  containerInit: null,
                 })
               }
             >

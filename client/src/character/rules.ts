@@ -123,7 +123,10 @@ export interface ResolvedHp {
  * tokens with no sheet). Every HP read/write site should go through this
  * resolver instead of re-deriving the `characterId` branch itself.
  */
-export function resolveTokenHp(token: TokenRecord, charactersById: Map<string, CharacterRecord>): ResolvedHp | null {
+export function resolveTokenHp(
+  token: Pick<TokenRecord, 'characterId' | 'hp'>,
+  charactersById: Map<string, CharacterRecord>,
+): ResolvedHp | null {
   if (token.characterId) {
     const character = charactersById.get(token.characterId)
     if (!character) return null

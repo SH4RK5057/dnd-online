@@ -50,12 +50,21 @@ const Scene3D = lazy(() => import('../canvas3d/Scene3D').then((m) => ({ default:
 import type { MeasureShape } from '../canvas/MeasureLayer'
 import { FullscreenEnterIcon, FullscreenExitIcon } from '../components/icons'
 import { DEFAULT_WALL_THICKNESS_PX } from '../canvas/WallLayer'
-import { footprintCells, snapToSlot } from '../map/sizeCategory'
+import { footprintCells, rectanglesOverlap, snapToSlot, tokenFootprintRect } from '../map/sizeCategory'
 import { monsterSizeToCategory, parseSpeedFeet } from '../content/monsterToToken'
 import type { ItemData, MonsterData } from '../content/types'
 import type { ToolMode } from '../canvas/interactionMode'
 import type { PendingPoiPlacement } from './pendingPoiPlacement'
 import type { PendingTokenPlacement } from './pendingTokenPlacement'
+import type { PendingTerrainPlacement } from './pendingTerrainPlacement'
+import type { PendingTriggerPlacement } from './pendingTriggerPlacement'
+import { useTerrain } from '../map/useTerrain'
+import { useTriggers } from '../map/useTriggers'
+import { TerrainTriggersPanel } from '../components/TerrainTriggersPanel'
+import { useCharacters } from '../character/useCharacters'
+import { useRollLog } from '../dice/useRollLog'
+import { resolveAreaEffect } from '../map/areaEffects'
+import { TERRAIN_LABELS } from '../map/constants'
 
 export function SessionScreen() {
   const { session, sessionMeta, leaveSession } = useSession()
@@ -69,11 +78,13 @@ export function SessionScreen() {
   )
   const compendium = useCompendium(session?.doc ?? null)
   const { undo, redo, canUndo, canRedo } = useUndoManager(session?.role === 'dm' ? (session?.doc ?? null) : null)
-  const { tokens, createToken, setTokenArt, setTokenModel, initTokenFromMonster, linkCharacter, assignOwner } = useTokens(
-    session?.doc ?? null,
-    activeSceneId,
-  )
+  const { tokens, createToken, setTokenArt, setTokenModel, initTokenFromMonster, linkCharacter, assignOwner, setTokenHp } =
+    useTokens(session?.doc ?? null, activeSceneId)
   const { createPoi } = usePois(session?.doc ?? null, activeSceneId)
+  const { terrain, createTerrain } = useTerrain(session?.doc ?? null, activeSceneId)
+  const { createTrigger } = useTriggers(session?.doc ?? null, activeSceneId)
+  const { characters, updateCharacter } = useCharacters(session?.doc ?? null)
+  const { pushRoll } = useRollLog(session?.doc ?? null, session?.role === 'dm')
   const [showCharacterManager, setShowCharacterManager] = useState(false)
   const [showSceneBuilder, setShowSceneBuilder] = useState(false)
   const [showCompendium, setShowCompendium] = useState(false)
@@ -81,6 +92,8 @@ export function SessionScreen() {
   const [showJoinCode, setShowJoinCode] = useState(true)
   const [pendingPoiPlacement, setPendingPoiPlacement] = useState<PendingPoiPlacement | null>(null)
   const [pendingTokenPlacement, setPendingTokenPlacement] = useState<PendingTokenPlacement | null>(null)
+  const [pendingTerrainPlacement, setPendingTerrainPlacement] = useState<PendingTerrainPlacement | null>(null)
+  const [pendingTriggerPlacement, setPendingTriggerPlacement] = useState<PendingTriggerPlacement | null>(null)
   const [previewPlayerId, setPreviewPlayerId] = useState<string | null>(null)
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null)
   const [showCharacterSheetFullscreen, setShowCharacterSheetFullscreen] = useState(false)
@@ -130,6 +143,24 @@ export function SessionScreen() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [session?.role, undo, redo])
+
+  useEffect(() => {
+    if (!pendingTerrainPlacement) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingTerrainPlacement(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [pendingTerrainPlacement])
+
+  useEffect(() => {
+    if (!pendingTriggerPlacement) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingTriggerPlacement(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [pendingTriggerPlacement])
 
   useEffect(() => {
     if (!pendingPoiPlacement) return
@@ -201,6 +232,8 @@ export function SessionScreen() {
       },
       characterInit: null,
       hazardSize: null,
+      trapEffect: null,
+      containerInit: null,
     })
     setShowCompendium(false)
   }
@@ -214,6 +247,8 @@ export function SessionScreen() {
       monsterInit: null,
       characterInit: null,
       hazardSize: null,
+      trapEffect: null,
+      containerInit: null,
     })
     setShowCompendium(false)
   }
@@ -261,9 +296,35 @@ export function SessionScreen() {
     ? 'move'
     : pendingTokenPlacement
       ? 'place-tokens'
-      : pendingPoiPlacement
-        ? 'place-pois'
-        : 'move'
+      : pendingTerrainPlacement
+        ? 'place-terrain'
+        : pendingTriggerPlacement
+          ? 'place-trigger'
+          : pendingPoiPlacement
+            ? 'place-pois'
+            : 'move'
+
+  const handlePlaceTerrain = (x: number, y: number) => {
+    if (!pendingTerrainPlacement || !activeSceneId) return
+    const { terrainType, widthCells, heightCells, effect } = pendingTerrainPlacement
+    setPendingTerrainPlacement(null)
+    try {
+      createTerrain({ sceneId: activeSceneId, x, y, widthCells, heightCells, terrainType, effect })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not paint that terrain.')
+    }
+  }
+
+  const handlePlaceTrigger = (x: number, y: number) => {
+    if (!pendingTriggerPlacement || !activeSceneId) return
+    const { name, widthCells, heightCells, hidden, perceptionDc, oneShot, actions } = pendingTriggerPlacement
+    setPendingTriggerPlacement(null)
+    try {
+      createTrigger({ sceneId: activeSceneId, name, x, y, widthCells, heightCells, hidden, perceptionDc, oneShot, actions })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not place that trigger.')
+    }
+  }
 
   const handlePlacePoi = (x: number, y: number) => {
     if (!pendingPoiPlacement || !activeSceneId) return
@@ -278,7 +339,8 @@ export function SessionScreen() {
 
   const handlePlaceToken = (x: number, y: number) => {
     if (!pendingTokenPlacement || !activeSceneId) return
-    const { name, sizeCategory, file, modelFile, monsterInit, characterInit, hazardSize } = pendingTokenPlacement
+    const { name, sizeCategory, file, modelFile, monsterInit, characterInit, hazardSize, trapEffect, containerInit } =
+      pendingTokenPlacement
     setPendingTokenPlacement(null)
     try {
       const footprint = hazardSize ? Math.max(hazardSize.widthCells, hazardSize.heightCells) : footprintCells(sizeCategory)
@@ -291,11 +353,34 @@ export function SessionScreen() {
         x: snappedX,
         y: snappedY,
         hazardSize,
+        trapEffect,
+        containerItems: containerInit?.items ?? null,
         hidden: !!hazardSize,
       })
       if (file) void setTokenArt(tokenId, file)
       if (modelFile) void setTokenModel(tokenId, modelFile)
       if (monsterInit) initTokenFromMonster(tokenId, monsterInit)
+      // Stepping directly onto hazardous terrain via placement counts the
+      // same as dragging onto it — no "newly overlapping" check needed here
+      // (unlike MapCanvas's drag-based version) since a fresh placement has
+      // no prior position to compare against. Hazard tokens themselves skip
+      // this, matching the drag-based check's hazards-don't-trigger-hazards
+      // (or terrain) rule.
+      if (!hazardSize) {
+        const placedRect = tokenFootprintRect(snappedX, snappedY, footprint, footprint)
+        const charactersById = new Map(characters.map((c) => [c.id, c]))
+        for (const patch of terrain) {
+          if (!patch.effect) continue
+          const terrainRect = tokenFootprintRect(patch.x, patch.y, patch.widthCells, patch.heightCells)
+          if (!rectanglesOverlap(placedRect, terrainRect)) continue
+          resolveAreaEffect(
+            patch.effect,
+            [{ id: tokenId, name, characterId: characterInit?.characterId ?? null, hp: monsterInit?.hp ?? null }],
+            charactersById,
+            { pushRoll, updateCharacter, setTokenHp, sourceName: TERRAIN_LABELS[patch.terrainType] },
+          )
+        }
+      }
       if (characterInit) {
         linkCharacter(tokenId, characterInit.characterId)
         assignOwner(tokenId, characterInit.ownerId)
@@ -434,6 +519,21 @@ export function SessionScreen() {
                       id: 'dm-toolbox',
                       title: 'DM Toolbox',
                       content: <DmToolboxPanel doc={session.doc} sessionName={sessionMeta?.sessionName ?? 'campaign'} />,
+                    },
+                    {
+                      id: 'terrain-triggers',
+                      title: 'Terrain & Triggers',
+                      content: (
+                        <TerrainTriggersPanel
+                          sceneId={activeSceneId}
+                          pendingTerrainPlacement={pendingTerrainPlacement}
+                          onRequestTerrainPlacement={setPendingTerrainPlacement}
+                          onCancelTerrainPlacement={() => setPendingTerrainPlacement(null)}
+                          pendingTriggerPlacement={pendingTriggerPlacement}
+                          onRequestTriggerPlacement={setPendingTriggerPlacement}
+                          onCancelTriggerPlacement={() => setPendingTriggerPlacement(null)}
+                        />
+                      ),
                     },
                   ]
 
@@ -601,6 +701,8 @@ export function SessionScreen() {
                   wallThickness={DEFAULT_WALL_THICKNESS_PX}
                   onPlaceToken={handlePlaceToken}
                   onPlacePoi={handlePlacePoi}
+                  onPlaceTerrain={handlePlaceTerrain}
+                  onPlaceTrigger={handlePlaceTrigger}
                   previewPlayerId={session.role === 'dm' ? previewPlayerId : null}
                   selectedTokenId={selectedTokenId}
                   onSelectToken={(tokenId) => setSelectedTokenId((prev) => (prev === tokenId ? null : tokenId))}

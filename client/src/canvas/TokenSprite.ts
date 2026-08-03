@@ -42,6 +42,14 @@ export class TokenSprite {
   private readonly hpBar = new Graphics()
   private readonly conditionDots = new Graphics()
   private readonly label = new Text({ text: '', style: { fontSize: 12, fill: 0xffffff, fontFamily: 'sans-serif' } })
+  /** Live "here's where it'll land" outline shown only while dragging —
+   * redrawn every pointermove tick from the same snapToSlot math
+   * handlePointerUp uses for the real drop, so a big multi-cell footprint
+   * always has a clear preview of its snapped position instead of only
+   * finding out on release. Positioned relative to `container` (see
+   * handlePointerMove) rather than as a sibling, so no extra parent-timing
+   * handling is needed beyond what the rest of this class already does. */
+  private readonly snapPreview = new Graphics()
 
   private readonly callbacks: TokenSpriteCallbacks
   private readonly draggable: boolean
@@ -58,7 +66,7 @@ export class TokenSprite {
     this.draggable = interactive.draggable
     this.art.visible = false
     this.label.anchor.set(0.5, 0)
-    this.container.addChild(this.selectionRing, this.placeholder, this.art, this.hpBar, this.conditionDots, this.label)
+    this.container.addChild(this.selectionRing, this.placeholder, this.art, this.hpBar, this.conditionDots, this.label, this.snapPreview)
 
     if (interactive.draggable || interactive.selectable) {
       this.container.eventMode = 'static'
@@ -190,6 +198,22 @@ export class TokenSprite {
     const y = local.y - this.dragPointerOffset.y
     this.container.position.set(x, y)
 
+    // Same snapToSlot math handlePointerUp uses for the real drop — drawn
+    // in coordinates local to `container` (which is `x, y` above), so the
+    // preview rect's local offset is just the snapped world position minus
+    // the container's own current (unsnapped) world position.
+    const snapGridX = snapToSlot(x / this.gridSizePx, this.footprintWCells)
+    const snapGridY = snapToSlot(y / this.gridSizePx, this.footprintHCells)
+    this.snapPreview
+      .clear()
+      .rect(
+        snapGridX * this.gridSizePx - x,
+        snapGridY * this.gridSizePx - y,
+        this.footprintWCells * this.gridSizePx,
+        this.footprintHCells * this.gridSizePx,
+      )
+      .stroke({ width: 2, color: 0xffee66, alpha: 0.8 })
+
     const now = performance.now()
     if (now - this.lastWriteAt >= DRAG_WRITE_INTERVAL_MS) {
       this.lastWriteAt = now
@@ -206,6 +230,7 @@ export class TokenSprite {
     if (this.dragging) {
       this.dragging = false
       this.container.cursor = 'grab'
+      this.snapPreview.clear()
       const x = local.x - this.dragPointerOffset.x
       const y = local.y - this.dragPointerOffset.y
       // Snap to whichever slot the token's current position falls within on
